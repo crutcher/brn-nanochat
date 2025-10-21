@@ -1,5 +1,7 @@
 //! # Nanochat Lib
 
+pub mod gpt;
+
 pub fn xyzzy() -> usize {
     42
 }
