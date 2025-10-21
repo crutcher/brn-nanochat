@@ -92,7 +92,7 @@ impl<B: Backend> MLP<B> {
 
         let x = self.c_fc.forward(x);
         let x = self.act.forward(x);
-        let x = x.clone() * x;
+        let x = x.square();
         let x = self.c_proj.forward(x);
 
         assert_shape_contract_periodically!(
