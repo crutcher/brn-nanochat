@@ -1,0 +1,30 @@
+[workspace]
+# Require version 2 to avoid "feature" additiveness for dev-dependencies
+# https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2
+resolver = "2"
+
+members = [
+    "crates/*",
+]
+
+[workspace.package]
+version = "0.0.1"
+repository = "https://github.com/crutcher/brn-nanochat"
+rust-version = "1.90.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.lints.rust]
+warnings = "deny"
+
+[workspace.lints.clippy]
+double_must_use = "allow"
+doc_markdown = "warn"
+
+
+[workspace.dependencies]
+burn = "^0.18.0"
+bimm-contracts = "^0.4.3"
+
+clap = "^4.5.47"
+
