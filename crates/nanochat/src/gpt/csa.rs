@@ -1,14 +1,14 @@
 //! # Causal Self-Attention
 
-use crate::burn_ext::tensor;
+use crate::burn_ext::attention;
+use crate::burn_ext::attention::ScaledDotProductAttentionConfig;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::{Linear, LinearConfig};
-use burn::prelude::{Backend, Int, s};
+use burn::prelude::{Backend, s};
 use burn::tensor::DType::F32;
-use burn::tensor::activation::softmax;
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {
@@ -182,7 +182,14 @@ impl<B: Backend> CausalSelfAttention<B> {
             .reshape([b, t, self.n_kv_head(), self.head_dim()]);
         let v = v.swap_dims(1, 2);
 
-        let y = scaled_dot_product_attention(q, k, v, true, self.gqa_enabled());
+        let y = attention::scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            None,
+            None,
+            ScaledDotProductAttentionConfig::new().with_enable_gqa(true),
+        );
 
         let y = y.swap_dims(1, 2);
         let y = y.reshape([b as i32, t as i32, -1]);
@@ -197,47 +204,6 @@ impl<B: Backend> CausalSelfAttention<B> {
 
         y
     }
-}
-
-#[allow(unused)]
-pub fn scaled_dot_product_attention<B: Backend>(
-    q: Tensor<B, 4>,
-    k: Tensor<B, 4>,
-    v: Tensor<B, 4>,
-    is_causal: bool,
-    enable_gqa: bool,
-) -> Tensor<B, 4> {
-    let device = q.device();
-    let dtype = q.dtype();
-    let eps: f32 = 1e-7;
-
-    let l = q.dims()[2];
-    let s = k.dims()[2];
-
-    let scale_factor = 1.0 / (q.dims()[3] as f32).sqrt();
-
-    let mut attn_bias = Tensor::<B, 2>::zeros([l, s], &device).cast(dtype);
-    if is_causal {
-        let temp_mask = Tensor::<B, 2, Int>::ones([l, s], &device).tril(0);
-        attn_bias = attn_bias.mask_fill(temp_mask.bool().bool_not(), f32::NEG_INFINITY);
-    }
-
-    let mut k = k;
-    let mut v = v;
-
-    if enable_gqa {
-        let k_repeats = q.dims()[1] / k.dims()[1];
-        k = tensor::repeat_interleave::<B, 4, 5, _>(k, k_repeats, 1);
-
-        let v_repeats = q.dims()[1] / v.dims()[1];
-        v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
-    }
-
-    let attn_weight = q.matmul(k).swap_dims(2, 3) * scale_factor;
-    let attn_weight = attn_weight + attn_bias.unsqueeze();
-    let attn_weight = softmax(attn_weight, 3);
-
-    attn_weight.matmul(v)
 }
 
 #[cfg(test)]
