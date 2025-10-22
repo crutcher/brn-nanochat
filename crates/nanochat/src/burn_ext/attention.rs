@@ -54,7 +54,7 @@ pub fn scaled_dot_product_attention<B: Backend>(
 
     let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f32).sqrt());
 
-    let attn_bias = scaled_dot_product_attention_bias(l, s, bias, mask, config, dtype, &device);
+    let attn_bias = sdpa_bias(l, s, bias, mask, config, dtype, &device);
 
     let mut k = k;
     let mut v = v;
@@ -86,7 +86,7 @@ pub fn scaled_dot_product_attention<B: Backend>(
 ///
 /// # Returns
 /// - a ``[l, s]`` attention bias tensor.
-pub fn scaled_dot_product_attention_bias<B: Backend>(
+pub fn sdpa_bias<B: Backend>(
     l: usize,
     s: usize,
     bias: Option<Tensor<B, 2>>,
@@ -112,4 +112,159 @@ pub fn scaled_dot_product_attention_bias<B: Backend>(
         attn_bias = attn_bias.mask_fill(mask.bool_not(), f32::NEG_INFINITY);
     }
     attn_bias
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use burn::backend::Wgpu;
+
+    #[test]
+    fn test_scaled_dot_product_attention_bias() {
+        type B = Wgpu;
+        let device = Default::default();
+        let dtype = DType::F32;
+
+        let l = 3;
+        let s = 5;
+
+        let ni = f32::NEG_INFINITY;
+
+        sdpa_bias::<B>(
+            l,
+            s,
+            None,
+            None,
+            ScaledDotProductAttentionConfig::new(),
+            dtype,
+            &device,
+        )
+        .to_data()
+        .assert_eq(
+            &Tensor::<B, 2>::from_data(
+                [
+                    [0., 0., 0., 0., 0.],
+                    [0., 0., 0., 0., 0.],
+                    [0., 0., 0., 0., 0.],
+                ],
+                &device,
+            )
+            .to_data(),
+            false,
+        );
+
+        // Causal Only
+        sdpa_bias::<B>(
+            l,
+            s,
+            None,
+            None,
+            ScaledDotProductAttentionConfig::new().with_is_causal(true),
+            dtype,
+            &device,
+        )
+        .to_data()
+        .assert_eq(
+            &Tensor::<B, 2>::from_data(
+                [
+                    [0., ni, ni, ni, ni],
+                    [0., 0., ni, ni, ni],
+                    [0., 0., 0., ni, ni],
+                ],
+                &device,
+            )
+            .to_data(),
+            false,
+        );
+
+        let bias = Tensor::<B, 2>::from_data(
+            [
+                [1., 2., 3., 4., 5.],
+                [6., 7., 8., 9., 10.],
+                [11., 12., 13., 14., 15.],
+            ],
+            &device,
+        );
+
+        // +bias
+        sdpa_bias::<B>(
+            l,
+            s,
+            Some(bias.clone()),
+            None,
+            ScaledDotProductAttentionConfig::new(),
+            dtype,
+            &device,
+        )
+        .to_data()
+        .assert_eq(
+            &Tensor::<B, 2>::from_data(
+                [
+                    [1., 2., 3., 4., 5.],
+                    [6., 7., 8., 9., 10.],
+                    [11., 12., 13., 14., 15.],
+                ],
+                &device,
+            )
+            .to_data(),
+            false,
+        );
+
+        let mask = Tensor::<B, 2, Bool>::from_data(
+            [
+                [true, true, true, true, false],
+                [true, true, true, true, true],
+                [false, true, true, true, true],
+            ],
+            &device,
+        );
+
+        // +mask, +bias
+        sdpa_bias::<B>(
+            l,
+            s,
+            Some(bias.clone()),
+            Some(mask.clone()),
+            ScaledDotProductAttentionConfig::new(),
+            dtype,
+            &device,
+        )
+        .to_data()
+        .assert_eq(
+            &Tensor::<B, 2>::from_data(
+                [
+                    [1., 2., 3., 4., ni],
+                    [6., 7., 8., 9., 10.],
+                    [ni, 12., 13., 14., 15.],
+                ],
+                &device,
+            )
+            .to_data(),
+            false,
+        );
+
+        // +mask, +bias, +causal
+        sdpa_bias::<B>(
+            l,
+            s,
+            Some(bias.clone()),
+            Some(mask.clone()),
+            ScaledDotProductAttentionConfig::new().with_is_causal(true),
+            dtype,
+            &device,
+        )
+        .to_data()
+        .assert_eq(
+            &Tensor::<B, 2>::from_data(
+                [
+                    [1., ni, ni, ni, ni],
+                    [6., 7., ni, ni, ni],
+                    [ni, 12., 13., ni, ni],
+                ],
+                &device,
+            )
+            .to_data(),
+            false,
+        );
+    }
 }
