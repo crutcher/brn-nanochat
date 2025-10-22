@@ -55,10 +55,6 @@ pub fn scaled_dot_product_attention<B: Backend>(
     let l = q.dims()[2];
     let s = k.dims()[2];
 
-    let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f32).sqrt());
-
-    let attn_bias = sdpa_bias(l, s, config.is_causal, bias, mask, dtype, &device);
-
     let mut k = k;
     let mut v = v;
 
@@ -70,8 +66,12 @@ pub fn scaled_dot_product_attention<B: Backend>(
         v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
     }
 
+    let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f32).sqrt());
     let attn_weight = q.matmul(k).swap_dims(2, 3) * scale_factor;
+
+    let attn_bias = sdpa_bias(l, s, config.is_causal, bias, mask, dtype, &device);
     let attn_weight = attn_weight + attn_bias.unsqueeze();
+
     let attn_weight = softmax(attn_weight, 3);
 
     attn_weight.matmul(v)
