@@ -1,15 +1,14 @@
 //! # Causal Self-Attention
 
+use crate::burn_ext::tensor;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::{Linear, LinearConfig};
 use burn::prelude::{Backend, Int, s};
-use burn::tensor::AsIndex;
 use burn::tensor::DType::F32;
 use burn::tensor::activation::softmax;
-use burn::tensor::indexing::canonicalize_dim;
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {
@@ -228,10 +227,10 @@ pub fn scaled_dot_product_attention<B: Backend>(
 
     if enable_gqa {
         let k_repeats = q.dims()[1] / k.dims()[1];
-        k = repeat_interleave(k, k_repeats, 1);
+        k = tensor::repeat_interleave::<B, 4, 5, _>(k, k_repeats, 1);
 
         let v_repeats = q.dims()[1] / v.dims()[1];
-        v = repeat_interleave(v, v_repeats, 1);
+        v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
     }
 
     let attn_weight = q.matmul(k).swap_dims(2, 3) * scale_factor;
@@ -239,17 +238,6 @@ pub fn scaled_dot_product_attention<B: Backend>(
     let attn_weight = softmax(attn_weight, 3);
 
     attn_weight.matmul(v)
-}
-
-#[allow(unused)]
-pub fn repeat_interleave<B: Backend, const R: usize, D: AsIndex>(
-    x: Tensor<B, R>,
-    repeats: usize,
-    dim: D,
-) -> Tensor<B, R> {
-    let dim = canonicalize_dim(dim, R, false);
-
-    todo!()
 }
 
 #[cfg(test)]
