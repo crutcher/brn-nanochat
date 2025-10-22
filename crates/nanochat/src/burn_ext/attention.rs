@@ -1,5 +1,6 @@
 //! # Attention Extensions
 
+use crate::burn_ext::drop::dropout;
 use crate::burn_ext::tensor;
 use burn::Tensor;
 use burn::config::Config;
@@ -17,13 +18,17 @@ pub struct ScaledDotProductAttentionConfig {
     #[config(default = "false")]
     pub enable_gqa: bool,
 
-    /// Scale factor; always enabled if set to `Some(_)`.
+    /// Manual Scale factor.
     #[config(default = "None")]
-    pub scale: Option<f32>,
+    pub scale: Option<f64>,
 
-    /// Dropout rate; always enabled if set to `Some(_)`.
+    /// Dropout rate.
     #[config(default = "None")]
-    pub dropout: Option<f32>,
+    pub dropout: Option<f64>,
+
+    /// Enable dropout during inference.
+    #[config(default = "true")]
+    pub enable_dropout_during_inference: bool,
 }
 
 /// Computes scaled dot product attention.
@@ -49,6 +54,34 @@ pub fn scaled_dot_product_attention<B: Backend>(
     mask: Option<Tensor<B, 2, Bool>>,
     config: ScaledDotProductAttentionConfig,
 ) -> Tensor<B, 4> {
+    let q_dims = q.dims();
+
+    let attn_weight = sdpa_attn_weight(q, k, bias, mask, config);
+
+    let mut v = v;
+    if config.enable_gqa {
+        let v_repeats = q_dims[1] / v.dims()[1];
+        v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
+    }
+
+    attn_weight.matmul(v)
+}
+
+/// Build the Attention Weight for [`scaled_dot_product_attention`].
+///
+/// # Arguments
+/// - `q`: the query tensor.
+/// - `k`: the key tensor.
+/// - `bias`: optional additive bias.
+/// - `mask`: optional bias mask.
+/// - `config`: attention config.
+pub fn sdpa_attn_weight<B: Backend>(
+    q: Tensor<B, 4>,
+    k: Tensor<B, 4>,
+    bias: Option<Tensor<B, 2>>,
+    mask: Option<Tensor<B, 2, Bool>>,
+    config: ScaledDotProductAttentionConfig,
+) -> Tensor<B, 4> {
     let device = q.device();
     let dtype = q.dtype();
 
@@ -56,25 +89,25 @@ pub fn scaled_dot_product_attention<B: Backend>(
     let s = k.dims()[2];
 
     let mut k = k;
-    let mut v = v;
 
     if config.enable_gqa {
         let k_repeats = q.dims()[1] / k.dims()[1];
         k = tensor::repeat_interleave::<B, 4, 5, _>(k, k_repeats, 1);
-
-        let v_repeats = q.dims()[1] / v.dims()[1];
-        v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
     }
 
-    let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f32).sqrt());
+    let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f64).sqrt());
     let attn_weight = q.matmul(k).swap_dims(2, 3) * scale_factor;
 
     let attn_bias = sdpa_bias(l, s, config.is_causal, bias, mask, dtype, &device);
-    let attn_weight = attn_weight + attn_bias.unsqueeze();
+    let mut attn_weight = attn_weight + attn_bias.unsqueeze();
 
-    let attn_weight = softmax(attn_weight, 3);
+    if let Some(prob) = config.dropout
+        && (config.enable_dropout_during_inference || B::ad_enabled())
+    {
+        attn_weight = dropout(prob, attn_weight);
+    }
 
-    attn_weight.matmul(v)
+    softmax(attn_weight, 3)
 }
 
 /// Build the Attention Bias for [`scaled_dot_product_attention`].
