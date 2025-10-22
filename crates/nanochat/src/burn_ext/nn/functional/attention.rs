@@ -1,6 +1,6 @@
 //! # Attention Extensions
 
-use crate::burn_ext::drop::dropout;
+use crate::burn_ext::nn::functional::drop::dropout;
 use crate::burn_ext::tensor;
 use burn::Tensor;
 use burn::config::Config;

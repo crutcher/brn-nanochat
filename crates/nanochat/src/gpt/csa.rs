@@ -1,7 +1,7 @@
 //! # Causal Self-Attention
 
-use crate::burn_ext::attention;
-use crate::burn_ext::attention::ScaledDotProductAttentionConfig;
+use crate::burn_ext::nn::functional::attention;
+use crate::burn_ext::nn::functional::attention::ScaledDotProductAttentionConfig;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
