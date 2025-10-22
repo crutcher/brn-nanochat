@@ -2,13 +2,14 @@
 
 use crate::burn_ext::nn::functional::attention;
 use crate::burn_ext::nn::functional::attention::ScaledDotProductAttentionConfig;
+use crate::burn_ext::nn::functional::embedding::rotary;
+use crate::burn_ext::norm;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::{Linear, LinearConfig};
-use burn::prelude::{Backend, s};
-use burn::tensor::DType::F32;
+use burn::prelude::Backend;
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {
@@ -119,32 +120,6 @@ impl<B: Backend> CausalSelfAttentionMeta for CausalSelfAttention<B> {
     }
 }
 
-fn apply_rotary_embedding<B: Backend>(
-    x: Tensor<B, 4>,
-    cos_sin: (f32, f32),
-) -> Tensor<B, 4> {
-    let dtype = x.dtype();
-    let (cos, sin) = cos_sin;
-
-    let d = x.dims()[3];
-    let x1 = x.clone().slice_dim(3, s![..d]);
-    let x2 = x.clone().slice_dim(3, s![d..]);
-
-    let y1 = x1.clone() * cos + x2.clone() * sin;
-    let y2 = x1 * (-sin) + x2 * cos;
-
-    Tensor::cat(vec![y1, y2], 3).cast(dtype)
-}
-
-fn rms_norm<B: Backend>(x: Tensor<B, 4>) -> Tensor<B, 4> {
-    let eps: f32 = 1e-7;
-    let dtype = x.dtype();
-
-    let rms = (x.clone().cast(F32).square().mean_dim(-1) + eps).sqrt();
-
-    x / rms.cast(dtype)
-}
-
 impl<B: Backend> CausalSelfAttention<B> {
     /// Forward Pass.
     #[allow(unused)]
@@ -164,16 +139,16 @@ impl<B: Backend> CausalSelfAttention<B> {
             .c_q
             .forward(x.clone())
             .reshape([b, t, self.n_head(), self.head_dim()]);
-        let q = apply_rotary_embedding(q, cos_sin);
-        let q = rms_norm(q);
+        let q = rotary::apply_rotary_embedding(q, cos_sin);
+        let q = norm::rms_norm(q);
         let q = q.swap_dims(1, 2);
 
         let k = self
             .c_k
             .forward(x.clone())
             .reshape([b, t, self.n_kv_head(), self.head_dim()]);
-        let k = apply_rotary_embedding(k, cos_sin);
-        let k = rms_norm(k);
+        let k = rotary::apply_rotary_embedding(k, cos_sin);
+        let k = norm::rms_norm(k);
         let k = k.swap_dims(1, 2);
 
         let v = self
