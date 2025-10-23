@@ -129,10 +129,10 @@ impl<B: Backend> CausalSelfAttention<B> {
         cos_sin: (f32, f32),
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(
-            ["batch", "time", "embed"],
+            ["B", "T", "D"],
             &x.dims(),
-            &["batch", "time"],
-            &[("embed", self.n_embed())]
+            &["B", "T"],
+            &[("D", self.n_embed())]
         );
 
         let q = self
@@ -157,13 +157,25 @@ impl<B: Backend> CausalSelfAttention<B> {
             .reshape([b, t, self.n_kv_head(), self.head_dim()]);
         let v = v.swap_dims(1, 2);
 
+        // B, H_?, T, D
+
+        // Number of queries in this forward pass.
+        let _t_q = q.dims()[2];
+        // Number of keys/values in total (in the cache + current forward pass)
+        let _t_kv = k.dims()[2];
+
+        // TODO: enable kv cache.
+        let is_causal = true;
+
         let y = attention::scaled_dot_product_attention(
             q,
             k,
             v,
             None,
             None,
-            ScaledDotProductAttentionConfig::new().with_enable_gqa(true),
+            ScaledDotProductAttentionConfig::new()
+                .with_is_causal(is_causal)
+                .with_enable_gqa(self.gqa_enabled()),
         );
 
         let y = y.swap_dims(1, 2);
@@ -172,9 +184,9 @@ impl<B: Backend> CausalSelfAttention<B> {
         let y = self.c_proj.forward(y);
 
         assert_shape_contract_periodically!(
-            ["batch", "time", "embed"],
+            ["B", "T", "D"],
             &y.dims(),
-            &[("batch", b), ("time", t), ("embed", self.n_embed())]
+            &[("B", b), ("T", t), ("D", self.n_embed())]
         );
 
         y

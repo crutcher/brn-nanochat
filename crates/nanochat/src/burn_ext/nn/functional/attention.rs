@@ -2,6 +2,7 @@
 
 use crate::burn_ext::nn::functional::drop::dropout;
 use crate::burn_ext::tensor;
+use bimm_contracts::unpack_shape_contract;
 use burn::Tensor;
 use burn::config::Config;
 use burn::prelude::{Backend, Bool, Int};
@@ -37,11 +38,11 @@ pub struct ScaledDotProductAttentionConfig {
 /// - [pytorch scaled_dot_product_attention](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html)
 ///
 /// # Arguments
-/// - `q`: the query tensor.
-/// - `k`: the key tensor.
-/// - `v`: the value tensor.
-/// - `bias`: optional additive bias.
-/// - `mask`: optional bias mask.
+/// - `q`: the query tensor, as ``[B, H_q, T_q, D]``.
+/// - `k`: the key tensor, as ``[B, H_k, T_kv, D]``.
+/// - `v`: the value tensor, as ``[B, H_v, T_kv, D]``.
+/// - `bias`: optional additive bias, as ``[??, ??]``.
+/// - `mask`: optional bias mask, as ``[??, ??]``.
 /// - `config`: attention config.
 ///
 /// # Returns
@@ -54,13 +55,25 @@ pub fn scaled_dot_product_attention<B: Backend>(
     mask: Option<Tensor<B, 2, Bool>>,
     config: ScaledDotProductAttentionConfig,
 ) -> Tensor<B, 4> {
-    let q_dims = q.dims();
+    let [b, h_q, _t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q.dims());
+    let [_h_k, t_kv] = unpack_shape_contract!(
+        ["B", "H_k", "T_kv", "D"],
+        &q.dims(),
+        &["H_k", "T_kv"],
+        &[("B", b), ("D", d)]
+    );
+    let [h_v] = unpack_shape_contract!(
+        ["B", "H_v", "T_kv", "D"],
+        &q.dims(),
+        &["H_v"],
+        &[("B", b), ("T_kv", t_kv), ("D", d)]
+    );
 
     let attn_weight = sdpa_attn_weight(q, k, bias, mask, config);
 
     let mut v = v;
     if config.enable_gqa {
-        let v_repeats = q_dims[1] / v.dims()[1];
+        let v_repeats = h_q / h_v;
         v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
     }
 
@@ -70,10 +83,10 @@ pub fn scaled_dot_product_attention<B: Backend>(
 /// Build the Attention Weight for [`scaled_dot_product_attention`].
 ///
 /// # Arguments
-/// - `q`: the query tensor.
-/// - `k`: the key tensor.
-/// - `bias`: optional additive bias.
-/// - `mask`: optional bias mask.
+/// - `q`: the query tensor, as ``[B, H_q, T_q, D]``.
+/// - `k`: the key tensor, as ``[B, H_k, T_k, D]``.
+/// - `bias`: optional additive bias, as ``[T_q, T_k]``.
+/// - `mask`: optional bias mask, as ``[T_q, T_k]``.
 /// - `config`: attention config.
 pub fn sdpa_attn_weight<B: Backend>(
     q: Tensor<B, 4>,
@@ -85,8 +98,8 @@ pub fn sdpa_attn_weight<B: Backend>(
     let device = q.device();
     let dtype = q.dtype();
 
-    let l = q.dims()[2];
-    let s = k.dims()[2];
+    let t_q = q.dims()[2];
+    let t_k = k.dims()[2];
 
     let mut k = k;
 
@@ -98,7 +111,7 @@ pub fn sdpa_attn_weight<B: Backend>(
     let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f64).sqrt());
     let attn_weight = q.matmul(k).swap_dims(2, 3) * scale_factor;
 
-    let attn_bias = sdpa_bias(l, s, config.is_causal, bias, mask, dtype, &device);
+    let attn_bias = sdpa_bias(t_q, t_k, config.is_causal, bias, mask, dtype, &device);
     let mut attn_weight = attn_weight + attn_bias.unsqueeze();
 
     if let Some(prob) = config.dropout
