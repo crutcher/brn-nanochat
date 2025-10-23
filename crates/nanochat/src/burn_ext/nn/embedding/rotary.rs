@@ -80,6 +80,8 @@ impl RotaryEmbeddingConfig {
             .unsqueeze_dim::<3>(1)
             .unsqueeze_dim(0);
 
+        // [1, T, 1, D/2]
+
         RotaryEmbedding { head_dim, cos, sin }
     }
 }
