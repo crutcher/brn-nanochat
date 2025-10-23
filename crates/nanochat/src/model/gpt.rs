@@ -19,6 +19,7 @@ pub trait GPTMeta {
     fn n_embed(&self) -> usize;
 }
 
+/// High-level GPT Config.
 #[derive(Config, Debug)]
 pub struct GPTConfig {
     /// Sequence Length.
@@ -65,6 +66,12 @@ impl GPTMeta for GPTConfig {
 }
 
 impl GPTConfig {
+    /// Initialize a [`GPT`].
+    pub fn init<B: Backend>(self, device: &B::Device) -> GPT<B> {
+        self.into_structure().init(device)
+    }
+
+    /// Convert this config into a [`GPTStructureConfig`].
     pub fn into_structure(self) -> GPTStructureConfig {
         let wte = EmbeddingConfig::new(self.vocab_size, self.n_embed);
 
@@ -99,12 +106,29 @@ impl GPTConfig {
     }
 }
 
+/// Low-level GPT Structure Config.
+///
+/// This config has a lot of duplicate information.
 #[derive(Config, Debug)]
 pub struct GPTStructureConfig {
     wte: EmbeddingConfig,
     h: Vec<GPTBlockConfig>,
     lm_head: LinearConfig,
     rotary_embedding: RotaryEmbeddingConfig,
+}
+
+impl GPTStructureConfig {
+    /// Initialize a [`GPT`].
+    pub fn init<B: Backend>(self, device: &B::Device) -> GPT<B> {
+        let wte = self.wte.init(device);
+        let h = self.h.into_iter().enumerate()
+            .map(|(layer_idx, c)| c.init(layer_idx, device))
+            .collect();
+        let lm_head = self.lm_head.init(device);
+        let rotary_embedding = self.rotary_embedding.init(device);
+
+        GPT { wte, h, lm_head, rotary_embedding }
+    }
 }
 
 /// GPT Module
