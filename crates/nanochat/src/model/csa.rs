@@ -2,7 +2,6 @@
 
 use crate::burn_ext::nn::functional::attention;
 use crate::burn_ext::nn::functional::attention::ScaledDotProductAttentionConfig;
-use crate::burn_ext::nn::functional::embedding::rotary;
 use crate::burn_ext::norm;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
@@ -10,6 +9,7 @@ use burn::config::Config;
 use burn::module::Module;
 use burn::nn::{Linear, LinearConfig};
 use burn::prelude::Backend;
+use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {
@@ -77,10 +77,12 @@ impl CausalSelfAttentionConfig {
     /// Initialize the module.
     pub fn init<B: Backend>(
         self,
+        layer_index: usize,
         device: &B::Device,
     ) -> CausalSelfAttention<B> {
         let head_dim = self.head_dim();
         CausalSelfAttention {
+            layer_index,
             c_q: LinearConfig::new(self.n_embed, self.n_head * head_dim)
                 .with_bias(false)
                 .init(device),
@@ -100,6 +102,7 @@ impl CausalSelfAttentionConfig {
 /// Causal Self-Attention Module
 #[derive(Module, Debug)]
 pub struct CausalSelfAttention<B: Backend> {
+    pub layer_index: usize,
     pub c_q: Linear<B>,
     pub c_k: Linear<B>,
     pub c_v: Linear<B>,
@@ -126,7 +129,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     pub fn forward(
         &self,
         x: Tensor<B, 3>,
-        cos_sin: (f32, f32),
+        rotary_embedding: &RotaryEmbedding<B>,
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(
             ["B", "T", "D"],
@@ -139,7 +142,7 @@ impl<B: Backend> CausalSelfAttention<B> {
             .c_q
             .forward(x.clone())
             .reshape([b, t, self.n_head(), self.head_dim()]);
-        let q = rotary::apply_rotary_embedding(q, cos_sin);
+        let q = rotary_embedding.apply(q);
         let q = norm::rms_norm(q);
         let q = q.swap_dims(1, 2);
 
@@ -147,7 +150,7 @@ impl<B: Backend> CausalSelfAttention<B> {
             .c_k
             .forward(x.clone())
             .reshape([b, t, self.n_kv_head(), self.head_dim()]);
-        let k = rotary::apply_rotary_embedding(k, cos_sin);
+        let k = rotary_embedding.apply(k);
         let k = norm::rms_norm(k);
         let k = k.swap_dims(1, 2);
 

@@ -41,8 +41,8 @@ pub struct ScaledDotProductAttentionConfig {
 /// - `q`: the query tensor, as ``[B, H_q, T_q, D]``.
 /// - `k`: the key tensor, as ``[B, H_k, T_kv, D]``.
 /// - `v`: the value tensor, as ``[B, H_v, T_kv, D]``.
-/// - `bias`: optional additive bias, as ``[??, ??]``.
-/// - `mask`: optional bias mask, as ``[??, ??]``.
+/// - `bias`: optional additive bias, as ``[T_q, T_kv]``.
+/// - `mask`: optional bias mask, as ``[T_q, T_kv]``.
 /// - `config`: attention config.
 ///
 /// # Returns
@@ -95,16 +95,21 @@ pub fn sdpa_attn_weight<B: Backend>(
     mask: Option<Tensor<B, 2, Bool>>,
     config: ScaledDotProductAttentionConfig,
 ) -> Tensor<B, 4> {
+    let [b, h_q, t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q.dims());
+    let [h_k, t_k] = unpack_shape_contract!(
+        ["B", "H_k", "T_k", "D"],
+        &q.dims(),
+        &["H_k", "T_k"],
+        &[("B", b), ("D", d)]
+    );
+
     let device = q.device();
     let dtype = q.dtype();
-
-    let t_q = q.dims()[2];
-    let t_k = k.dims()[2];
 
     let mut k = k;
 
     if config.enable_gqa {
-        let k_repeats = q.dims()[1] / k.dims()[1];
+        let k_repeats = h_q / h_k;
         k = tensor::repeat_interleave::<B, 4, 5, _>(k, k_repeats, 1);
     }
 

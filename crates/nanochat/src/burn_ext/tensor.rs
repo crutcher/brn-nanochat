@@ -2,7 +2,7 @@
 
 use burn::Tensor;
 use burn::prelude::Backend;
-use burn::tensor::AsIndex;
+use burn::tensor::{AsIndex, BasicOps, Numeric};
 use burn::tensor::indexing::canonicalize_dim;
 
 /// Repeat Interleave.
@@ -58,10 +58,49 @@ pub fn repeat_interleave<B: Backend, const R: usize, const R2: usize, D: AsIndex
     x.flatten(dim, dim + 1)
 }
 
+/// Outer Product of two tensors.
+///
+/// # Arguments
+/// - `a`: a ``[M]`` tensor.
+/// - `b`: a ``[N]`` tensor.
+///
+/// # Returns
+/// - a ``[M, N]`` tensor.
+pub fn outer<B: Backend, K: BasicOps<B> + Numeric<B>>(
+    a: Tensor<B, 1, K>,
+    b: Tensor<B, 1, K>,
+) -> Tensor<B, 2, K> {
+    a.unsqueeze_dim::<2>(1) * b.unsqueeze_dim::<2>(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use burn::backend::Wgpu;
+
+    #[test]
+    fn test_outer() {
+        type B = Wgpu;
+        let device = Default::default();
+
+        let a: Tensor<B, 1> = Tensor::arange(1..5, &device).float();
+        let b: Tensor<B, 1> = Tensor::arange(1..4, &device).float();
+
+        let res = outer(a, b);
+
+        res.to_data().assert_eq(
+            &Tensor::<B, 2>::from_data(
+                [
+                    [1., 2., 3.],
+                    [2., 4., 6.],
+                    [3., 6., 9.],
+                    [4., 8., 12.],
+                ],
+                &device,
+            ).to_data(),
+            true,
+        )
+    }
 
     #[test]
     fn test_repeat_interleave() {

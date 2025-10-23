@@ -1,7 +1,7 @@
 //! # Nanochat Lib
 
 pub mod burn_ext;
-pub mod gpt;
+pub mod model;
 
 pub fn xyzzy() -> usize {
     42
