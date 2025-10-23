@@ -25,6 +25,8 @@ pub struct RotaryEmbeddingConfig {
     pub seq_len: usize,
 
     /// Head Dimension.
+    ///
+    /// This must be even.
     pub head_dim: usize,
 
     /// Base.
