@@ -189,6 +189,30 @@ mod tests {
     use burn::backend::Cuda;
 
     #[test]
+    fn test_clip_range() {
+        type B = Cuda;
+        let device = Default::default();
+
+        let config = RotaryEmbeddingConfig::new(1024, 64);
+        let re: RotaryEmbedding<B> = config.init(&device);
+        assert_eq!(re.seq_len(), 1024);
+        assert_eq!(re.head_dim(), 64);
+
+        let clip_re = re.clip_range(10..20);
+        assert_eq!(clip_re.seq_len(), 10);
+        clip_re
+            .sin
+            .clone()
+            .to_data()
+            .assert_eq(&re.sin.clone().slice_dim(1, 10..20).to_data(), true);
+        clip_re
+            .cos
+            .clone()
+            .to_data()
+            .assert_eq(&re.cos.clone().slice_dim(1, 10..20).to_data(), true);
+    }
+
+    #[test]
     fn test_rotary_embedding() {
         type B = Cuda;
         let device = Default::default();
@@ -199,7 +223,6 @@ mod tests {
         assert_eq!(config.base, 10000);
 
         let re: RotaryEmbedding<B> = config.init(&device);
-
         assert_eq!(re.seq_len(), 1024);
         assert_eq!(re.head_dim(), 64);
     }
