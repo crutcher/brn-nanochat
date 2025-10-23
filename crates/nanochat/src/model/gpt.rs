@@ -1,17 +1,19 @@
 //! # GPT Module
 
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::{Embedding, EmbeddingConfig, Linear, LinearConfig};
-use burn::nn::activation::ActivationConfig;
-use burn::prelude::{Backend, Int};
-use burn::Tensor;
+use crate::burn_ext::nn::embedding::rotary::{
+    RotaryEmbedding, RotaryEmbeddingConfig, RotaryEmbeddingMeta,
+};
 use crate::burn_ext::norm::rms_norm;
 use crate::model::block::{GPTBlock, GPTBlockConfig};
-use crate::burn_ext::nn::embedding::rotary::{RotaryEmbedding, RotaryEmbeddingConfig, RotaryEmbeddingMeta};
 use crate::model::csa::CausalSelfAttentionConfig;
 use crate::model::mlp::MLPConfig;
+use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
+use burn::Tensor;
+use burn::config::Config;
+use burn::module::Module;
+use burn::nn::activation::ActivationConfig;
+use burn::nn::{Embedding, EmbeddingConfig, Linear, LinearConfig};
+use burn::prelude::{Backend, Int};
 
 /// Common meta for [`GPT`] and [`GPTConfig`].
 pub trait GPTMeta {
@@ -67,7 +69,10 @@ impl GPTMeta for GPTConfig {
 
 impl GPTConfig {
     /// Initialize a [`GPT`].
-    pub fn init<B: Backend>(self, device: &B::Device) -> GPT<B> {
+    pub fn init<B: Backend>(
+        self,
+        device: &B::Device,
+    ) -> GPT<B> {
         self.into_structure().init(device)
     }
 
@@ -77,16 +82,19 @@ impl GPTConfig {
 
         let block_config = self.block_config();
 
-        let h = (0..self.n_layer)
-            .map(|_| block_config.clone())
-            .collect();
+        let h = (0..self.n_layer).map(|_| block_config.clone()).collect();
 
         let lm_head = LinearConfig::new(self.n_embed, self.vocab_size);
 
         let rotary_seq_len = self.sequence_len * self.rotary_sequence_factor;
         let rotary_embedding = RotaryEmbeddingConfig::new(rotary_seq_len, self.head_dim());
 
-        GPTStructureConfig { wte, h, lm_head, rotary_embedding }
+        GPTStructureConfig {
+            wte,
+            h,
+            lm_head,
+            rotary_embedding,
+        }
     }
 
     pub fn head_dim(&self) -> usize {
@@ -94,9 +102,7 @@ impl GPTConfig {
     }
 
     /// Build the [`GPTBlockConfig`] for this config.
-    pub fn block_config(
-        &self,
-    ) -> GPTBlockConfig {
+    pub fn block_config(&self) -> GPTBlockConfig {
         GPTBlockConfig::new(
             CausalSelfAttentionConfig::new(self.n_head, self.n_kv_head, self.n_embed),
             MLPConfig::new(self.n_embed)
@@ -125,15 +131,26 @@ impl GPTMeta for GPTStructureConfig {
 
 impl GPTStructureConfig {
     /// Initialize a [`GPT`].
-    pub fn init<B: Backend>(self, device: &B::Device) -> GPT<B> {
+    pub fn init<B: Backend>(
+        self,
+        device: &B::Device,
+    ) -> GPT<B> {
         let wte = self.wte.init(device);
-        let h = self.h.into_iter().enumerate()
+        let h = self
+            .h
+            .into_iter()
+            .enumerate()
             .map(|(layer_idx, c)| c.init(layer_idx, device))
             .collect();
         let lm_head = self.lm_head.init(device);
         let rotary_embedding = self.rotary_embedding.init(device);
 
-        GPT { wte, h, lm_head, rotary_embedding }
+        GPT {
+            wte,
+            h,
+            lm_head,
+            rotary_embedding,
+        }
     }
 }
 
@@ -154,14 +171,13 @@ impl<B: Backend> GPTMeta for GPT<B> {
 
 impl<B: Backend> GPT<B> {
     /// Forward Pass.
-    pub fn forward(&self,
-       idx: Tensor<B, 2, Int>,
+    pub fn forward(
+        &self,
+        idx: Tensor<B, 2, Int>,
     ) -> Tensor<B, 3> {
-        let [b, t] = unpack_shape_contract!(
-            ["B", "T"],
-            &idx.dims()
-        );
-        assert!(t <= self.rotary_embedding.seq_len(),
+        let [b, t] = unpack_shape_contract!(["B", "T"], &idx.dims());
+        assert!(
+            t <= self.rotary_embedding.seq_len(),
             "Sequence length grew beyond the rotary embeddings cache: {t} > {}",
             self.rotary_embedding.seq_len()
         );

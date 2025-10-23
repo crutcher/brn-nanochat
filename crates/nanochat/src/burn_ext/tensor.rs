@@ -2,8 +2,8 @@
 
 use burn::Tensor;
 use burn::prelude::Backend;
-use burn::tensor::{AsIndex, BasicOps, Numeric};
 use burn::tensor::indexing::canonicalize_dim;
+use burn::tensor::{AsIndex, BasicOps, Numeric};
 
 /// Repeat Interleave.
 ///
@@ -90,14 +90,10 @@ mod tests {
 
         res.to_data().assert_eq(
             &Tensor::<B, 2>::from_data(
-                [
-                    [1., 2., 3.],
-                    [2., 4., 6.],
-                    [3., 6., 9.],
-                    [4., 8., 12.],
-                ],
+                [[1., 2., 3.], [2., 4., 6.], [3., 6., 9.], [4., 8., 12.]],
                 &device,
-            ).to_data(),
+            )
+            .to_data(),
             true,
         )
     }

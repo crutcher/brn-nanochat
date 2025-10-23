@@ -1,5 +1,6 @@
 //! # Causal Self-Attention
 
+use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 use crate::burn_ext::nn::functional::attention;
 use crate::burn_ext::nn::functional::attention::ScaledDotProductAttentionConfig;
 use crate::burn_ext::norm;
@@ -9,7 +10,6 @@ use burn::config::Config;
 use burn::module::Module;
 use burn::nn::{Linear, LinearConfig};
 use burn::prelude::Backend;
-use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {

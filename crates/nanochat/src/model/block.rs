@@ -1,13 +1,13 @@
 //! # GPT Block
 
-use burn::config::Config;
-use burn::module::Module;
+use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 use crate::burn_ext::norm::rms_norm;
 use crate::model::csa::{CausalSelfAttention, CausalSelfAttentionConfig, CausalSelfAttentionMeta};
 use crate::model::mlp::{MLP, MLPConfig, MLPMeta};
 use burn::Tensor;
+use burn::config::Config;
+use burn::module::Module;
 use burn::prelude::Backend;
-use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 
 /// Common meta for [`GPTBlock`] and [`GPTBlockConfig`].
 pub trait GPTBlockMeta {

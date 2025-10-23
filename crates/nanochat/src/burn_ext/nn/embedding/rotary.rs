@@ -1,11 +1,13 @@
 //! # Rotary Embedding
 
-use burn::config::Config;
-use burn::module::{Module};
-use burn::prelude::Backend;
-use burn::Tensor;
-use crate::burn_ext::nn::functional::embedding::rotary::apply_rotary_embedding;
 use crate::burn_ext::tensor::outer;
+use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
+use burn::Tensor;
+use burn::config::Config;
+use burn::module::Module;
+use burn::prelude::{Backend, s};
+use burn::tensor::DType;
+use std::ops::Range;
 
 /// Common meta for [`RotaryEmbedding`] and [`RotaryEmbeddingConfig`].
 pub trait RotaryEmbeddingMeta {
@@ -26,7 +28,7 @@ pub struct RotaryEmbeddingConfig {
     pub head_dim: usize,
 
     /// Base.
-    #[config(default= 10000)]
+    #[config(default = 10000)]
     pub base: usize,
 }
 
@@ -48,8 +50,10 @@ impl RotaryEmbeddingConfig {
         let seq_len = self.seq_len;
         let head_dim = self.head_dim;
         let base = self.base;
-        let channel_range: Tensor<B, 1> = Tensor::arange_step(0..head_dim as i64, 2, device).float();
-        let base = channel_range.full_like(base as f32);
+
+        let channel_range: Tensor<B, 1> =
+            Tensor::arange_step(0..head_dim as i64, 2, device).float();
+        let base: Tensor<B, 1> = Tensor::from_data([base as f32], device);
         let inv_freq: Tensor<B, 1> = base.powf(-channel_range / head_dim as f32);
 
         let t: Tensor<B, 1> = Tensor::arange(0..seq_len as i64, device).float();
@@ -61,8 +65,14 @@ impl RotaryEmbeddingConfig {
 
         // TODO: possibly down-cast to the smallest available dtype.
 
-        let cos = cos.set_require_grad(false).unsqueeze_dim::<3>(1).unsqueeze_dim(0);
-        let sin = sin.set_require_grad(false).unsqueeze_dim::<3>(1).unsqueeze_dim(0);
+        let cos = cos
+            .set_require_grad(false)
+            .unsqueeze_dim::<3>(1)
+            .unsqueeze_dim(0);
+        let sin = sin
+            .set_require_grad(false)
+            .unsqueeze_dim::<3>(1)
+            .unsqueeze_dim(0);
 
         RotaryEmbedding { cos, sin }
     }
@@ -89,10 +99,98 @@ impl<B: Backend> RotaryEmbeddingMeta for RotaryEmbedding<B> {
 }
 
 impl<B: Backend> RotaryEmbedding<B> {
+    /// Cast the embedding to a different dtype.
+    pub fn cast(
+        self,
+        dtype: DType,
+    ) -> Self {
+        Self {
+            cos: self.cos.cast(dtype),
+            sin: self.sin.cast(dtype),
+        }
+    }
+
+    /// Clip the embedding to cover only the given range.
+    ///
+    /// # Arguments
+    /// - `range`: the ``start..end`` range to cover.
+    ///
+    /// # Returns
+    /// - a clipped [`RotaryEmbedding`].
+    pub fn clip_range(
+        &self,
+        range: Range<usize>,
+    ) -> Self {
+        Self {
+            cos: self.cos.clone().slice_dim(1, range.clone()),
+            sin: self.sin.clone().slice_dim(1, range),
+        }
+    }
+
+    /// Apply the rotary embedding to the input.
+    ///
+    /// # Arguments
+    /// - `input`: a ``[B, T, H, D]`` tensor.
+    ///
+    /// # Returns
+    /// - a ``[B, T, H, D]`` tensor.
     pub fn apply(
         &self,
         x: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        apply_rotary_embedding(x, &self)
+        let [b, t, h, d] = unpack_shape_contract!(["B", "T", "H", "D"], &x.dims());
+
+        assert_eq!(
+            t,
+            self.seq_len(),
+            "Sequence length not aligned with rotary embedding cache: {t} != {}",
+            self.seq_len()
+        );
+
+        let cos = self.cos.clone();
+        let sin = self.sin.clone();
+
+        let pivot = d / 2;
+
+        let x1 = x.clone().slice_dim(3, s![..pivot]);
+        let x2 = x.clone().slice_dim(3, s![pivot..]);
+
+        let output = Tensor::cat(
+            vec![
+                x1.clone() * cos.clone() + x2.clone() * sin.clone(),
+                x1 * (-sin) + x2 * cos,
+            ],
+            3,
+        );
+
+        assert_shape_contract_periodically!(
+            ["B", "T", "H", "D"],
+            &output.dims(),
+            &[("B", b), ("T", t), ("H", h), ("D", d)]
+        );
+
+        output
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use burn::backend::Wgpu;
+
+    #[test]
+    fn test_rotary_embedding() {
+        type B = Wgpu;
+        let device = Default::default();
+
+        let config = RotaryEmbeddingConfig::new(1024, 64);
+        assert_eq!(config.seq_len(), 1024);
+        assert_eq!(config.head_dim(), 64);
+        assert_eq!(config.base, 10000);
+
+        let re: RotaryEmbedding<B> = config.init(&device);
+
+        assert_eq!(re.seq_len(), 1024);
+        assert_eq!(re.head_dim(), 64);
     }
 }
