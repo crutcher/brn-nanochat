@@ -117,6 +117,12 @@ pub struct GPTStructureConfig {
     rotary_embedding: RotaryEmbeddingConfig,
 }
 
+impl GPTMeta for GPTStructureConfig {
+    fn n_embed(&self) -> usize {
+        self.wte.n_embedding
+    }
+}
+
 impl GPTStructureConfig {
     /// Initialize a [`GPT`].
     pub fn init<B: Backend>(self, device: &B::Device) -> GPT<B> {
