@@ -162,13 +162,10 @@ impl<B: Backend> RotaryEmbedding<B> {
         let x1 = input.clone().slice_dim(3, s![..pivot]);
         let x2 = input.clone().slice_dim(3, s![pivot..]);
 
-        let output = Tensor::cat(
-            vec![
-                x1.clone() * self.cos.clone() + x2.clone() * self.sin.clone(),
-                x1 * (-self.sin.clone()) + x2 * self.cos.clone(),
-            ],
-            3,
-        );
+        let y1 = x1.clone() * self.cos.clone() + x2.clone() * self.sin.clone();
+        let y2 = x1 * (-self.sin.clone()) + x2 * self.cos.clone();
+
+        let output = Tensor::cat(vec![y1, y2], 3);
 
         assert_shape_contract_periodically!(
             ["B", "T", "H", "D"],
