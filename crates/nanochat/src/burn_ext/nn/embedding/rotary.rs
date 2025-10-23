@@ -47,6 +47,12 @@ impl RotaryEmbeddingConfig {
         self,
         device: &B::Device,
     ) -> RotaryEmbedding<B> {
+        assert!(
+            self.head_dim.is_multiple_of(2),
+            "Head dimension must be even: {}",
+            self.head_dim
+        );
+
         let seq_len = self.seq_len;
         let head_dim = self.head_dim;
         let base = self.base;
@@ -74,17 +80,20 @@ impl RotaryEmbeddingConfig {
             .unsqueeze_dim::<3>(1)
             .unsqueeze_dim(0);
 
-        RotaryEmbedding { cos, sin }
+        RotaryEmbedding { head_dim, cos, sin }
     }
 }
 
 /// Rotary Embedding Module
 #[derive(Module, Debug)]
 pub struct RotaryEmbedding<B: Backend> {
-    /// a ``[1, T, 1, D]`` tensor.
+    /// Head Dimension, D
+    pub head_dim: usize,
+
+    /// a ``[1, T, 1, D/2]`` tensor.
     pub cos: Tensor<B, 4>,
 
-    /// a ``[1, T, 1, D]`` tensor.
+    /// a ``[1, T, 1, D/2]`` tensor.
     pub sin: Tensor<B, 4>,
 }
 
@@ -94,7 +103,7 @@ impl<B: Backend> RotaryEmbeddingMeta for RotaryEmbedding<B> {
     }
 
     fn head_dim(&self) -> usize {
-        self.cos.dims()[3]
+        self.head_dim
     }
 }
 
@@ -107,6 +116,7 @@ impl<B: Backend> RotaryEmbedding<B> {
         Self {
             cos: self.cos.cast(dtype),
             sin: self.sin.cast(dtype),
+            ..self
         }
     }
 
@@ -122,6 +132,7 @@ impl<B: Backend> RotaryEmbedding<B> {
         range: Range<usize>,
     ) -> Self {
         Self {
+            head_dim: self.head_dim,
             cos: self.cos.clone().slice_dim(1, range.clone()),
             sin: self.sin.clone().slice_dim(1, range),
         }
@@ -136,29 +147,23 @@ impl<B: Backend> RotaryEmbedding<B> {
     /// - a ``[B, T, H, D]`` tensor.
     pub fn apply(
         &self,
-        x: Tensor<B, 4>,
+        input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        let [b, t, h, d] = unpack_shape_contract!(["B", "T", "H", "D"], &x.dims());
-
-        assert_eq!(
-            t,
-            self.seq_len(),
-            "Sequence length not aligned with rotary embedding cache: {t} != {}",
-            self.seq_len()
+        let [b, h] = unpack_shape_contract!(
+            ["B", "T", "H", "D"],
+            &input.dims(),
+            &["B", "H"],
+            &[("T", self.seq_len()), ("D", self.head_dim())]
         );
 
-        let cos = self.cos.clone();
-        let sin = self.sin.clone();
-
-        let pivot = d / 2;
-
-        let x1 = x.clone().slice_dim(3, s![..pivot]);
-        let x2 = x.clone().slice_dim(3, s![pivot..]);
+        let pivot = self.head_dim() / 2;
+        let x1 = input.clone().slice_dim(3, s![..pivot]);
+        let x2 = input.clone().slice_dim(3, s![pivot..]);
 
         let output = Tensor::cat(
             vec![
-                x1.clone() * cos.clone() + x2.clone() * sin.clone(),
-                x1 * (-sin) + x2 * cos,
+                x1.clone() * self.cos.clone() + x2.clone() * self.sin.clone(),
+                x1 * (-self.sin.clone()) + x2 * self.cos.clone(),
             ],
             3,
         );
@@ -166,7 +171,12 @@ impl<B: Backend> RotaryEmbedding<B> {
         assert_shape_contract_periodically!(
             ["B", "T", "H", "D"],
             &output.dims(),
-            &[("B", b), ("T", t), ("H", h), ("D", d)]
+            &[
+                ("B", b),
+                ("T", self.seq_len()),
+                ("H", h),
+                ("D", self.head_dim())
+            ]
         );
 
         output
@@ -176,11 +186,11 @@ impl<B: Backend> RotaryEmbedding<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn::backend::Wgpu;
+    use burn::backend::Cuda;
 
     #[test]
     fn test_rotary_embedding() {
-        type B = Wgpu;
+        type B = Cuda;
         let device = Default::default();
 
         let config = RotaryEmbeddingConfig::new(1024, 64);

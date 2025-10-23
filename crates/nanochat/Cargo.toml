@@ -11,7 +11,7 @@ burn = { workspace = true }
 bimm-contracts = { workspace = true }
 
 [dev-dependencies]
-burn = { workspace = true, features = ["wgpu"] }
+burn = { workspace = true, features = ["wgpu", "cuda"] }
 
 [lints]
 workspace = true
