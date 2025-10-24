@@ -81,6 +81,13 @@ impl CausalSelfAttentionConfig {
         device: &B::Device,
     ) -> CausalSelfAttention<B> {
         let head_dim = self.head_dim();
+        assert!(
+            head_dim > 0,
+            "head_dim must be > 0; got n_embed={}/n_head={}",
+            self.n_embed,
+            self.n_head
+        );
+
         CausalSelfAttention {
             layer_index,
             c_q: LinearConfig::new(self.n_embed, self.n_head * head_dim)
