@@ -1,6 +1,5 @@
 //! # Rotary Embedding
 
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
@@ -54,21 +53,11 @@ impl RotaryEmbeddingConfig {
             self.head_dim
         );
 
-        let seq_len = self.seq_len;
-        let head_dim = self.head_dim;
-        let base = self.base;
+        let freq_matrix =
+            positional_frequency_table(self.seq_len, self.base, self.head_dim, device);
 
-        let channel_range: Tensor<B, 1> =
-            Tensor::arange_step(0..head_dim as i64, 2, device).float();
-        let base: Tensor<B, 1> = Tensor::from_data([base as f32], device);
-        let inv_freq: Tensor<B, 1> = base.powf(-channel_range / head_dim as f32);
-
-        let t: Tensor<B, 1> = Tensor::arange(0..seq_len as i64, device).float();
-
-        let freqs = linalg::outer::<_, 1, 2, _>(t, inv_freq);
-
-        let cos = freqs.clone().cos();
-        let sin = freqs.sin();
+        let cos = freq_matrix.clone().cos();
+        let sin = freq_matrix.sin();
 
         // TODO: possibly down-cast to the smallest available dtype.
 
@@ -83,7 +72,11 @@ impl RotaryEmbeddingConfig {
 
         // [1, T, 1, D/2]
 
-        RotaryEmbedding { head_dim, cos, sin }
+        RotaryEmbedding {
+            head_dim: self.head_dim,
+            cos,
+            sin,
+        }
     }
 }
 
@@ -152,7 +145,8 @@ impl<B: Backend> RotaryEmbedding<B> {
         &self,
         input: Tensor<B, 4>,
     ) -> Tensor<B, 4> {
-        let [b, h] = unpack_shape_contract!(
+        #[cfg(debug_assertions)]
+        let [b, h] = bimm_contracts::unpack_shape_contract!(
             ["B", "T", "H", "D"],
             &input.dims(),
             &["B", "H"],
@@ -168,7 +162,8 @@ impl<B: Backend> RotaryEmbedding<B> {
 
         let output = Tensor::cat(vec![y1, y2], 3);
 
-        assert_shape_contract_periodically!(
+        #[cfg(debug_assertions)]
+        bimm_contracts::assert_shape_contract_periodically!(
             ["B", "T", "H", "D"],
             &output.dims(),
             &[
@@ -183,10 +178,114 @@ impl<B: Backend> RotaryEmbedding<B> {
     }
 }
 
+/// Compute the rotary embedding inverse frequency table.
+///
+/// # Arguments
+/// - `base`: the base.
+/// - `head_dim`: the number of head dimensions.
+/// - `device`: the target device.
+///
+/// # Returns
+/// - ``[(1.0 / (base**(d / head_dim))) for d in 0:head_dim:2]``
+pub fn inverse_frequency_table<B: Backend>(
+    base: usize,
+    head_dim: usize,
+    device: &B::Device,
+) -> Tensor<B, 1> {
+    Tensor::from_data([base as f32], device).powf(
+        -Tensor::arange_step(0..head_dim as i64, 2, device)
+            .float()
+            .div_scalar(head_dim as f32),
+    )
+}
+
+/// Compute the positionally shifted frequency table.
+///
+/// # Arguments
+/// - `seq_len`: the sequence length.
+/// - `base`: the base.
+/// - `head_dim`: the number of head dimensions.
+/// - `device`: the target device.
+///
+/// # Returns
+/// - ``[T, F=D/2]`` sequence x inverse frequency table.
+pub fn positional_frequency_table<B: Backend>(
+    seq_len: usize,
+    base: usize,
+    head_dim: usize,
+    device: &B::Device,
+) -> Tensor<B, 2> {
+    let inv_freq = inverse_frequency_table::<B>(base, head_dim, device);
+
+    let t: Tensor<B, 1> = Tensor::arange(0..seq_len as i64, device).float();
+
+    linalg::outer::<_, 1, 2, _>(t, inv_freq)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use burn::backend::Cuda;
+    use burn::tensor::Tolerance;
+
+    #[test]
+    fn test_inverse_frequency_table() {
+        type B = Cuda;
+        let device = Default::default();
+
+        let base = 10000;
+        let head_dim = 4;
+
+        let base_f = base as f32;
+        let head_dim_f = head_dim as f32;
+
+        inverse_frequency_table::<B>(base, head_dim, &device)
+            .to_data()
+            .assert_approx_eq(
+                &Tensor::<B, 1>::from_data(
+                    [
+                        1.0 / base_f.powf(0.0 / head_dim_f),
+                        1.0 / base_f.powf(2.0 / head_dim_f),
+                    ],
+                    &device,
+                )
+                .to_data(),
+                Tolerance::<f32>::default(),
+            );
+    }
+
+    #[test]
+    fn test_frequency_matrix() {
+        type B = Cuda;
+        let device = Default::default();
+
+        let base = 10000;
+        let head_dim = 4;
+
+        let base_f = base as f32;
+        let head_dim_f = head_dim as f32;
+
+        positional_frequency_table::<B>(3, base, head_dim, &device)
+            .to_data()
+            .assert_approx_eq(
+                &Tensor::<B, 2>::from_data(
+                    [
+                        [0.0, 0.0],
+                        [
+                            1.0 / base_f.powf(0.0 / head_dim_f),
+                            1.0 / base_f.powf(2.0 / head_dim_f),
+                        ],
+                        [
+                            2.0 / base_f.powf(0.0 / head_dim_f),
+                            2.0 / base_f.powf(2.0 / head_dim_f),
+                        ],
+                    ],
+                    &device,
+                )
+                .to_data(),
+                Tolerance::<f32>::default(),
+            );
+    }
 
     #[test]
     fn test_clip_range() {
