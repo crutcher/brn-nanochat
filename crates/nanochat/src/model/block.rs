@@ -61,12 +61,19 @@ impl<B: Backend> GPTBlockMeta for GPTBlock<B> {
 
 impl<B: Backend> GPTBlock<B> {
     /// Forward Pass.
+    ///
+    /// # Arguments
+    /// - `input`: a ``[B, T, D]`` input.
+    /// - `rotary_embedding`: a ``[1, T, 1, D/2]`` embedding.
+    ///
+    /// # Returns
+    /// - the ``[B, T, D]`` block output.
     pub fn forward(
         &self,
-        x: Tensor<B, 3>,
+        input: Tensor<B, 3>,
         rotary_embedding: &RotaryEmbedding<B>,
     ) -> Tensor<B, 3> {
-        let x = rms_norm(x);
+        let x = rms_norm(input);
         let x = self.attn.forward(x, rotary_embedding);
         let x = rms_norm(x);
         self.mlp.forward(x)
