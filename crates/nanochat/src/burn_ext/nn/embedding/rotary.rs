@@ -1,12 +1,11 @@
 //! # Rotary Embedding
 
-use crate::burn_ext::tensor::outer;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
 use burn::prelude::{Backend, s};
-use burn::tensor::DType;
+use burn::tensor::{DType, linalg};
 use std::ops::Range;
 
 /// Common meta for [`RotaryEmbedding`] and [`RotaryEmbeddingConfig`].
@@ -66,7 +65,7 @@ impl RotaryEmbeddingConfig {
 
         let t: Tensor<B, 1> = Tensor::arange(0..seq_len as i64, device).float();
 
-        let freqs = outer(t, inv_freq);
+        let freqs = linalg::outer::<_, 1, 2, _>(t, inv_freq);
 
         let cos = freqs.clone().cos();
         let sin = freqs.sin();
