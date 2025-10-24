@@ -56,16 +56,17 @@ impl RotaryEmbeddingConfig {
         let freq_matrix =
             positional_frequency_table(self.seq_len, self.base, self.head_dim, device);
 
-        let cos = freq_matrix.clone().cos();
-        let sin = freq_matrix.sin();
-
         // TODO: possibly down-cast to the smallest available dtype.
 
-        let cos = cos
+        let cos = freq_matrix
+            .clone()
+            .cos()
             .set_require_grad(false)
             .unsqueeze_dim::<3>(1)
             .unsqueeze_dim(0);
-        let sin = sin
+
+        let sin = freq_matrix
+            .sin()
             .set_require_grad(false)
             .unsqueeze_dim::<3>(1)
             .unsqueeze_dim(0);
