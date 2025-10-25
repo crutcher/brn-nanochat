@@ -146,6 +146,13 @@ impl<B: Backend> CausalSelfAttentionMeta for CausalSelfAttention<B> {
 
 impl<B: Backend> CausalSelfAttention<B> {
     /// Forward Pass.
+    ///
+    /// # Arguments
+    /// - `x`: a ``[B, T, D]`` sequence.
+    /// - `re`: a rotary embedding with len ``T``.
+    ///
+    /// # Returns
+    /// - ``[B, T, D]`` attention.
     pub fn forward(
         &self,
         x: Tensor<B, 3>,
