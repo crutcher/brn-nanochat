@@ -84,6 +84,7 @@ impl<B: Backend> GPTBlock<B> {
 mod tests {
     use super::*;
     use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
+    use bimm_contracts::assert_shape_contract;
     use burn::backend::{Cuda, Wgpu};
     use burn::tensor::Distribution;
 
@@ -138,6 +139,11 @@ mod tests {
         let rotary_embedding =
             RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
 
-        let _output = block.forward(input.clone(), &rotary_embedding);
+        let output = block.forward(input.clone(), &rotary_embedding);
+        assert_shape_contract!(
+            ["B", "T", "D"],
+            &output.dims(),
+            &[("B", batch), ("T", seq_len), ("D", n_embed)]
+        );
     }
 }

@@ -220,6 +220,7 @@ impl<B: Backend> CausalSelfAttention<B> {
 mod tests {
     use super::*;
     use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
+    use bimm_contracts::assert_shape_contract;
     use burn::backend::Cuda;
     use burn::tensor::Distribution;
 
@@ -260,6 +261,11 @@ mod tests {
         let input: Tensor<B, 3> =
             Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
-        let _output = csa.forward(input.clone(), &rotary_embedding);
+        let output = csa.forward(input.clone(), &rotary_embedding);
+        assert_shape_contract!(
+            ["B", "T", "D"],
+            &output.dims(),
+            &[("B", batch), ("T", seq_len), ("D", n_embed)]
+        );
     }
 }
