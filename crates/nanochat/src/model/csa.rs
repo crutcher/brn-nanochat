@@ -61,11 +61,6 @@ impl CausalSelfAttentionMeta for CausalSelfAttentionConfig {
 }
 
 impl CausalSelfAttentionConfig {
-    /// Return the size of each head.
-    pub fn head_dim(&self) -> usize {
-        self.n_embed / self.n_head
-    }
-
     /// Validate the config.
     pub fn validate(&self) {
         assert!(self.n_embed.is_multiple_of(self.n_head));
@@ -87,9 +82,23 @@ impl CausalSelfAttentionConfig {
             self.n_embed,
             self.n_head
         );
+        assert!(
+            self.n_kv_head < self.n_head,
+            "n_kv_head must be < n_head; got n_kv_head={}, n_head={}",
+            self.n_kv_head,
+            self.n_head
+        );
+        assert_eq!(
+            self.n_head % self.n_kv_head,
+            0,
+            "n_head must be divisible by n_kv_head; got n_head={}, n_kv_head={}",
+            self.n_head,
+            self.n_kv_head
+        );
 
         CausalSelfAttention {
             layer_index,
+            head_dim,
             c_q: LinearConfig::new(self.n_embed, self.n_head * head_dim)
                 .with_bias(false)
                 .init(device),
@@ -110,6 +119,7 @@ impl CausalSelfAttentionConfig {
 #[derive(Module, Debug)]
 pub struct CausalSelfAttention<B: Backend> {
     pub layer_index: usize,
+    pub head_dim: usize,
     pub c_q: Linear<B>,
     pub c_k: Linear<B>,
     pub c_v: Linear<B>,
@@ -117,6 +127,10 @@ pub struct CausalSelfAttention<B: Backend> {
 }
 
 impl<B: Backend> CausalSelfAttentionMeta for CausalSelfAttention<B> {
+    fn head_dim(&self) -> usize {
+        self.head_dim
+    }
+
     fn n_embed(&self) -> usize {
         self.c_q.weight.dims()[0]
     }
@@ -132,7 +146,6 @@ impl<B: Backend> CausalSelfAttentionMeta for CausalSelfAttention<B> {
 
 impl<B: Backend> CausalSelfAttention<B> {
     /// Forward Pass.
-    #[allow(unused)]
     pub fn forward(
         &self,
         x: Tensor<B, 3>,
@@ -164,8 +177,8 @@ impl<B: Backend> CausalSelfAttention<B> {
         let v = self
             .c_v
             .forward(x)
-            .reshape([b, t, self.n_kv_head(), self.head_dim()]);
-        let v = v.swap_dims(1, 2);
+            .reshape([b, t, self.n_kv_head(), self.head_dim()])
+            .swap_dims(1, 2);
 
         // B, H_?, T, D
 
@@ -206,6 +219,9 @@ impl<B: Backend> CausalSelfAttention<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
+    use burn::backend::Cuda;
+    use burn::tensor::Distribution;
 
     #[test]
     fn test_csa_config() {
@@ -217,5 +233,33 @@ mod tests {
         assert_eq!(cfg.n_head(), 3);
         assert_eq!(cfg.n_kv_head(), 2);
         assert_eq!(cfg.head_dim(), 1);
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn test_csa_forward() {
+        type B = Cuda;
+        let device = Default::default();
+
+        let batch = 1;
+        let seq_len = 10;
+
+        let n_embed = 1024;
+        let n_head = 128;
+        let n_kv_head = 64;
+        let layer_index = 12;
+
+        let cfg = CausalSelfAttentionConfig::new(n_head, n_kv_head, n_embed);
+        let csa: CausalSelfAttention<B> = cfg.init(layer_index, &device);
+
+        let head_dim = csa.head_dim();
+
+        let re_cfg = RotaryEmbeddingConfig::new(seq_len, csa.head_dim());
+        let rotary_embedding: RotaryEmbedding<B> = re_cfg.init(&device);
+
+        let input: Tensor<B, 3> =
+            Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
+
+        let _output = csa.forward(input.clone(), &rotary_embedding);
     }
 }

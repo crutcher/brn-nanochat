@@ -83,29 +83,12 @@ impl<B: Backend> GPTBlock<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn::backend::Wgpu;
+    use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
+    use burn::backend::{Cuda, Wgpu};
+    use burn::tensor::Distribution;
 
     #[test]
     fn test_gpt_block_config() {
-        let n_embed = 1024;
-        let n_head = 128;
-        let n_kv_head = 64;
-
-        let config = GPTBlockConfig::new(
-            CausalSelfAttentionConfig::new(n_head, n_kv_head, n_embed),
-            MLPConfig::new(n_embed),
-        );
-
-        assert_eq!(config.n_embed(), n_embed);
-        assert_eq!(config.attn.n_embed(), n_embed);
-        assert_eq!(config.attn.n_head(), n_head);
-        assert_eq!(config.attn.n_kv_head(), n_kv_head);
-
-        assert_eq!(config.mlp.n_embed(), n_embed);
-    }
-
-    #[test]
-    fn test_gpt_block() {
         type B = Wgpu;
         let device = Default::default();
 
@@ -117,10 +100,44 @@ mod tests {
             CausalSelfAttentionConfig::new(n_head, n_kv_head, n_embed),
             MLPConfig::new(n_embed),
         );
+        assert_eq!(config.n_embed(), n_embed);
+        assert_eq!(config.attn.n_embed(), n_embed);
+        assert_eq!(config.attn.n_head(), n_head);
+        assert_eq!(config.attn.n_kv_head(), n_kv_head);
+
+        assert_eq!(config.mlp.n_embed(), n_embed);
 
         let layer_index = 12;
         let block: GPTBlock<B> = config.init(layer_index, &device);
 
         assert_eq!(block.n_embed(), n_embed);
+    }
+
+    #[test]
+    fn test_gpt_block_forward() {
+        type B = Cuda;
+        let device = Default::default();
+
+        let batch = 2;
+        let seq_len = 10;
+
+        let n_embed = 1024;
+        let n_head = 128;
+        let n_kv_head = 64;
+        let layer_index = 12;
+
+        let config = GPTBlockConfig::new(
+            CausalSelfAttentionConfig::new(n_head, n_kv_head, n_embed),
+            MLPConfig::new(n_embed),
+        );
+
+        let block: GPTBlock<B> = config.init(layer_index, &device);
+
+        let input = Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
+
+        let rotary_embedding =
+            RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
+
+        let _output = block.forward(input.clone(), &rotary_embedding);
     }
 }

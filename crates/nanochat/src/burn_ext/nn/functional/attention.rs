@@ -2,7 +2,7 @@
 
 use crate::burn_ext::nn::functional::drop::dropout;
 use crate::burn_ext::tensor;
-use bimm_contracts::unpack_shape_contract;
+use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::prelude::{Backend, Bool, Int};
@@ -56,24 +56,23 @@ pub fn scaled_dot_product_attention<B: Backend>(
     config: ScaledDotProductAttentionConfig,
 ) -> Tensor<B, 4> {
     let [b, h_q, _t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q.dims());
-    let [_h_k, t_kv] = unpack_shape_contract!(
-        ["B", "H_k", "T_kv", "D"],
-        &q.dims(),
-        &["H_k", "T_kv"],
+    let [h_kv] = unpack_shape_contract!(
+        ["B", "H_kv", "T_k", "D"],
+        &k.dims(),
+        &["H_kv"],
         &[("B", b), ("D", d)]
     );
-    let [h_v] = unpack_shape_contract!(
-        ["B", "H_v", "T_kv", "D"],
-        &q.dims(),
-        &["H_v"],
-        &[("B", b), ("T_kv", t_kv), ("D", d)]
+    assert_shape_contract_periodically!(
+        ["B", "H_kv", "T_v", "D"],
+        &v.dims(),
+        &[("B", b), ("H_kv", h_kv), ("D", d)]
     );
 
     let attn_weight = sdpa_attn_weight(q, k, bias, mask, config);
 
     let mut v = v;
     if config.enable_gqa {
-        let v_repeats = h_q / h_v;
+        let v_repeats = h_q / h_kv;
         v = tensor::repeat_interleave::<B, 4, 5, _>(v, v_repeats, 1);
     }
 
@@ -98,7 +97,7 @@ pub fn sdpa_attn_weight<B: Backend>(
     let [b, h_q, t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q.dims());
     let [h_k, t_k] = unpack_shape_contract!(
         ["B", "H_k", "T_k", "D"],
-        &q.dims(),
+        &k.dims(),
         &["H_k", "T_k"],
         &[("B", b), ("D", d)]
     );
@@ -114,7 +113,7 @@ pub fn sdpa_attn_weight<B: Backend>(
     }
 
     let scale_factor = config.scale.unwrap_or(1.0 / (q.dims()[3] as f64).sqrt());
-    let attn_weight = q.matmul(k).swap_dims(2, 3) * scale_factor;
+    let attn_weight = q.matmul(k.swap_dims(2, 3)) * scale_factor;
 
     let attn_bias = sdpa_bias(t_q, t_k, config.is_causal, bias, mask, dtype, &device);
     let mut attn_weight = attn_weight + attn_bias.unsqueeze();
