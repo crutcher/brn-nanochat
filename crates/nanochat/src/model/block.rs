@@ -64,17 +64,17 @@ impl<B: Backend> GPTBlock<B> {
     ///
     /// # Arguments
     /// - `input`: a ``[B, T, D]`` input.
-    /// - `rotary_embedding`: a ``[1, T, 1, D/2]`` embedding.
+    /// - `re`: a ``[1, T, 1, D/2]`` embedding.
     ///
     /// # Returns
     /// - the ``[B, T, D]`` block output.
     pub fn forward(
         &self,
         input: Tensor<B, 3>,
-        rotary_embedding: &RotaryEmbedding<B>,
+        re: &RotaryEmbedding<B>,
     ) -> Tensor<B, 3> {
         let x = rms_norm(input);
-        let x = self.attn.forward(x, rotary_embedding);
+        let x = self.attn.forward(x, re);
         let x = rms_norm(x);
         self.mlp.forward(x)
     }
@@ -136,10 +136,9 @@ mod tests {
 
         let input = Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
-        let rotary_embedding =
-            RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
+        let re = RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
 
-        let output = block.forward(input.clone(), &rotary_embedding);
+        let output = block.forward(input.clone(), &re);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),

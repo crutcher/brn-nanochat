@@ -149,7 +149,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     pub fn forward(
         &self,
         x: Tensor<B, 3>,
-        rotary_embedding: &RotaryEmbedding<B>,
+        re: &RotaryEmbedding<B>,
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(
             ["B", "T", "D"],
@@ -162,7 +162,7 @@ impl<B: Backend> CausalSelfAttention<B> {
             .c_q
             .forward(x.clone())
             .reshape([b, t, self.n_head(), self.head_dim()]);
-        let q = rotary_embedding.apply(q);
+        let q = re.apply(q);
         let q = norm::rms_norm(q);
         let q = q.swap_dims(1, 2);
 
@@ -170,7 +170,7 @@ impl<B: Backend> CausalSelfAttention<B> {
             .c_k
             .forward(x.clone())
             .reshape([b, t, self.n_kv_head(), self.head_dim()]);
-        let k = rotary_embedding.apply(k);
+        let k = re.apply(k);
         let k = norm::rms_norm(k);
         let k = k.swap_dims(1, 2);
 
@@ -190,7 +190,7 @@ impl<B: Backend> CausalSelfAttention<B> {
         // TODO: enable kv cache.
         let is_causal = true;
 
-        let y = attention::scaled_dot_product_attention(
+        let y: Tensor<B, 3> = attention::scaled_dot_product_attention(
             q,
             k,
             v,
@@ -199,10 +199,9 @@ impl<B: Backend> CausalSelfAttention<B> {
             ScaledDotProductAttentionConfig::new()
                 .with_is_causal(is_causal)
                 .with_enable_gqa(self.gqa_enabled()),
-        );
-
-        let y = y.swap_dims(1, 2);
-        let y = y.reshape([b as i32, t as i32, -1]);
+        )
+        .swap_dims(1, 2)
+        .reshape([b as i32, t as i32, self.n_embed() as i32]);
 
         let y = self.c_proj.forward(y);
 
@@ -256,12 +255,12 @@ mod tests {
         let head_dim = csa.head_dim();
 
         let re_cfg = RotaryEmbeddingConfig::new(seq_len, csa.head_dim());
-        let rotary_embedding: RotaryEmbedding<B> = re_cfg.init(&device);
+        let re: RotaryEmbedding<B> = re_cfg.init(&device);
 
         let input: Tensor<B, 3> =
             Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
-        let output = csa.forward(input.clone(), &rotary_embedding);
+        let output = csa.forward(input.clone(), &re);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),
