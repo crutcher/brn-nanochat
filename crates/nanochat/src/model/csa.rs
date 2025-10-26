@@ -63,21 +63,25 @@ impl CausalSelfAttentionMeta for CausalSelfAttentionConfig {
 impl CausalSelfAttentionConfig {
     /// Validate the config.
     pub fn validate(&self) {
-        assert!(self.n_embed.is_multiple_of(self.n_head));
-        assert!(self.n_embed.is_multiple_of(self.n_kv_head));
-    }
-}
-
-impl CausalSelfAttentionConfig {
-    /// Initialize the module.
-    pub fn init<B: Backend>(
-        self,
-        layer_index: usize,
-        device: &B::Device,
-    ) -> CausalSelfAttention<B> {
-        let head_dim = self.head_dim();
         assert!(
-            head_dim > 0,
+            self.n_head > 0,
+            "n_head must be > 0; got n_head={}",
+            self.n_head
+        );
+        assert!(
+            self.n_embed.is_multiple_of(self.n_head),
+            "n_embed ({}) must be multiple of n_head ({})",
+            self.n_embed,
+            self.n_head
+        );
+        assert!(
+            self.n_embed.is_multiple_of(self.n_kv_head),
+            "n_embed ({}) must be multiple of n_kv_head ({})",
+            self.n_embed,
+            self.n_kv_head
+        );
+        assert!(
+            self.head_dim() > 0,
             "head_dim must be > 0; got n_embed={}/n_head={}",
             self.n_embed,
             self.n_head
@@ -88,13 +92,24 @@ impl CausalSelfAttentionConfig {
             self.n_kv_head,
             self.n_head
         );
-        assert_eq!(
-            self.n_head % self.n_kv_head,
-            0,
+        assert!(
+            self.n_head.is_multiple_of(self.n_kv_head),
             "n_head must be divisible by n_kv_head; got n_head={}, n_kv_head={}",
             self.n_head,
             self.n_kv_head
         );
+    }
+}
+
+impl CausalSelfAttentionConfig {
+    /// Initialize the module.
+    pub fn init<B: Backend>(
+        self,
+        layer_index: usize,
+        device: &B::Device,
+    ) -> CausalSelfAttention<B> {
+        self.validate();
+        let head_dim = self.head_dim();
 
         CausalSelfAttention {
             layer_index,

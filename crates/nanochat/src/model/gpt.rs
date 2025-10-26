@@ -48,6 +48,10 @@ pub struct GPTConfig {
     #[config(default = "768")]
     pub n_embed: usize,
 
+    /// Softcap for the logits.
+    #[config(default = "15.0")]
+    pub softcap: f64,
+
     /// MLP Expansion Factor.
     #[config(default = "4")]
     pub expansion_factor: usize,
@@ -89,12 +93,7 @@ impl GPTConfig {
         let rotary_seq_len = self.sequence_len * self.rotary_sequence_factor;
         let rotary_embedding = RotaryEmbeddingConfig::new(rotary_seq_len, self.head_dim());
 
-        GPTStructureConfig {
-            wte,
-            h,
-            lm_head,
-            rotary_embedding,
-        }
+        GPTStructureConfig::new(wte, h, lm_head, rotary_embedding).with_softcap(self.softcap)
     }
 
     pub fn head_dim(&self) -> usize {
@@ -117,10 +116,14 @@ impl GPTConfig {
 /// This config has a lot of duplicate information.
 #[derive(Config, Debug)]
 pub struct GPTStructureConfig {
-    wte: EmbeddingConfig,
-    h: Vec<GPTBlockConfig>,
-    lm_head: LinearConfig,
-    rotary_embedding: RotaryEmbeddingConfig,
+    pub wte: EmbeddingConfig,
+    pub h: Vec<GPTBlockConfig>,
+    pub lm_head: LinearConfig,
+    pub rotary_embedding: RotaryEmbeddingConfig,
+
+    /// Softcap for the logits.
+    #[config(default = "15.0")]
+    pub softcap: f64,
 }
 
 impl GPTMeta for GPTStructureConfig {
@@ -150,6 +153,7 @@ impl GPTStructureConfig {
             h,
             lm_head,
             rotary_embedding,
+            softcap: self.softcap,
         }
     }
 }
@@ -161,6 +165,7 @@ pub struct GPT<B: Backend> {
     h: Vec<GPTBlock<B>>,
     lm_head: Linear<B>,
     rotary_embedding: RotaryEmbedding<B>,
+    softcap: f64,
 }
 
 impl<B: Backend> GPTMeta for GPT<B> {
@@ -183,15 +188,19 @@ impl<B: Backend> GPT<B> {
         );
 
         let mut x = self.wte.forward(idx);
-        x = rms_norm(x);
+
+        // Note: The reference nanochat has a norm here,
+        // but the block has the same norm as the first operation.
+        // x = rms_norm(x);
+
         for block in &self.h {
             x = block.forward(x, &self.rotary_embedding);
         }
+
         x = rms_norm(x);
-        let softcap = 15.0;
 
         let logits = self.lm_head.forward(x);
-        let logits: Tensor<B, 3> = softcap * (logits / softcap).tanh();
+        let logits: Tensor<B, 3> = self.softcap * (logits / self.softcap).tanh();
 
         assert_shape_contract_periodically!(
             ["B", "T", "D"],
@@ -199,5 +208,24 @@ impl<B: Backend> GPT<B> {
             &[("B", b), ("T", t), ("D", self.n_embed())]
         );
         logits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gpt_config() {
+        let cfg = GPTConfig::new();
+        assert_eq!(cfg.sequence_len, 1024);
+        assert_eq!(cfg.vocab_size, 50304);
+        assert_eq!(cfg.n_layer, 12);
+        assert_eq!(cfg.n_head, 6);
+        assert_eq!(cfg.n_kv_head, 6);
+        assert_eq!(cfg.n_embed, 768);
+        assert_eq!(cfg.expansion_factor, 4);
+
+        assert_eq!(cfg.n_embed(), 768);
     }
 }
