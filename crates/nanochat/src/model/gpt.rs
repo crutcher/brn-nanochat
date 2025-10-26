@@ -89,17 +89,14 @@ impl GPTConfig {
 
     /// Convert this config into a [`GPTStructureConfig`].
     pub fn into_structure(self) -> GPTStructureConfig {
-        let wte = EmbeddingConfig::new(self.vocab_size, self.n_embed);
-
         let block_config = self.block_config();
-
-        let h = (0..self.n_layer).map(|_| block_config.clone()).collect();
-
-        let lm_head = LinearConfig::new(self.n_embed, self.vocab_size);
-
-        let re = RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim());
-
-        GPTStructureConfig::new(wte, h, lm_head, re).with_softcap(self.softcap)
+        GPTStructureConfig {
+            wte: EmbeddingConfig::new(self.vocab_size, self.n_embed),
+            h: (0..self.n_layer).map(|_| block_config.clone()).collect(),
+            lm_head: LinearConfig::new(self.n_embed, self.vocab_size),
+            re: RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim()),
+            softcap: self.softcap,
+        }
     }
 
     pub fn head_dim(&self) -> usize {
@@ -205,7 +202,6 @@ impl<B: Backend> GPT<B> {
         for block in &self.h {
             x = block.forward(x, &self.re);
         }
-
         x = rms_norm(x);
 
         let logits = self
