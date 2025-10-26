@@ -19,9 +19,6 @@ use burn::prelude::{Backend, Int};
 pub trait GPTMeta {
     /// Return the size of the input and output.
     fn n_embed(&self) -> usize;
-
-    /// Return the size of the rotary embedding cache.
-    fn seq_len(&self) -> usize;
 }
 
 /// High-level GPT Config.
@@ -72,10 +69,6 @@ impl GPTMeta for GPTConfig {
     fn n_embed(&self) -> usize {
         self.n_embed
     }
-
-    fn seq_len(&self) -> usize {
-        self.seq_len
-    }
 }
 
 impl GPTConfig {
@@ -97,10 +90,10 @@ impl GPTConfig {
 
         let lm_head = LinearConfig::new(self.n_embed, self.vocab_size);
 
-        let rotary_seq_len = self.seq_len * self.rotary_sequence_factor;
-        let rotary_embedding = RotaryEmbeddingConfig::new(rotary_seq_len, self.head_dim());
+        let re_seq_len = self.seq_len * self.rotary_sequence_factor;
+        let re = RotaryEmbeddingConfig::new(re_seq_len, self.head_dim());
 
-        GPTStructureConfig::new(wte, h, lm_head, rotary_embedding).with_softcap(self.softcap)
+        GPTStructureConfig::new(wte, h, lm_head, re).with_softcap(self.softcap)
     }
 
     pub fn head_dim(&self) -> usize {
@@ -126,7 +119,7 @@ pub struct GPTStructureConfig {
     pub wte: EmbeddingConfig,
     pub h: Vec<GPTBlockConfig>,
     pub lm_head: LinearConfig,
-    pub rotary_embedding: RotaryEmbeddingConfig,
+    pub re: RotaryEmbeddingConfig,
 
     /// Softcap for the logits.
     #[config(default = "15.0")]
@@ -137,10 +130,6 @@ impl GPTMeta for GPTStructureConfig {
     fn n_embed(&self) -> usize {
         self.wte.n_embedding
     }
-
-    fn seq_len(&self) -> usize {
-        self.rotary_embedding.seq_len()
-    }
 }
 
 impl GPTStructureConfig {
@@ -149,21 +138,16 @@ impl GPTStructureConfig {
         self,
         device: &B::Device,
     ) -> GPT<B> {
-        let wte = self.wte.init(device);
-        let h = self
-            .h
-            .into_iter()
-            .enumerate()
-            .map(|(layer_idx, c)| c.init(layer_idx, device))
-            .collect();
-        let lm_head = self.lm_head.init(device);
-        let re = self.rotary_embedding.init(device);
-
         GPT {
-            wte,
-            h,
-            lm_head,
-            re,
+            wte: self.wte.init(device),
+            h: self
+                .h
+                .into_iter()
+                .enumerate()
+                .map(|(layer_idx, c)| c.init(layer_idx, device))
+                .collect(),
+            lm_head: self.lm_head.init(device),
+            re: self.re.init(device),
             softcap: self.softcap,
         }
     }
@@ -182,10 +166,6 @@ pub struct GPT<B: Backend> {
 impl<B: Backend> GPTMeta for GPT<B> {
     fn n_embed(&self) -> usize {
         self.wte.weight.dims()[0]
-    }
-
-    fn seq_len(&self) -> usize {
-        self.re.seq_len()
     }
 }
 
