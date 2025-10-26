@@ -62,6 +62,10 @@ impl<B: Backend> GPTBlockMeta for GPTBlock<B> {
 impl<B: Backend> GPTBlock<B> {
     /// Forward Pass.
     ///
+    /// # Usage Note
+    /// - this block norms on input.
+    /// - this block does not norm on output.
+    ///
     /// # Arguments
     /// - `input`: a ``[B, T, D]`` input.
     /// - `re`: a ``[1, T, 1, D/2]`` embedding.

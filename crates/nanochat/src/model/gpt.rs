@@ -157,13 +157,13 @@ impl GPTStructureConfig {
             .map(|(layer_idx, c)| c.init(layer_idx, device))
             .collect();
         let lm_head = self.lm_head.init(device);
-        let rotary_embedding = self.rotary_embedding.init(device);
+        let re = self.rotary_embedding.init(device);
 
         GPT {
             wte,
             h,
             lm_head,
-            rotary_embedding,
+            re,
             softcap: self.softcap,
         }
     }
@@ -175,7 +175,7 @@ pub struct GPT<B: Backend> {
     wte: Embedding<B>,
     h: Vec<GPTBlock<B>>,
     lm_head: Linear<B>,
-    rotary_embedding: RotaryEmbedding<B>,
+    re: RotaryEmbedding<B>,
     softcap: f64,
 }
 
@@ -185,7 +185,7 @@ impl<B: Backend> GPTMeta for GPT<B> {
     }
 
     fn seq_len(&self) -> usize {
-        self.rotary_embedding.seq_len()
+        self.re.seq_len()
     }
 }
 
@@ -197,9 +197,9 @@ impl<B: Backend> GPT<B> {
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(["B", "T"], &idx.dims());
         assert!(
-            t <= self.rotary_embedding.seq_len(),
+            t <= self.re.seq_len(),
             "Sequence length grew beyond the rotary embeddings cache: {t} > {}",
-            self.rotary_embedding.seq_len()
+            self.re.seq_len()
         );
 
         let mut x = self.wte.forward(idx);
@@ -209,13 +209,17 @@ impl<B: Backend> GPT<B> {
         // x = rms_norm(x);
 
         for block in &self.h {
-            x = block.forward(x, &self.rotary_embedding);
+            x = block.forward(x, &self.re);
         }
 
         x = rms_norm(x);
 
-        let logits = self.lm_head.forward(x);
-        let logits: Tensor<B, 3> = self.softcap * (logits / self.softcap).tanh();
+        let logits = self
+            .lm_head
+            .forward(x)
+            .div_scalar(self.softcap)
+            .tanh()
+            .mul_scalar(self.softcap);
 
         assert_shape_contract_periodically!(
             ["B", "T", "D"],
