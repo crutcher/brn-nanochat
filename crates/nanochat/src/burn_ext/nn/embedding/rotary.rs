@@ -226,8 +226,9 @@ pub fn positional_frequency_table<B: Backend>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bimm_contracts::assert_shape_contract;
     use burn::backend::Cuda;
-    use burn::tensor::Tolerance;
+    use burn::tensor::{Distribution, Tolerance};
 
     #[test]
     fn test_inverse_frequency_table() {
@@ -317,13 +318,41 @@ mod tests {
         type B = Cuda;
         let device = Default::default();
 
-        let config = RotaryEmbeddingConfig::new(1024, 64);
-        assert_eq!(config.seq_len(), 1024);
-        assert_eq!(config.head_dim(), 64);
+        let batch = 1;
+        let heads = 2;
+        let seq_len = 1024;
+        let head_dim = 64;
+
+        let config = RotaryEmbeddingConfig::new(seq_len, head_dim);
+        assert_eq!(config.seq_len(), seq_len);
+        assert_eq!(config.head_dim(), head_dim);
         assert_eq!(config.base, 10000);
 
         let re: RotaryEmbedding<B> = config.init(&device);
-        assert_eq!(re.seq_len(), 1024);
-        assert_eq!(re.head_dim(), 64);
+        assert_eq!(re.seq_len(), seq_len);
+        assert_eq!(re.head_dim(), head_dim);
+
+        let input: Tensor<B, 4> = Tensor::random(
+            [batch, seq_len, heads, head_dim],
+            Distribution::Default,
+            &device,
+        );
+
+        let output = re.apply(input.clone());
+        assert_shape_contract!(
+            ["B", "T", "H", "D"],
+            &output.dims(),
+            &[("B", batch), ("T", seq_len), ("H", heads), ("D", head_dim)]
+        );
+
+        let x1 = input.clone().slice_dim(3, s![..head_dim / 2]);
+        let x2 = input.clone().slice_dim(3, s![head_dim / 2..]);
+        let y1 = x1.clone() * re.cos.clone() + x2.clone() * re.sin.clone();
+        let y2 = x1 * (-re.sin.clone()) + x2 * re.cos.clone();
+        let expected = Tensor::cat(vec![y1, y2], 3);
+
+        expected
+            .to_data()
+            .assert_approx_eq(&output.to_data(), Tolerance::<f32>::default());
     }
 }
