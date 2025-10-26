@@ -19,6 +19,9 @@ use burn::prelude::{Backend, Int};
 pub trait GPTMeta {
     /// Return the size of the input and output.
     fn n_embed(&self) -> usize;
+
+    /// Return the size of the rotary embedding cache.
+    fn seq_len(&self) -> usize;
 }
 
 /// High-level GPT Config.
@@ -26,7 +29,7 @@ pub trait GPTMeta {
 pub struct GPTConfig {
     /// Sequence Length.
     #[config(default = "1024")]
-    pub sequence_len: usize,
+    pub seq_len: usize,
 
     /// Vocabulary Size.
     #[config(default = "50304")]
@@ -69,6 +72,10 @@ impl GPTMeta for GPTConfig {
     fn n_embed(&self) -> usize {
         self.n_embed
     }
+
+    fn seq_len(&self) -> usize {
+        self.seq_len
+    }
 }
 
 impl GPTConfig {
@@ -90,7 +97,7 @@ impl GPTConfig {
 
         let lm_head = LinearConfig::new(self.n_embed, self.vocab_size);
 
-        let rotary_seq_len = self.sequence_len * self.rotary_sequence_factor;
+        let rotary_seq_len = self.seq_len * self.rotary_sequence_factor;
         let rotary_embedding = RotaryEmbeddingConfig::new(rotary_seq_len, self.head_dim());
 
         GPTStructureConfig::new(wte, h, lm_head, rotary_embedding).with_softcap(self.softcap)
@@ -129,6 +136,10 @@ pub struct GPTStructureConfig {
 impl GPTMeta for GPTStructureConfig {
     fn n_embed(&self) -> usize {
         self.wte.n_embedding
+    }
+
+    fn seq_len(&self) -> usize {
+        self.rotary_embedding.seq_len()
     }
 }
 
@@ -171,6 +182,10 @@ pub struct GPT<B: Backend> {
 impl<B: Backend> GPTMeta for GPT<B> {
     fn n_embed(&self) -> usize {
         self.wte.weight.dims()[0]
+    }
+
+    fn seq_len(&self) -> usize {
+        self.rotary_embedding.seq_len()
     }
 }
 
@@ -218,7 +233,7 @@ mod tests {
     #[test]
     fn test_gpt_config() {
         let cfg = GPTConfig::new();
-        assert_eq!(cfg.sequence_len, 1024);
+        assert_eq!(cfg.seq_len, 1024);
         assert_eq!(cfg.vocab_size, 50304);
         assert_eq!(cfg.n_layer, 12);
         assert_eq!(cfg.n_head, 6);
