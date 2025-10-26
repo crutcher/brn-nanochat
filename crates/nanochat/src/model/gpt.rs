@@ -19,6 +19,9 @@ use burn::prelude::{Backend, Int};
 pub trait GPTMeta {
     /// Return the size of the input and output.
     fn n_embed(&self) -> usize;
+
+    /// Return the maximum sequence length.
+    fn max_seq_len(&self) -> usize;
 }
 
 /// High-level GPT Config.
@@ -69,6 +72,10 @@ impl GPTMeta for GPTConfig {
     fn n_embed(&self) -> usize {
         self.n_embed
     }
+
+    fn max_seq_len(&self) -> usize {
+        self.seq_len * self.rotary_sequence_factor
+    }
 }
 
 impl GPTConfig {
@@ -90,8 +97,7 @@ impl GPTConfig {
 
         let lm_head = LinearConfig::new(self.n_embed, self.vocab_size);
 
-        let re_seq_len = self.seq_len * self.rotary_sequence_factor;
-        let re = RotaryEmbeddingConfig::new(re_seq_len, self.head_dim());
+        let re = RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim());
 
         GPTStructureConfig::new(wte, h, lm_head, re).with_softcap(self.softcap)
     }
@@ -130,6 +136,10 @@ impl GPTMeta for GPTStructureConfig {
     fn n_embed(&self) -> usize {
         self.wte.n_embedding
     }
+
+    fn max_seq_len(&self) -> usize {
+        self.re.seq_len()
+    }
 }
 
 impl GPTStructureConfig {
@@ -166,6 +176,10 @@ pub struct GPT<B: Backend> {
 impl<B: Backend> GPTMeta for GPT<B> {
     fn n_embed(&self) -> usize {
         self.wte.weight.dims()[0]
+    }
+
+    fn max_seq_len(&self) -> usize {
+        self.re.seq_len()
     }
 }
 
