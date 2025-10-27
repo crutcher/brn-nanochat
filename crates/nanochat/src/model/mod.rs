@@ -3,4 +3,5 @@
 pub mod block;
 pub mod csa;
 pub mod gpt;
+pub mod kvcache;
 pub mod mlp;
