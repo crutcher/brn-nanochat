@@ -104,7 +104,7 @@ mod tests {
     use super::*;
     use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::{Cuda, Wgpu};
+    use burn::backend::{Wgpu};
     use burn::tensor::Distribution;
 
     #[test]
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_gpt_block_forward() {
-        type B = Cuda;
+        type B = Wgpu;
         let device = Default::default();
 
         let batch = 2;

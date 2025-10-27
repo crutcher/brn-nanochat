@@ -329,7 +329,7 @@ impl<B: Backend> GPT<B> {
 mod tests {
     use super::*;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::Cuda;
+    use burn::backend::{Wgpu};
     use burn::tensor::Distribution;
 
     #[test]
@@ -348,17 +348,19 @@ mod tests {
 
     #[test]
     fn test_gpt_forward() {
-        type B = Cuda;
+        type B = Wgpu;
         let device = Default::default();
 
         let batch_size = 1;
         let seq_len = 100;
         let n_layer = 4;
+        let n_embed = 36;
 
         let vocab_size = 1000;
 
         let cfg = GPTConfig::new()
             .with_vocab_size(vocab_size)
+            .with_n_embed(n_embed)
             .with_n_layer(n_layer);
         let gpt: GPT<B> = cfg.init(&device);
 
