@@ -36,6 +36,9 @@ pub trait GPTMeta {
 
     /// Return the maximum sequence length.
     fn max_seq_len(&self) -> usize;
+
+    /// Return the number of layers.
+    fn n_layer(&self) -> usize;
 }
 
 /// High-level GPT Config.
@@ -106,6 +109,10 @@ impl GPTMeta for GPTConfig {
 
     fn max_seq_len(&self) -> usize {
         self.init_seq_len() * self.max_seq_len_factor
+    }
+
+    fn n_layer(&self) -> usize {
+        self.n_layer
     }
 }
 
@@ -191,6 +198,10 @@ impl GPTMeta for GPTStructureConfig {
     fn max_seq_len(&self) -> usize {
         self.r_emb.seq_len()
     }
+
+    fn n_layer(&self) -> usize {
+        self.h.len()
+    }
 }
 
 impl GPTStructureConfig {
@@ -253,6 +264,10 @@ impl<B: Backend> GPTMeta for GPT<B> {
 
     fn max_seq_len(&self) -> usize {
         self.r_emb.seq_len()
+    }
+
+    fn n_layer(&self) -> usize {
+        self.h.len()
     }
 }
 
@@ -317,11 +332,27 @@ impl<B: Backend> GPT<B> {
         KVCacheConfig {
             batch_size,
             num_heads: self.n_kv_head(),
-            seq_len: self.init_seq_len,
+            seq_len: self.init_seq_len(),
             head_dim: self.head_dim(),
-            num_layers: self.h.len(),
+            num_layers: self.n_layer(),
         }
         .init()
+    }
+
+    /// Calculate the estimated FLOPs per token for the model.
+    ///
+    /// Ref: <https://arxiv.org/abs/2204.02311>
+    pub fn estimate_flops_per_token(&self) -> usize {
+        let nparams = self.num_params();
+        let nparams_embedding = self.wte.num_params();
+        let nparams = nparams - nparams_embedding;
+
+        let l = self.n_layer();
+        let h = self.n_head();
+        let q = self.head_dim();
+        let t = self.init_seq_len;
+
+        6 * nparams + 12 * l * h * q * t
     }
 }
 
