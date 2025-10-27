@@ -227,7 +227,7 @@ pub fn positional_frequency_table<B: Backend>(
 mod tests {
     use super::*;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::{Wgpu};
+    use burn::backend::Wgpu;
     use burn::tensor::{Distribution, Tolerance};
 
     #[test]
