@@ -364,14 +364,14 @@ mod tests {
 
         let mut kv_cache = gpt.new_kv_cache(batch_size);
 
-        let input = Tensor::<B, 2>::random(
+        let input_tokens = Tensor::<B, 2>::random(
             [batch_size, seq_len],
             Distribution::Uniform(0.0, vocab_size as f64),
             &device,
         )
         .int();
 
-        let logits = gpt.forward(input, &mut Some(&mut kv_cache));
+        let logits = gpt.forward(input_tokens, &mut Some(&mut kv_cache));
         assert_shape_contract!(
             ["B", "T", "D"],
             &logits.dims(),
