@@ -217,28 +217,12 @@ impl<B: Backend> CausalSelfAttention<B> {
         // Number of keys/values in total (in the cache + current forward pass)
         let _t_kv = k.dims()[2];
 
-        let y: Tensor<B, 4> = if kv_cache.is_none() || t_q == t_kv {
-            attention::scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                None,
-                None,
-                ScaledDotProductAttentionConfig::new()
-                    .with_is_causal(true)
-                    .with_enable_gqa(self.gqa_enabled()),
-            )
+        let (attn_mask, cfg) = if kv_cache.is_none() || t_q == t_kv {
+            (None, ScaledDotProductAttentionConfig::new()
+                .with_is_causal(true))
         } else if t_q == 1 {
-            attention::scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                None,
-                None,
-                ScaledDotProductAttentionConfig::new()
-                    .with_is_causal(false)
-                    .with_enable_gqa(self.gqa_enabled()),
-            )
+            (None, ScaledDotProductAttentionConfig::new()
+                .with_is_causal(false))
         } else {
             let device = q.device();
 
@@ -252,19 +236,20 @@ impl<B: Backend> CausalSelfAttention<B> {
                 .bool();
             attn_mask = attn_mask.slice_assign(s![.., prefix_len..], fill);
 
+            (Some(attn_mask), ScaledDotProductAttentionConfig::new()
+                .with_is_causal(false))
+        };
+
+        let y =
             attention::scaled_dot_product_attention(
                 q,
                 k,
                 v,
                 None,
-                Some(attn_mask),
-                ScaledDotProductAttentionConfig::new()
-                    .with_is_causal(false)
+                attn_mask,
+                cfg
                     .with_enable_gqa(self.gqa_enabled()),
             )
-        };
-
-        let y = y
             .swap_dims(1, 2)
             .reshape([b as i32, t_q as i32, self.n_embed() as i32]);
 
