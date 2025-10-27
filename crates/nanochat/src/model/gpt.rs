@@ -3,7 +3,6 @@
 use crate::burn_ext::nn::embedding::rotary::{
     RotaryEmbedding, RotaryEmbeddingConfig, RotaryEmbeddingMeta,
 };
-use crate::burn_ext::norm::rms_norm;
 use crate::model::block::{GPTBlock, GPTBlockConfig};
 use crate::model::csa::CausalSelfAttentionConfig;
 use crate::model::kvcache::KVCache;
@@ -13,6 +12,7 @@ use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::activation::ActivationConfig;
+use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
 use burn::nn::{Embedding, EmbeddingConfig, Linear, LinearConfig};
 use burn::prelude::{Backend, Int};
 
@@ -67,6 +67,11 @@ pub struct GPTConfig {
     /// Over-compute factor for rotary embeddings.
     #[config(default = "10")]
     pub rotary_sequence_factor: usize,
+
+    /// Normalization.
+    /// This normalization will be adapted to the appropriate feature count.
+    #[config(default = "NormalizationConfig::Rms(RmsNormConfig::new(0))")]
+    pub norm: NormalizationConfig,
 }
 
 impl GPTMeta for GPTConfig {
@@ -97,6 +102,7 @@ impl GPTConfig {
             lm_head: LinearConfig::new(self.n_embed, self.vocab_size),
             r_emb: RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim()),
             softcap: self.softcap,
+            norm: self.norm,
         }
     }
 
@@ -107,11 +113,13 @@ impl GPTConfig {
     /// Build the [`GPTBlockConfig`] for this config.
     pub fn block_config(&self) -> GPTBlockConfig {
         GPTBlockConfig::new(
-            CausalSelfAttentionConfig::new(self.n_head, self.n_kv_head, self.n_embed),
+            CausalSelfAttentionConfig::new(self.n_head, self.n_kv_head, self.n_embed)
+                .with_norm(self.norm.clone()),
             MLPConfig::new(self.n_embed)
                 .with_expansion_factor(self.expansion_factor)
                 .with_activation(self.activation.clone()),
         )
+        .with_norm(self.norm.clone())
     }
 }
 
@@ -128,6 +136,11 @@ pub struct GPTStructureConfig {
     /// Softcap for the logits.
     #[config(default = "15.0")]
     pub softcap: f64,
+
+    /// Normalization.
+    /// This normalization will be adapted to the appropriate feature count.
+    #[config(default = "NormalizationConfig::Rms(RmsNormConfig::new(0))")]
+    pub norm: NormalizationConfig,
 }
 
 impl GPTMeta for GPTStructureConfig {
@@ -146,6 +159,7 @@ impl GPTStructureConfig {
         self,
         device: &B::Device,
     ) -> GPT<B> {
+        let n_embed = self.n_embed();
         GPT {
             wte: self.wte.init(device),
             h: self
@@ -154,6 +168,7 @@ impl GPTStructureConfig {
                 .enumerate()
                 .map(|(layer_idx, c)| c.init(layer_idx, device))
                 .collect(),
+            h_norm: self.norm.clone().with_num_features(n_embed).init(device),
             lm_head: self.lm_head.init(device),
             r_emb: self.r_emb.init(device),
             softcap: self.softcap,
@@ -166,6 +181,7 @@ impl GPTStructureConfig {
 pub struct GPT<B: Backend> {
     wte: Embedding<B>,
     h: Vec<GPTBlock<B>>,
+    h_norm: Normalization<B>,
     lm_head: Linear<B>,
     r_emb: RotaryEmbedding<B>,
     softcap: f64,
@@ -214,7 +230,7 @@ impl<B: Backend> GPT<B> {
         for block in &self.h {
             x = block.forward(x, &r_emb, kv_cache);
         }
-        x = rms_norm(x);
+        x = self.h_norm.forward(x);
 
         let logits = self
             .lm_head
