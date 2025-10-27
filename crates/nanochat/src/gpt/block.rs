@@ -1,9 +1,11 @@
 //! # GPT Block
 
+use crate::burn_ext::nn::attention::csa::{
+    CausalSelfAttention, CausalSelfAttentionConfig, CausalSelfAttentionMeta,
+};
+use crate::burn_ext::nn::attention::kvcache::KVCache;
 use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
-use crate::model::csa::{CausalSelfAttention, CausalSelfAttentionConfig, CausalSelfAttentionMeta};
-use crate::model::kvcache::KVCache;
-use crate::model::mlp::{MLP, MLPConfig, MLPMeta};
+use crate::gpt::mlp::{MLP, MLPConfig, MLPMeta};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;

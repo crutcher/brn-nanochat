@@ -1,10 +1,10 @@
 //! # Causal Self-Attention
 
-use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
-use crate::burn_ext::nn::functional::attention::{
+use crate::burn_ext::nn::attention::kvcache::KVCache;
+use crate::burn_ext::nn::attention::sdpa::{
     ScaledDotProductAttentionConfig, scaled_dot_product_attention,
 };
-use crate::model::kvcache::KVCache;
+use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;

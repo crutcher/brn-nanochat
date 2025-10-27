@@ -1,12 +1,12 @@
 //! # GPT Module
 
+use crate::burn_ext::nn::attention::csa::{CausalSelfAttentionConfig, CausalSelfAttentionMeta};
+use crate::burn_ext::nn::attention::kvcache::{KVCache, KVCacheConfig};
 use crate::burn_ext::nn::embedding::rotary::{
     RotaryEmbedding, RotaryEmbeddingConfig, RotaryEmbeddingMeta,
 };
-use crate::model::block::{GPTBlock, GPTBlockConfig};
-use crate::model::csa::{CausalSelfAttentionConfig, CausalSelfAttentionMeta};
-use crate::model::kvcache::{KVCache, KVCacheConfig};
-use crate::model::mlp::MLPConfig;
+use crate::gpt::block::{GPTBlock, GPTBlockConfig};
+use crate::gpt::mlp::MLPConfig;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::module::Module;

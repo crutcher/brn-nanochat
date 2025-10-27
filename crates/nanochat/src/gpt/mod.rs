@@ -1,7 +1,5 @@
 //! # GPT Module
 
 pub mod block;
-pub mod csa;
-pub mod gpt;
-pub mod kvcache;
+pub mod gpt_model;
 pub mod mlp;
