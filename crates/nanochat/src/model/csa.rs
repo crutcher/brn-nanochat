@@ -94,8 +94,8 @@ impl CausalSelfAttentionConfig {
             self.n_head
         );
         assert!(
-            self.n_kv_head < self.n_head,
-            "n_kv_head must be < n_head; got n_kv_head={}, n_head={}",
+            self.n_kv_head <= self.n_head,
+            "n_kv_head must be <= n_head; got n_kv_head={}, n_head={}",
             self.n_kv_head,
             self.n_head
         );

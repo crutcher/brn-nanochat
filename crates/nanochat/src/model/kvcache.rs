@@ -44,6 +44,16 @@ pub struct KVCacheConfig {
     pub num_layers: usize,
 }
 
+impl KVCacheConfig {
+    /// Set the `batch_size`.
+    pub fn with_batch_size(
+        self,
+        batch_size: usize,
+    ) -> Self {
+        Self { batch_size, ..self }
+    }
+}
+
 impl KVCacheMeta for KVCacheConfig {
     fn batch_size(&self) -> usize {
         self.batch_size

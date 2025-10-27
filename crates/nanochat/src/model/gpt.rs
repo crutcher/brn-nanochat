@@ -4,22 +4,35 @@ use crate::burn_ext::nn::embedding::rotary::{
     RotaryEmbedding, RotaryEmbeddingConfig, RotaryEmbeddingMeta,
 };
 use crate::model::block::{GPTBlock, GPTBlockConfig};
-use crate::model::csa::CausalSelfAttentionConfig;
-use crate::model::kvcache::KVCache;
+use crate::model::csa::{CausalSelfAttentionConfig, CausalSelfAttentionMeta};
+use crate::model::kvcache::{KVCache, KVCacheConfig};
 use crate::model::mlp::MLPConfig;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
-use burn::config::Config;
 use burn::module::Module;
 use burn::nn::activation::ActivationConfig;
 use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
 use burn::nn::{Embedding, EmbeddingConfig, Linear, LinearConfig};
-use burn::prelude::{Backend, Int};
+use burn::prelude::{Backend, Config, Int};
 
 /// Common meta for [`GPT`] and [`GPTConfig`].
 pub trait GPTMeta {
     /// Return the size of the input and output.
     fn n_embed(&self) -> usize;
+
+    /// Return the number of heads.
+    fn n_head(&self) -> usize;
+
+    /// Return the number of KV heads.
+    fn n_kv_head(&self) -> usize;
+
+    /// Return the size of each head.
+    fn head_dim(&self) -> usize {
+        self.n_embed() / self.n_head()
+    }
+
+    /// Return the initial sequence length.
+    fn init_seq_len(&self) -> usize;
 
     /// Return the maximum sequence length.
     fn max_seq_len(&self) -> usize;
@@ -28,9 +41,13 @@ pub trait GPTMeta {
 /// High-level GPT Config.
 #[derive(Config, Debug)]
 pub struct GPTConfig {
-    /// Sequence Length.
+    /// Initial sequence Length.
     #[config(default = "1024")]
-    pub seq_len: usize,
+    pub init_seq_len: usize,
+
+    /// Max `seq_len` factor.
+    #[config(default = "10")]
+    pub max_seq_len_factor: usize,
 
     /// Vocabulary Size.
     #[config(default = "50304")]
@@ -64,10 +81,6 @@ pub struct GPTConfig {
     #[config(default = "ActivationConfig::Relu")]
     pub activation: ActivationConfig,
 
-    /// Over-compute factor for rotary embeddings.
-    #[config(default = "10")]
-    pub rotary_sequence_factor: usize,
-
     /// Normalization.
     /// This normalization will be adapted to the appropriate feature count.
     #[config(default = "NormalizationConfig::Rms(RmsNormConfig::new(0))")]
@@ -79,8 +92,20 @@ impl GPTMeta for GPTConfig {
         self.n_embed
     }
 
+    fn n_head(&self) -> usize {
+        self.n_head
+    }
+
+    fn n_kv_head(&self) -> usize {
+        self.n_kv_head
+    }
+
+    fn init_seq_len(&self) -> usize {
+        self.init_seq_len
+    }
+
     fn max_seq_len(&self) -> usize {
-        self.seq_len * self.rotary_sequence_factor
+        self.init_seq_len() * self.max_seq_len_factor
     }
 }
 
@@ -101,13 +126,10 @@ impl GPTConfig {
             h: (0..self.n_layer).map(|_| block_config.clone()).collect(),
             lm_head: LinearConfig::new(self.n_embed, self.vocab_size),
             r_emb: RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim()),
-            softcap: self.softcap,
             norm: self.norm,
+            init_seq_len: self.init_seq_len,
+            softcap: self.softcap,
         }
-    }
-
-    pub fn head_dim(&self) -> usize {
-        self.n_embed / self.n_head
     }
 
     /// Build the [`GPTBlockConfig`] for this config.
@@ -133,6 +155,8 @@ pub struct GPTStructureConfig {
     pub lm_head: LinearConfig,
     pub r_emb: RotaryEmbeddingConfig,
 
+    pub init_seq_len: usize,
+
     /// Softcap for the logits.
     #[config(default = "15.0")]
     pub softcap: f64,
@@ -145,7 +169,23 @@ pub struct GPTStructureConfig {
 
 impl GPTMeta for GPTStructureConfig {
     fn n_embed(&self) -> usize {
-        self.wte.n_embedding
+        self.wte.d_model
+    }
+
+    fn n_head(&self) -> usize {
+        self.h[0].attn.n_head()
+    }
+
+    fn n_kv_head(&self) -> usize {
+        self.h[0].attn.n_kv_head()
+    }
+
+    fn head_dim(&self) -> usize {
+        self.h[0].attn.head_dim()
+    }
+
+    fn init_seq_len(&self) -> usize {
+        self.init_seq_len
     }
 
     fn max_seq_len(&self) -> usize {
@@ -171,6 +211,7 @@ impl GPTStructureConfig {
             h_norm: self.norm.clone().with_num_features(n_embed).init(device),
             lm_head: self.lm_head.init(device),
             r_emb: self.r_emb.init(device),
+            init_seq_len: self.init_seq_len,
             softcap: self.softcap,
         }
     }
@@ -184,12 +225,30 @@ pub struct GPT<B: Backend> {
     h_norm: Normalization<B>,
     lm_head: Linear<B>,
     r_emb: RotaryEmbedding<B>,
+
+    init_seq_len: usize,
     softcap: f64,
 }
 
 impl<B: Backend> GPTMeta for GPT<B> {
     fn n_embed(&self) -> usize {
         self.wte.weight.dims()[0]
+    }
+
+    fn n_head(&self) -> usize {
+        self.h[0].attn.n_head()
+    }
+
+    fn n_kv_head(&self) -> usize {
+        self.h[0].attn.n_kv_head()
+    }
+
+    fn head_dim(&self) -> usize {
+        self.h[0].attn.head_dim()
+    }
+
+    fn init_seq_len(&self) -> usize {
+        self.init_seq_len
     }
 
     fn max_seq_len(&self) -> usize {
@@ -246,16 +305,37 @@ impl<B: Backend> GPT<B> {
         );
         logits
     }
+
+    /// Allocate a new [`KVCache`]
+    ///
+    /// # Arguments
+    /// - `batch_size`: the batch size.
+    pub fn new_kv_cache(
+        &self,
+        batch_size: usize,
+    ) -> KVCache<B> {
+        KVCacheConfig {
+            batch_size,
+            num_heads: self.n_kv_head(),
+            seq_len: self.init_seq_len,
+            head_dim: self.head_dim(),
+            num_layers: self.h.len(),
+        }
+        .init()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bimm_contracts::assert_shape_contract;
+    use burn::backend::Cuda;
+    use burn::tensor::Distribution;
 
     #[test]
     fn test_gpt_config() {
         let cfg = GPTConfig::new();
-        assert_eq!(cfg.seq_len, 1024);
+        assert_eq!(cfg.init_seq_len, 1024);
         assert_eq!(cfg.vocab_size, 50304);
         assert_eq!(cfg.n_layer, 12);
         assert_eq!(cfg.n_head, 6);
@@ -264,5 +344,38 @@ mod tests {
         assert_eq!(cfg.expansion_factor, 4);
 
         assert_eq!(cfg.n_embed(), 768);
+    }
+
+    #[test]
+    fn test_gpt_forward() {
+        type B = Cuda;
+        let device = Default::default();
+
+        let batch_size = 1;
+        let seq_len = 100;
+        let n_layer = 4;
+
+        let vocab_size = 1000;
+
+        let cfg = GPTConfig::new()
+            .with_vocab_size(vocab_size)
+            .with_n_layer(n_layer);
+        let gpt: GPT<B> = cfg.init(&device);
+
+        let mut kv_cache = gpt.new_kv_cache(batch_size);
+
+        let input = Tensor::<B, 2>::random(
+            [batch_size, seq_len],
+            Distribution::Uniform(0.0, vocab_size as f64),
+            &device,
+        )
+        .int();
+
+        let logits = gpt.forward(input, &mut Some(&mut kv_cache));
+        assert_shape_contract!(
+            ["B", "T", "D"],
+            &logits.dims(),
+            &[("B", batch_size), ("T", seq_len), ("D", gpt.n_embed())]
+        );
     }
 }
