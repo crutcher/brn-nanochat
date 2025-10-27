@@ -1,13 +1,13 @@
 //! # GPT Block
 
 use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
-use crate::burn_ext::norm::rms_norm;
 use crate::model::csa::{CausalSelfAttention, CausalSelfAttentionConfig, CausalSelfAttentionMeta};
 use crate::model::kvcache::KVCache;
 use crate::model::mlp::{MLP, MLPConfig, MLPMeta};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
+use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
 use burn::prelude::Backend;
 
 /// Common meta for [`GPTBlock`] and [`GPTBlockConfig`].
@@ -24,6 +24,11 @@ pub struct GPTBlockConfig {
 
     /// MLP Config.
     pub mlp: MLPConfig,
+
+    /// Attention Normalization.
+    /// This normalization will be adapted to the appropriate feature count.
+    #[config(default = "NormalizationConfig::Rms(RmsNormConfig::new(0))")]
+    pub norm: NormalizationConfig,
 }
 
 impl GPTBlockMeta for GPTBlockConfig {
@@ -40,8 +45,11 @@ impl GPTBlockConfig {
         device: &B::Device,
     ) -> GPTBlock<B> {
         assert_eq!(self.attn.n_embed(), self.mlp.n_embed());
+        let n_embed = self.n_embed();
         GPTBlock {
+            input_norm: self.norm.clone().with_num_features(n_embed).init(device),
             attn: self.attn.init(layer_index, device),
+            attn_norm: self.norm.clone().with_num_features(n_embed).init(device),
             mlp: self.mlp.init(device),
         }
     }
@@ -50,7 +58,9 @@ impl GPTBlockConfig {
 /// GPT Block
 #[derive(Module, Debug)]
 pub struct GPTBlock<B: Backend> {
+    pub input_norm: Normalization<B>,
     pub attn: CausalSelfAttention<B>,
+    pub attn_norm: Normalization<B>,
     pub mlp: MLP<B>,
 }
 
@@ -69,7 +79,7 @@ impl<B: Backend> GPTBlock<B> {
     ///
     /// # Arguments
     /// - `input`: a ``[B, T, D]`` input.
-    /// - `re`: a ``[1, T, 1, D/2]`` embedding.
+    /// - `r_emb`: a ``[1, T, 1, D/2]`` embedding.
     /// - `kv_cache`: optional KV cache.
     ///
     /// # Returns
@@ -77,12 +87,12 @@ impl<B: Backend> GPTBlock<B> {
     pub fn forward(
         &self,
         input: Tensor<B, 3>,
-        re: &RotaryEmbedding<B>,
+        r_emb: &RotaryEmbedding<B>,
         kv_cache: &mut Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
-        let x = rms_norm(input);
-        let x = self.attn.forward(x, re, kv_cache);
-        let x = rms_norm(x);
+        let x = self.input_norm.forward(input);
+        let x = self.attn.forward(x, r_emb, kv_cache);
+        let x = self.attn_norm.forward(x);
         self.mlp.forward(x)
     }
 }
@@ -143,10 +153,10 @@ mod tests {
 
         let input = Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
-        let re = RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
+        let r_emb = RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
         let mut kv_cache: Option<&mut KVCache<B>> = None;
 
-        let output = block.forward(input.clone(), &re, &mut kv_cache);
+        let output = block.forward(input.clone(), &r_emb, &mut kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),

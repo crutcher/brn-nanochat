@@ -95,7 +95,7 @@ impl GPTConfig {
             wte: EmbeddingConfig::new(self.vocab_size, self.n_embed),
             h: (0..self.n_layer).map(|_| block_config.clone()).collect(),
             lm_head: LinearConfig::new(self.n_embed, self.vocab_size),
-            re: RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim()),
+            r_emb: RotaryEmbeddingConfig::new(self.max_seq_len(), self.head_dim()),
             softcap: self.softcap,
         }
     }
@@ -123,7 +123,7 @@ pub struct GPTStructureConfig {
     pub wte: EmbeddingConfig,
     pub h: Vec<GPTBlockConfig>,
     pub lm_head: LinearConfig,
-    pub re: RotaryEmbeddingConfig,
+    pub r_emb: RotaryEmbeddingConfig,
 
     /// Softcap for the logits.
     #[config(default = "15.0")]
@@ -136,7 +136,7 @@ impl GPTMeta for GPTStructureConfig {
     }
 
     fn max_seq_len(&self) -> usize {
-        self.re.seq_len()
+        self.r_emb.seq_len()
     }
 }
 
@@ -155,7 +155,7 @@ impl GPTStructureConfig {
                 .map(|(layer_idx, c)| c.init(layer_idx, device))
                 .collect(),
             lm_head: self.lm_head.init(device),
-            re: self.re.init(device),
+            r_emb: self.r_emb.init(device),
             softcap: self.softcap,
         }
     }
@@ -167,7 +167,7 @@ pub struct GPT<B: Backend> {
     wte: Embedding<B>,
     h: Vec<GPTBlock<B>>,
     lm_head: Linear<B>,
-    re: RotaryEmbedding<B>,
+    r_emb: RotaryEmbedding<B>,
     softcap: f64,
 }
 
@@ -177,7 +177,7 @@ impl<B: Backend> GPTMeta for GPT<B> {
     }
 
     fn max_seq_len(&self) -> usize {
-        self.re.seq_len()
+        self.r_emb.seq_len()
     }
 }
 
@@ -194,16 +194,16 @@ impl<B: Backend> GPT<B> {
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(["B", "T"], &idx.dims());
         assert!(
-            t <= self.re.seq_len(),
+            t <= self.r_emb.seq_len(),
             "Sequence length grew beyond the rotary embeddings cache: {t} > {}",
-            self.re.seq_len()
+            self.r_emb.seq_len()
         );
 
         let t0 = match kv_cache {
             Some(kv_cache) => kv_cache.pos(),
             None => 0,
         };
-        let re = self.re.clip_range(t0..t0 + t);
+        let r_emb = self.r_emb.clip_range(t0..t0 + t);
 
         let mut x = self.wte.forward(idx);
 
@@ -212,7 +212,7 @@ impl<B: Backend> GPT<B> {
         // x = rms_norm(x);
 
         for block in &self.h {
-            x = block.forward(x, &re, kv_cache);
+            x = block.forward(x, &r_emb, kv_cache);
         }
         x = rms_norm(x);
 

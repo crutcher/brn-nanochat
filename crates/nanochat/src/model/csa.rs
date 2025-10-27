@@ -1,14 +1,15 @@
 //! # Causal Self-Attention
 
 use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
-use crate::burn_ext::nn::functional::attention;
-use crate::burn_ext::nn::functional::attention::ScaledDotProductAttentionConfig;
-use crate::burn_ext::norm;
+use crate::burn_ext::nn::functional::attention::{
+    ScaledDotProductAttentionConfig, scaled_dot_product_attention,
+};
 use crate::model::kvcache::KVCache;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
+use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
 use burn::nn::{Linear, LinearConfig};
 use burn::prelude::{Backend, Bool, Int, s};
 
@@ -45,6 +46,11 @@ pub struct CausalSelfAttentionConfig {
 
     /// Embedding Size.
     pub n_embed: usize,
+
+    /// Attention Normalization.
+    /// This normalization will be adapted to the appropriate feature count.
+    #[config(default = "NormalizationConfig::Rms(RmsNormConfig::new(0))")]
+    pub norm: NormalizationConfig,
 }
 
 impl CausalSelfAttentionMeta for CausalSelfAttentionConfig {
@@ -118,8 +124,18 @@ impl CausalSelfAttentionConfig {
             c_q: LinearConfig::new(self.n_embed, self.n_head * head_dim)
                 .with_bias(false)
                 .init(device),
+            q_norm: self
+                .norm
+                .clone()
+                .with_num_features(self.head_dim())
+                .init(device),
             c_k: LinearConfig::new(self.n_embed, self.n_kv_head * head_dim)
                 .with_bias(false)
+                .init(device),
+            k_norm: self
+                .norm
+                .clone()
+                .with_num_features(self.head_dim())
                 .init(device),
             c_v: LinearConfig::new(self.n_embed, self.n_kv_head * head_dim)
                 .with_bias(false)
@@ -137,7 +153,9 @@ pub struct CausalSelfAttention<B: Backend> {
     pub layer_index: usize,
     pub head_dim: usize,
     pub c_q: Linear<B>,
+    pub q_norm: Normalization<B>,
     pub c_k: Linear<B>,
+    pub k_norm: Normalization<B>,
     pub c_v: Linear<B>,
     pub c_proj: Linear<B>,
 }
@@ -165,7 +183,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     ///
     /// # Arguments
     /// - `input`: a ``[B, T, D]`` sequence.
-    /// - `re`: a rotary embedding with len ``T``.
+    /// - `r_emb`: a rotary embedding with len ``T``.
     /// - `kv_cache`: optional KV cache.
     ///
     /// # Returns
@@ -173,7 +191,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     pub fn forward(
         &self,
         input: Tensor<B, 3>,
-        re: &RotaryEmbedding<B>,
+        r_emb: &RotaryEmbedding<B>,
         kv_cache: &mut Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
         let [b, t_q] = unpack_shape_contract!(
@@ -187,19 +205,19 @@ impl<B: Backend> CausalSelfAttention<B> {
             .c_q
             .forward(input.clone())
             .reshape([b, t_q, self.n_head(), self.head_dim()]);
-        let q = re.apply(q);
-        let q = norm::rms_norm(q);
+        let q = r_emb.apply(q);
+        let q = self.q_norm.forward(q);
         let q = q.swap_dims(1, 2);
 
         let k =
             self.c_k
                 .forward(input.clone())
                 .reshape([b, t_q, self.n_kv_head(), self.head_dim()]);
-        let k = re.apply(k);
-        let k = norm::rms_norm(k);
-        let mut k = k.swap_dims(1, 2);
+        let k = r_emb.apply(k);
+        let k = self.k_norm.forward(k);
+        let k = k.swap_dims(1, 2);
 
-        let mut v = self
+        let v = self
             .c_v
             .forward(input)
             .reshape([b, t_q, self.n_kv_head(), self.head_dim()])
@@ -207,49 +225,43 @@ impl<B: Backend> CausalSelfAttention<B> {
 
         // B, H_?, T, D
 
+        let mut k = k;
+        let mut v = v;
+
         if let Some(kvc) = kv_cache {
             (k, v) = (*kvc).insert_kv(self.layer_index, k.clone(), v.clone());
         }
         let t_kv = k.dims()[2];
 
-        // Number of queries in this forward pass.
-        let _t_q = q.dims()[2];
-        // Number of keys/values in total (in the cache + current forward pass)
-        let _t_kv = k.dims()[2];
-
-        let (attn_mask, cfg) = if kv_cache.is_none() || t_q == t_kv {
-            (None, ScaledDotProductAttentionConfig::new()
-                .with_is_causal(true))
+        let attn_mask: Option<Tensor<B, 2, Bool>>;
+        let is_causal: bool;
+        if kv_cache.is_none() || t_q == t_kv {
+            attn_mask = None;
+            is_causal = true;
         } else if t_q == 1 {
-            (None, ScaledDotProductAttentionConfig::new()
-                .with_is_causal(false))
+            attn_mask = None;
+            is_causal = false;
         } else {
             let device = q.device();
-
-            let mut attn_mask = Tensor::<B, 2, Bool>::empty([t_q, t_kv], &device);
+            let mut mask = Tensor::<B, 2, Bool>::empty([t_q, t_kv], &device);
             let prefix_len = t_kv - t_q;
             if prefix_len > 0 {
-                attn_mask = attn_mask.slice_fill(s![.., ..prefix_len], true);
+                mask = mask.slice_fill(s![.., ..prefix_len], true);
             }
             let fill = Tensor::<B, 2, Int>::ones([t_q, t_q], &device)
                 .tril(-1)
                 .bool();
-            attn_mask = attn_mask.slice_assign(s![.., prefix_len..], fill);
+            mask = mask.slice_assign(s![.., prefix_len..], fill);
 
-            (Some(attn_mask), ScaledDotProductAttentionConfig::new()
-                .with_is_causal(false))
+            attn_mask = Some(mask);
+            is_causal = false;
         };
 
-        let y =
-            attention::scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                None,
-                attn_mask,
-                cfg
-                    .with_enable_gqa(self.gqa_enabled()),
-            )
+        let cfg = ScaledDotProductAttentionConfig::new()
+            .with_is_causal(is_causal)
+            .with_enable_gqa(self.gqa_enabled());
+
+        let y = scaled_dot_product_attention(q, k, v, None, attn_mask, cfg)
             .swap_dims(1, 2)
             .reshape([b as i32, t_q as i32, self.n_embed() as i32]);
 
@@ -305,14 +317,14 @@ mod tests {
         let head_dim = csa.head_dim();
 
         let re_cfg = RotaryEmbeddingConfig::new(seq_len, csa.head_dim());
-        let re: RotaryEmbedding<B> = re_cfg.init(&device);
+        let r_emb: RotaryEmbedding<B> = re_cfg.init(&device);
 
         let input: Tensor<B, 3> =
             Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
         let mut kv_cache: Option<&mut KVCache<B>> = None;
 
-        let output = csa.forward(input.clone(), &re, &mut kv_cache);
+        let output = csa.forward(input.clone(), &r_emb, &mut kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),
