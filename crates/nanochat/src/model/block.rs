@@ -3,6 +3,7 @@
 use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 use crate::burn_ext::norm::rms_norm;
 use crate::model::csa::{CausalSelfAttention, CausalSelfAttentionConfig, CausalSelfAttentionMeta};
+use crate::model::kvcache::KVCache;
 use crate::model::mlp::{MLP, MLPConfig, MLPMeta};
 use burn::Tensor;
 use burn::config::Config;
@@ -69,6 +70,7 @@ impl<B: Backend> GPTBlock<B> {
     /// # Arguments
     /// - `input`: a ``[B, T, D]`` input.
     /// - `re`: a ``[1, T, 1, D/2]`` embedding.
+    /// - `kv_cache`: optional KV cache.
     ///
     /// # Returns
     /// - the ``[B, T, D]`` block output.
@@ -76,9 +78,10 @@ impl<B: Backend> GPTBlock<B> {
         &self,
         input: Tensor<B, 3>,
         re: &RotaryEmbedding<B>,
+        kv_cache: &Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
         let x = rms_norm(input);
-        let x = self.attn.forward(x, re);
+        let x = self.attn.forward(x, re, kv_cache);
         let x = rms_norm(x);
         self.mlp.forward(x)
     }
@@ -141,8 +144,9 @@ mod tests {
         let input = Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
         let re = RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
+        let kv_cache = None;
 
-        let output = block.forward(input.clone(), &re);
+        let output = block.forward(input.clone(), &re, &kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),

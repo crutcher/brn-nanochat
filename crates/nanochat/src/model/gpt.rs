@@ -6,6 +6,7 @@ use crate::burn_ext::nn::embedding::rotary::{
 use crate::burn_ext::norm::rms_norm;
 use crate::model::block::{GPTBlock, GPTBlockConfig};
 use crate::model::csa::CausalSelfAttentionConfig;
+use crate::model::kvcache::KVCache;
 use crate::model::mlp::MLPConfig;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
@@ -182,9 +183,14 @@ impl<B: Backend> GPTMeta for GPT<B> {
 
 impl<B: Backend> GPT<B> {
     /// Forward Pass.
+    ///
+    /// # Arguments
+    /// - `idx`: a ``[B, T]`` input.
+    /// - `kv_cache`: a `KVCache`.
     pub fn forward(
         &self,
         idx: Tensor<B, 2, Int>,
+        kv_cache: &Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(["B", "T"], &idx.dims());
         assert!(
@@ -193,6 +199,12 @@ impl<B: Backend> GPT<B> {
             self.re.seq_len()
         );
 
+        let t0 = match kv_cache {
+            Some(kv_cache) => kv_cache.pos(),
+            None => 0,
+        };
+        let re = self.re.clip_range(t0..t0 + t);
+
         let mut x = self.wte.forward(idx);
 
         // Note: The reference nanochat has a norm here,
@@ -200,7 +212,7 @@ impl<B: Backend> GPT<B> {
         // x = rms_norm(x);
 
         for block in &self.h {
-            x = block.forward(x, &self.re);
+            x = block.forward(x, &re, kv_cache);
         }
         x = rms_norm(x);
 

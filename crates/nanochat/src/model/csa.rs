@@ -4,6 +4,7 @@ use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
 use crate::burn_ext::nn::functional::attention;
 use crate::burn_ext::nn::functional::attention::ScaledDotProductAttentionConfig;
 use crate::burn_ext::norm;
+use crate::model::kvcache::KVCache;
 use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
 use burn::Tensor;
 use burn::config::Config;
@@ -165,6 +166,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     /// # Arguments
     /// - `x`: a ``[B, T, D]`` sequence.
     /// - `re`: a rotary embedding with len ``T``.
+    /// - `kv_cache`: optional KV cache.
     ///
     /// # Returns
     /// - ``[B, T, D]`` attention.
@@ -172,6 +174,7 @@ impl<B: Backend> CausalSelfAttention<B> {
         &self,
         x: Tensor<B, 3>,
         re: &RotaryEmbedding<B>,
+        kv_cache: &Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(
             ["B", "T", "D"],
@@ -208,6 +211,8 @@ impl<B: Backend> CausalSelfAttention<B> {
         let _t_q = q.dims()[2];
         // Number of keys/values in total (in the cache + current forward pass)
         let _t_kv = k.dims()[2];
+
+        assert!(kv_cache.is_none(), "kv cache is not supported yet");
 
         // TODO: enable kv cache.
         let is_causal = true;
@@ -282,7 +287,9 @@ mod tests {
         let input: Tensor<B, 3> =
             Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
-        let output = csa.forward(input.clone(), &re);
+        let kv_cache = None;
+
+        let output = csa.forward(input.clone(), &re, &kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),
