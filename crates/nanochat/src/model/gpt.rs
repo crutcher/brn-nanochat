@@ -190,7 +190,7 @@ impl<B: Backend> GPT<B> {
     pub fn forward(
         &self,
         idx: Tensor<B, 2, Int>,
-        kv_cache: &Option<&mut KVCache<B>>,
+        kv_cache: &mut Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
         let [b, t] = unpack_shape_contract!(["B", "T"], &idx.dims());
         assert!(

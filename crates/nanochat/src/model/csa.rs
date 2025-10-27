@@ -10,7 +10,7 @@ use burn::Tensor;
 use burn::config::Config;
 use burn::module::Module;
 use burn::nn::{Linear, LinearConfig};
-use burn::prelude::Backend;
+use burn::prelude::{Backend, Bool, Int, s};
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {
@@ -164,7 +164,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     /// Forward Pass.
     ///
     /// # Arguments
-    /// - `x`: a ``[B, T, D]`` sequence.
+    /// - `input`: a ``[B, T, D]`` sequence.
     /// - `re`: a rotary embedding with len ``T``.
     /// - `kv_cache`: optional KV cache.
     ///
@@ -172,70 +172,108 @@ impl<B: Backend> CausalSelfAttention<B> {
     /// - ``[B, T, D]`` attention.
     pub fn forward(
         &self,
-        x: Tensor<B, 3>,
+        input: Tensor<B, 3>,
         re: &RotaryEmbedding<B>,
-        kv_cache: &Option<&mut KVCache<B>>,
+        kv_cache: &mut Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
-        let [b, t] = unpack_shape_contract!(
+        let [b, t_q] = unpack_shape_contract!(
             ["B", "T", "D"],
-            &x.dims(),
+            &input.dims(),
             &["B", "T"],
             &[("D", self.n_embed())]
         );
 
         let q = self
             .c_q
-            .forward(x.clone())
-            .reshape([b, t, self.n_head(), self.head_dim()]);
+            .forward(input.clone())
+            .reshape([b, t_q, self.n_head(), self.head_dim()]);
         let q = re.apply(q);
         let q = norm::rms_norm(q);
         let q = q.swap_dims(1, 2);
 
-        let k = self
-            .c_k
-            .forward(x.clone())
-            .reshape([b, t, self.n_kv_head(), self.head_dim()]);
+        let k =
+            self.c_k
+                .forward(input.clone())
+                .reshape([b, t_q, self.n_kv_head(), self.head_dim()]);
         let k = re.apply(k);
         let k = norm::rms_norm(k);
-        let k = k.swap_dims(1, 2);
+        let mut k = k.swap_dims(1, 2);
 
-        let v = self
+        let mut v = self
             .c_v
-            .forward(x)
-            .reshape([b, t, self.n_kv_head(), self.head_dim()])
+            .forward(input)
+            .reshape([b, t_q, self.n_kv_head(), self.head_dim()])
             .swap_dims(1, 2);
 
         // B, H_?, T, D
+
+        if let Some(kvc) = kv_cache {
+            (k, v) = (*kvc).insert_kv(self.layer_index, k.clone(), v.clone());
+        }
+        let t_kv = k.dims()[2];
 
         // Number of queries in this forward pass.
         let _t_q = q.dims()[2];
         // Number of keys/values in total (in the cache + current forward pass)
         let _t_kv = k.dims()[2];
 
-        assert!(kv_cache.is_none(), "kv cache is not supported yet");
+        let y: Tensor<B, 4> = if kv_cache.is_none() || t_q == t_kv {
+            attention::scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                None,
+                None,
+                ScaledDotProductAttentionConfig::new()
+                    .with_is_causal(true)
+                    .with_enable_gqa(self.gqa_enabled()),
+            )
+        } else if t_q == 1 {
+            attention::scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                None,
+                None,
+                ScaledDotProductAttentionConfig::new()
+                    .with_is_causal(false)
+                    .with_enable_gqa(self.gqa_enabled()),
+            )
+        } else {
+            let device = q.device();
 
-        // TODO: enable kv cache.
-        let is_causal = true;
+            let mut attn_mask = Tensor::<B, 2, Bool>::empty([t_q, t_kv], &device);
+            let prefix_len = t_kv - t_q;
+            if prefix_len > 0 {
+                attn_mask = attn_mask.slice_fill(s![.., ..prefix_len], true);
+            }
+            let fill = Tensor::<B, 2, Int>::ones([t_q, t_q], &device)
+                .tril(-1)
+                .bool();
+            attn_mask = attn_mask.slice_assign(s![.., prefix_len..], fill);
 
-        let y: Tensor<B, 3> = attention::scaled_dot_product_attention(
-            q,
-            k,
-            v,
-            None,
-            None,
-            ScaledDotProductAttentionConfig::new()
-                .with_is_causal(is_causal)
-                .with_enable_gqa(self.gqa_enabled()),
-        )
-        .swap_dims(1, 2)
-        .reshape([b as i32, t as i32, self.n_embed() as i32]);
+            attention::scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                None,
+                Some(attn_mask),
+                ScaledDotProductAttentionConfig::new()
+                    .with_is_causal(false)
+                    .with_enable_gqa(self.gqa_enabled()),
+            )
+        };
+
+        let y = y
+            .swap_dims(1, 2)
+            .reshape([b as i32, t_q as i32, self.n_embed() as i32]);
 
         let y = self.c_proj.forward(y);
 
         assert_shape_contract_periodically!(
             ["B", "T", "D"],
             &y.dims(),
-            &[("B", b), ("T", t), ("D", self.n_embed())]
+            &[("B", b), ("T", t_q), ("D", self.n_embed())]
         );
 
         y
@@ -287,9 +325,9 @@ mod tests {
         let input: Tensor<B, 3> =
             Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
-        let kv_cache = None;
+        let mut kv_cache: Option<&mut KVCache<B>> = None;
 
-        let output = csa.forward(input.clone(), &re, &kv_cache);
+        let output = csa.forward(input.clone(), &re, &mut kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),

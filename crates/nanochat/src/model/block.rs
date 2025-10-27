@@ -78,7 +78,7 @@ impl<B: Backend> GPTBlock<B> {
         &self,
         input: Tensor<B, 3>,
         re: &RotaryEmbedding<B>,
-        kv_cache: &Option<&mut KVCache<B>>,
+        kv_cache: &mut Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
         let x = rms_norm(input);
         let x = self.attn.forward(x, re, kv_cache);
@@ -144,9 +144,9 @@ mod tests {
         let input = Tensor::random([batch, seq_len, n_embed], Distribution::Default, &device);
 
         let re = RotaryEmbeddingConfig::new(seq_len, block.attn.head_dim()).init(&device);
-        let kv_cache = None;
+        let mut kv_cache: Option<&mut KVCache<B>> = None;
 
-        let output = block.forward(input.clone(), &re, &kv_cache);
+        let output = block.forward(input.clone(), &re, &mut kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),
