@@ -8,7 +8,7 @@ license.workspace = true
 
 [dependencies]
 burn = { workspace = true }
-bimm-contracts = { workspace = true }
+bimm-contracts = { workspace = true, features = ["burn"] }
 
 [dev-dependencies]
 burn = { workspace = true, features = ["wgpu"] }

@@ -227,18 +227,19 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "bimm-contracts"
-version = "0.4.4"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b74552252ca541eab25434cbc27e77741f06d4437ab49bda245e7fecd0d41a7"
+checksum = "aad42f181fdd1c76afeb0b32797fb51729d9ac7d8485bfebb04300e13137a396"
 dependencies = [
  "bimm-contracts-macros",
+ "burn",
 ]
 
 [[package]]
 name = "bimm-contracts-macros"
-version = "0.4.4"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "def13bcfae22592a29ffe3efc5790633d42f8c807229a2c1d7fc1e3247a98bfa"
+checksum = "a30a7d9f41df366b6733b82c04777d94b401575acbb5e537d123da25b4089e52"
 dependencies = [
  "proc-macro2",
  "quote",

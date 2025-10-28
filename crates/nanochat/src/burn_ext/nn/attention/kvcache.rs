@@ -204,7 +204,7 @@ impl<B: Backend> KVCache<B> {
     ) -> (Tensor<B, 4>, Tensor<B, 4>) {
         let [t_add] = unpack_shape_contract!(
             ["B", "H_kv", "T_add", "D"],
-            &k.dims(),
+            &k,
             &["T_add"],
             &[
                 ("B", self.batch_size),
@@ -214,7 +214,7 @@ impl<B: Backend> KVCache<B> {
         );
         assert_shape_contract_periodically!(
             ["B", "H_kv", "T_add", "D"],
-            &v.dims(),
+            &v,
             &[
                 ("B", self.batch_size),
                 ("H_kv", self.num_heads),

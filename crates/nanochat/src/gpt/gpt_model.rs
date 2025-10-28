@@ -282,7 +282,7 @@ impl<B: Backend> GPT<B> {
         idx: Tensor<B, 2, Int>,
         kv_cache: &mut Option<&mut KVCache<B>>,
     ) -> Tensor<B, 3> {
-        let [b, t] = unpack_shape_contract!(["B", "T"], &idx.dims());
+        let [b, t] = unpack_shape_contract!(["B", "T"], &idx);
         assert!(
             t <= self.r_emb.seq_len(),
             "Sequence length grew beyond the rotary embeddings cache: {t} > {}",
@@ -315,7 +315,7 @@ impl<B: Backend> GPT<B> {
 
         assert_shape_contract_periodically!(
             ["B", "T", "D"],
-            &logits.dims(),
+            &logits,
             &[("B", b), ("T", t), ("D", self.n_embed())]
         );
         logits
@@ -407,7 +407,7 @@ mod tests {
         let logits = gpt.forward(input_tokens, &mut Some(&mut kv_cache));
         assert_shape_contract!(
             ["B", "T", "D"],
-            &logits.dims(),
+            &logits,
             &[("B", batch_size), ("T", seq_len), ("D", gpt.n_embed())]
         );
     }

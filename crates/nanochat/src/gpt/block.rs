@@ -161,7 +161,7 @@ mod tests {
         let output = block.forward(input.clone(), &r_emb, &mut kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
-            &output.dims(),
+            &output,
             &[("B", batch), ("T", seq_len), ("D", n_embed)]
         );
     }

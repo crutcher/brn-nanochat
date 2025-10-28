@@ -149,7 +149,7 @@ impl<B: Backend> RotaryEmbedding<B> {
         #[cfg(debug_assertions)]
         let [b, h] = bimm_contracts::unpack_shape_contract!(
             ["B", "T", "H", "D"],
-            &input.dims(),
+            &input,
             &["B", "H"],
             &[("T", self.seq_len()), ("D", self.head_dim())]
         );
@@ -341,7 +341,7 @@ mod tests {
         let output = re.apply(input.clone());
         assert_shape_contract!(
             ["B", "T", "H", "D"],
-            &output.dims(),
+            &output,
             &[("B", batch), ("T", seq_len), ("H", heads), ("D", head_dim)]
         );
 

@@ -85,7 +85,7 @@ impl<B: Backend> MLP<B> {
     ) -> Tensor<B, 3> {
         let [batch, time] = unpack_shape_contract!(
             ["batch", "time", "embed"],
-            &x.dims(),
+            &x,
             &["batch", "time"],
             &[("embed", self.n_embed())]
         );
@@ -97,7 +97,7 @@ impl<B: Backend> MLP<B> {
 
         assert_shape_contract_periodically!(
             ["batch", "time", "embed"],
-            &x.dims(),
+            &x,
             &[("batch", batch), ("time", time), ("embed", self.n_embed())]
         );
 
@@ -148,21 +148,21 @@ mod tests {
                 let x = input;
                 assert_shape_contract!(
                     ["batch", "time", "embed"],
-                    &x.dims(),
+                    &x,
                     &[("batch", b), ("time", t), ("embed", n_embed)]
                 );
 
                 let x = mlp.c_fc.forward(x);
                 assert_shape_contract!(
                     ["batch", "time", "hidden"],
-                    &x.dims(),
+                    &x,
                     &[("batch", b), ("time", t), ("hidden", ef * n_embed)]
                 );
 
                 let x = mlp.act.forward(x);
                 assert_shape_contract!(
                     ["batch", "time", "hidden"],
-                    &x.dims(),
+                    &x,
                     &[("batch", b), ("time", t), ("hidden", ef * n_embed)]
                 );
 
@@ -170,7 +170,7 @@ mod tests {
                 let x = mlp.c_proj.forward(x);
                 assert_shape_contract!(
                     ["batch", "time", "embed"],
-                    &x.dims(),
+                    &x,
                     &[("batch", b), ("time", t), ("embed", n_embed)]
                 );
 
