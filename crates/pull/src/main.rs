@@ -1,5 +1,5 @@
 use burn::tensor::Slice;
-use clap::{arg, Parser};
+use clap::{Parser, arg};
 
 pub mod slice_parser;
 
@@ -19,5 +19,3 @@ fn main() {
 
     println!("{:#?}", args);
 }
-
-

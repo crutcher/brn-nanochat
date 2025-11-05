@@ -31,8 +31,7 @@ pub fn parse_slice(buf: &str) -> Result<Slice, String> {
             start = parse(start_s)?;
         }
         if !end_s.is_empty() {
-            if end_s.starts_with('=') {
-                let end_s = &end_s[1..];
+            if let Some(end_s) = end_s.strip_prefix('=') {
                 end = Some(parse(end_s)? + 1);
             } else {
                 end = Some(parse(end_s)?);
@@ -50,8 +49,8 @@ pub fn parse_slice(buf: &str) -> Result<Slice, String> {
 
 #[cfg(test)]
 mod tests {
-    use burn::tensor::Slice;
     use crate::slice_parser::parse_slice;
+    use burn::tensor::Slice;
 
     #[test]
     fn test_parse_slice() {
@@ -68,6 +67,9 @@ mod tests {
         assert_eq!(parse_slice("").unwrap_err(), "Invalid Slice: \"\"");
         assert_eq!(parse_slice("a").unwrap_err(), "Invalid Slice: \"a\"");
         assert_eq!(parse_slice("..x").unwrap_err(), "Invalid Slice: \"..x\"");
-        assert_eq!(parse_slice("a:b:c").unwrap_err(), "Invalid Slice: \"a:b:c\"");
+        assert_eq!(
+            parse_slice("a:b:c").unwrap_err(),
+            "Invalid Slice: \"a:b:c\""
+        );
     }
 }
