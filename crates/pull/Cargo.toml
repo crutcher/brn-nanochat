@@ -1,0 +1,14 @@
+[package]
+name = "pull"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+burn = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true
