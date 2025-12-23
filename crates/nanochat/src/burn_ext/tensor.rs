@@ -3,7 +3,6 @@
 use burn::Tensor;
 use burn::prelude::Backend;
 use burn::tensor::AsIndex;
-use burn::tensor::indexing::canonicalize_dim;
 
 /// Repeat Interleave.
 ///
@@ -46,7 +45,7 @@ pub fn repeat_interleave<B: Backend, const R: usize, const R2: usize, D: AsIndex
     repeats: usize,
     dim: D,
 ) -> Tensor<B, R> {
-    let dim = canonicalize_dim(dim, R, false);
+    let dim = dim.expect_dim_index(R);
 
     let x: Tensor<B, R2> = input.unsqueeze_dim(dim + 1);
 

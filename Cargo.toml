@@ -22,8 +22,14 @@ double_must_use = "allow"
 doc_markdown = "warn"
 
 [workspace.dependencies]
-burn = "^0.19.0"
+burn = "0.20.0-pre.6"
 bimm-contracts = "^0.19.1"
 
+parquet = "^57.0.0"
+
 clap = "^4.5.51"
+anyhow = "^1.0.100"
+shellexpand = "^3.1.1"
+
+tempdir = "^0.3.7"
 

@@ -6,9 +6,17 @@ rust-version.workspace = true
 edition.workspace = true
 license.workspace = true
 
-[dependencies]
-burn = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
-
 [lints]
 workspace = true
+
+[dependencies]
+burn = { workspace = true, features = ["network"] }
+nanochat = { path = "../nanochat" }
+
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+shellexpand = { workspace = true }
+parquet = { workspace = true }
+
+[dev-dependencies]
+tempdir = { workspace = true }

@@ -3,4 +3,5 @@
 
 pub mod nn;
 pub mod norm;
+pub mod slice_util;
 pub mod tensor;

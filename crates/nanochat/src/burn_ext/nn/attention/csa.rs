@@ -196,7 +196,7 @@ impl<B: Backend> CausalSelfAttention<B> {
     ) -> Tensor<B, 3> {
         let [b, t_q] = unpack_shape_contract!(
             ["B", "T", "D"],
-            &input,
+            &input.dims(),
             &["B", "T"],
             &[("D", self.n_embed())]
         );
@@ -269,7 +269,7 @@ impl<B: Backend> CausalSelfAttention<B> {
 
         assert_shape_contract_periodically!(
             ["B", "T", "D"],
-            &y,
+            &y.dims(),
             &[("B", b), ("T", t_q), ("D", self.n_embed())]
         );
 
@@ -327,7 +327,7 @@ mod tests {
         let output = csa.forward(input.clone(), &r_emb, &mut kv_cache);
         assert_shape_contract!(
             ["B", "T", "D"],
-            &output,
+            &output.dims(),
             &[("B", batch), ("T", seq_len), ("D", n_embed)]
         );
     }

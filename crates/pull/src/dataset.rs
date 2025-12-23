@@ -1,0 +1,284 @@
+//! # Nanochat Dataset Loader
+
+use anyhow::bail;
+use burn::config::Config;
+use burn::data::network::downloader;
+use burn::tensor::Slice;
+use nanochat::burn_ext::slice_util::slice_to_indices;
+use std::fs;
+use std::fs::{File, remove_file};
+use std::io::Write;
+use std::path::PathBuf;
+
+/// The upstream dataset URL.
+pub static NANOCHAT_TRAIN_BASE_URL: &str =
+    "https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle/resolve/main";
+
+/// The number of shards in the dataset.
+pub static NANOCHAT_TRAIN_MAX_SHARD: usize = 1822;
+
+/// Dataset Source Configuration.
+#[derive(Config, Debug)]
+pub struct DatasetSource {
+    /// The upstream dataset URL.
+    #[config(default = "NANOCHAT_TRAIN_BASE_URL.to_string()")]
+    pub base_url: String,
+
+    /// The number of shards in the dataset.
+    #[config(default = "NANOCHAT_TRAIN_MAX_SHARD")]
+    pub max_shard: usize,
+
+    /// The 0-pad width of the shard index.
+    #[config(default = "5")]
+    pub index_pad_width: usize,
+
+    /// The shard template.
+    #[config(default = "\"shard_{index}.parquet\".to_string()")]
+    pub shard_template: String,
+}
+
+impl Default for DatasetSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DatasetSource {
+    /// Format a shard index with 0-padding.
+    pub fn format_index(
+        &self,
+        index: usize,
+    ) -> String {
+        format!("{index:0width$}", width = self.index_pad_width)
+    }
+
+    /// Construct a shard filename.
+    ///
+    /// Substitutes the [`Self::pad_index(index)`] result in for `"{index}"` in
+    /// the [`Self::shard_template`].
+    pub fn format_shard_filename(
+        &self,
+        index: usize,
+    ) -> String {
+        self.shard_template
+            .replace("{index}", &self.format_index(index))
+    }
+}
+
+/// Config for [`DatasetCache`].
+#[derive(Config, Debug)]
+pub struct DatasetCacheConfig {
+    /// The dataset cache directory.
+    #[config(default = "\"~/.cache/brn-nanochat/dataset/\".to_string()")]
+    pub cache_dir: String,
+
+    /// The dataset source configuration.
+    #[config(default = "Default::default()")]
+    pub source: DatasetSource,
+}
+
+impl Default for DatasetCacheConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DatasetCacheConfig {
+    pub fn init(self) -> anyhow::Result<DatasetCache> {
+        let cache_dir = shellexpand::full(&self.cache_dir)?.to_string();
+
+        fs::create_dir_all(&cache_dir)?;
+
+        Ok(DatasetCache {
+            cache_dir: PathBuf::from(cache_dir).canonicalize()?,
+            source: self.source.clone(),
+        })
+    }
+}
+
+/// Dataset Cache.
+#[derive(Debug)]
+pub struct DatasetCache {
+    cache_dir: PathBuf,
+    source: DatasetSource,
+}
+
+impl Default for DatasetCache {
+    fn default() -> Self {
+        DatasetCacheConfig::default().init().unwrap()
+    }
+}
+
+impl DatasetCache {
+    /// Construct a shard path.
+    pub fn format_shard_path(
+        &self,
+        index: usize,
+    ) -> PathBuf {
+        let path: PathBuf = self.cache_dir.clone().into();
+        path.join(self.source.format_shard_filename(index))
+    }
+
+    /// Get a shard path, or an error.
+    pub fn try_shard_path(
+        &self,
+        index: usize,
+    ) -> anyhow::Result<PathBuf> {
+        let path = self.format_shard_path(index);
+        if path.exists() {
+            Ok(path)
+        } else {
+            Err(anyhow::anyhow!("shard {} not found", index))
+        }
+    }
+
+    /// Check if a shard is cached.
+    pub fn has_shard(
+        &self,
+        index: usize,
+    ) -> bool {
+        let path = self.format_shard_path(index);
+        path.exists()
+    }
+
+    /// List all parquet files in the cache.
+    pub fn list_cached_shard_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
+        const EXTENSION: &str = "parquet";
+
+        let mut paths = Vec::new();
+        for entry in fs::read_dir(&self.cache_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if entry.file_type()?.is_file() && path.extension().unwrap_or_default() == EXTENSION {
+                paths.push(path);
+            }
+        }
+
+        paths.sort();
+        Ok(paths)
+    }
+
+    /// List the ids of all cached shards.
+    pub fn list_cached_shard_ids(&self) -> anyhow::Result<Vec<usize>> {
+        let (pre, post) = self.source.shard_template.split_once("{index}").unwrap();
+
+        Ok(self
+            .list_cached_shard_paths()?
+            .into_iter()
+            .map(|path| {
+                let name = path.file_name().unwrap().to_str().unwrap();
+                let index = name.strip_prefix(pre).unwrap().strip_suffix(post).unwrap();
+                index.parse::<usize>().unwrap()
+            })
+            .collect::<Vec<_>>())
+    }
+
+    /// Load a shard (download if not cached).
+    pub fn load_shard(
+        &self,
+        index: usize,
+    ) -> anyhow::Result<PathBuf> {
+        let path = self.format_shard_path(index);
+        if path.exists() {
+            return Ok(path);
+        }
+
+        let url = format!(
+            "{}/{}",
+            self.source.base_url,
+            self.source.format_shard_filename(index)
+        );
+        try_cache_download_to_path(&url, path)
+    }
+
+    pub fn resolve_slice(
+        &self,
+        slice: Slice,
+    ) -> anyhow::Result<Vec<usize>> {
+        slice_to_indices(slice, self.source.max_shard)
+    }
+}
+
+/// Download a URL resource to a given path.
+///
+/// If the path already exists, does nothing.
+///
+/// # Returns
+///
+/// The cache path.
+pub fn try_cache_download_to_path(
+    url: &str,
+    cache_file_path: PathBuf,
+) -> anyhow::Result<PathBuf> {
+    if !cache_file_path.exists() {
+        let file_name = cache_file_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        // TODO: download-to-file instead of download-to-memory.
+        // Download file content
+        let bytes = downloader::download_file_as_bytes(url, &file_name);
+
+        // Write content to file
+        let mut output_file = File::create(&cache_file_path)?;
+        let bytes_written = output_file.write(&bytes)?;
+
+        if bytes_written != bytes.len() {
+            remove_file(cache_file_path)?;
+            bail!("Failed to write the whole model weights file.");
+        }
+    }
+
+    Ok(cache_file_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use tempdir::TempDir;
+
+    #[test]
+    fn test_dataset_source_config() {
+        let config = DatasetSource::default();
+
+        assert_eq!(config.base_url, NANOCHAT_TRAIN_BASE_URL.to_string());
+        assert_eq!(config.max_shard, NANOCHAT_TRAIN_MAX_SHARD);
+        assert_eq!(config.index_pad_width, 5);
+        assert_eq!(config.shard_template, "shard_{index}.parquet".to_string());
+
+        assert_eq!(config.format_index(0), "00000");
+        assert_eq!(config.format_index(312), "00312");
+
+        assert_eq!(config.format_shard_filename(0), "shard_00000.parquet");
+    }
+
+    #[test]
+    fn test_dataset_cache() -> anyhow::Result<()> {
+        let tmpdir = TempDir::new("brn-nanochat-test")?;
+        let base_dir = tmpdir.path();
+
+        let cache = DatasetCacheConfig::new()
+            .with_cache_dir(base_dir.to_string_lossy().to_string())
+            .init()?;
+
+        let shards = vec![0, 12, 312, 1821];
+        let mut expected_paths = Vec::new();
+        for &idx in &shards {
+            let path = cache.format_shard_path(idx);
+            expected_paths.push(path.clone());
+            File::create(path)?;
+        }
+
+        for idx in 0..cache.source.max_shard {
+            assert_eq!(cache.has_shard(idx), shards.contains(&idx));
+        }
+
+        assert_eq!(&cache.list_cached_shard_paths()?, &expected_paths);
+        assert_eq!(&cache.list_cached_shard_ids()?, &shards);
+
+        Ok(())
+    }
+}

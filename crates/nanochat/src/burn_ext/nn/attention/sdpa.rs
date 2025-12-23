@@ -55,16 +55,16 @@ pub fn scaled_dot_product_attention<B: Backend>(
     mask: Option<Tensor<B, 2, Bool>>,
     config: ScaledDotProductAttentionConfig,
 ) -> Tensor<B, 4> {
-    let [b, h_q, _t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q);
+    let [b, h_q, _t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q.dims());
     let [h_kv] = unpack_shape_contract!(
         ["B", "H_kv", "T_k", "D"],
-        &k,
+        &k.dims(),
         &["H_kv"],
         &[("B", b), ("D", d)]
     );
     assert_shape_contract_periodically!(
         ["B", "H_kv", "T_v", "D"],
-        &v,
+        &v.dims(),
         &[("B", b), ("H_kv", h_kv), ("D", d)]
     );
 
@@ -94,10 +94,10 @@ pub fn sdpa_attn_weight<B: Backend>(
     mask: Option<Tensor<B, 2, Bool>>,
     config: ScaledDotProductAttentionConfig,
 ) -> Tensor<B, 4> {
-    let [b, h_q, t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q);
+    let [b, h_q, t_q, d] = unpack_shape_contract!(["B", "H_q", "T_q", "D"], &q.dims());
     let [h_k, t_k] = unpack_shape_contract!(
         ["B", "H_k", "T_k", "D"],
-        &k,
+        &k.dims(),
         &["H_k", "T_k"],
         &[("B", b), ("D", d)]
     );
