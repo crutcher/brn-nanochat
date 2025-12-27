@@ -1,19 +1,54 @@
-use burn::tensor::Slice;
+use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
+use std::collections::HashSet;
 
 pub mod dataset;
 /// Nanochat Data Loader.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Indices to load.
+    /// Shards to load.
     #[arg(short, long, value_delimiter = ',', default_value = "0")]
-    pub indices: Vec<Slice>,
+    pub shards: Vec<Slice>,
+
+    /// Path to dataset directory.
+    #[arg(long)]
+    pub dataset_dir: String,
 }
 
-fn main() {
+#[allow(unused)]
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     println!("{:#?}", args);
 
-    let _cache = dataset::DatasetCache::default();
+    let cache_config = dataset::DatasetCacheConfig::new().with_cache_dir(args.dataset_dir);
+    println!("{:#?}", cache_config);
+
+    let shards: Vec<usize> = {
+        let max_shard = cache_config.source.max_shard;
+        let mut collected: HashSet<usize> = HashSet::new();
+        for slice in &args.shards {
+            for idx in slice.into_iter() {
+                let shard = idx.expect_elem_index(max_shard);
+                collected.insert(shard);
+            }
+        }
+        let mut shards: Vec<usize> = collected.into_iter().collect();
+        shards.sort();
+        shards
+    };
+
+    let mut cache = cache_config.init()?;
+
+    /*
+    for shard in shards {
+        println!("Loading shard {}...", shard);
+        let path = cache.load_shard(shard)?;
+        println!("  {:?}", path);
+    }
+     */
+
+    cache.load_shards(&shards)?;
+
+    Ok(())
 }

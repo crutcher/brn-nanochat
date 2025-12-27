@@ -25,11 +25,13 @@ doc_markdown = "warn"
 burn = "0.20.0-pre.6"
 bimm-contracts = "^0.19.1"
 
-parquet = "^57.0.0"
-
 clap = "^4.5.51"
 anyhow = "^1.0.100"
 shellexpand = "^3.1.1"
 
+downloader = "^0.2.8"
+
 tempdir = "^0.3.7"
+
+parquet = "^57.0.0"
 

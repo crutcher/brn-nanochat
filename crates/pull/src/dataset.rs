@@ -1,13 +1,10 @@
 //! # Nanochat Dataset Loader
 
-use anyhow::bail;
 use burn::config::Config;
-use burn::data::network::downloader;
 use burn::tensor::Slice;
+use downloader::{Download, Downloader};
 use nanochat::burn_ext::slice_util::slice_to_indices;
 use std::fs;
-use std::fs::{File, remove_file};
-use std::io::Write;
 use std::path::PathBuf;
 
 /// The upstream dataset URL.
@@ -89,18 +86,21 @@ impl DatasetCacheConfig {
 
         fs::create_dir_all(&cache_dir)?;
 
+        let downloader = Downloader::builder().parallel_requests(8).build()?;
+
         Ok(DatasetCache {
             cache_dir: PathBuf::from(cache_dir).canonicalize()?,
             source: self.source.clone(),
+            downloader,
         })
     }
 }
 
 /// Dataset Cache.
-#[derive(Debug)]
 pub struct DatasetCache {
     cache_dir: PathBuf,
     source: DatasetSource,
+    downloader: Downloader,
 }
 
 impl Default for DatasetCache {
@@ -175,7 +175,7 @@ impl DatasetCache {
 
     /// Load a shard (download if not cached).
     pub fn load_shard(
-        &self,
+        &mut self,
         index: usize,
     ) -> anyhow::Result<PathBuf> {
         let path = self.format_shard_path(index);
@@ -188,7 +188,42 @@ impl DatasetCache {
             self.source.base_url,
             self.source.format_shard_filename(index)
         );
-        try_cache_download_to_path(&url, path)
+
+        self.downloader
+            .download(&[Download::new(&url).file_name(path.as_ref())])?;
+
+        Ok(path)
+    }
+
+    /// Load multiple shards (download if not cached).
+    pub fn load_shards(
+        &mut self,
+        shards: &[usize],
+    ) -> anyhow::Result<Vec<PathBuf>> {
+        let mut paths = Vec::with_capacity(shards.len());
+        let mut downloads = Vec::new();
+        for &shard in shards {
+            let path = self.format_shard_path(shard);
+            paths.push(path.clone());
+
+            if path.exists() {
+                continue;
+            }
+
+            let url = format!(
+                "{}/{}",
+                self.source.base_url,
+                self.source.format_shard_filename(shard)
+            );
+
+            downloads.push(Download::new(&url).file_name(path.as_ref()));
+        }
+
+        if !downloads.is_empty() {
+            self.downloader.download(&downloads)?;
+        }
+
+        Ok(paths)
     }
 
     pub fn resolve_slice(
@@ -197,41 +232,6 @@ impl DatasetCache {
     ) -> anyhow::Result<Vec<usize>> {
         slice_to_indices(slice, self.source.max_shard)
     }
-}
-
-/// Download a URL resource to a given path.
-///
-/// If the path already exists, does nothing.
-///
-/// # Returns
-///
-/// The cache path.
-pub fn try_cache_download_to_path(
-    url: &str,
-    cache_file_path: PathBuf,
-) -> anyhow::Result<PathBuf> {
-    if !cache_file_path.exists() {
-        let file_name = cache_file_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
-
-        // TODO: download-to-file instead of download-to-memory.
-        // Download file content
-        let bytes = downloader::download_file_as_bytes(url, &file_name);
-
-        // Write content to file
-        let mut output_file = File::create(&cache_file_path)?;
-        let bytes_written = output_file.write(&bytes)?;
-
-        if bytes_written != bytes.len() {
-            remove_file(cache_file_path)?;
-            bail!("Failed to write the whole model weights file.");
-        }
-    }
-
-    Ok(cache_file_path)
 }
 
 #[cfg(test)]
