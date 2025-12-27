@@ -15,9 +15,5 @@ nanochat-data = { path = "../nanochat-data" }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
-shellexpand = { workspace = true }
 
 parquet = { workspace = true, features = ["arrow"] }
-
-[dev-dependencies]
-tempdir = { workspace = true }

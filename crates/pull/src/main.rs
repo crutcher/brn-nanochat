@@ -1,7 +1,6 @@
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use nanochat_data::dataset::DatasetCacheConfig;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReader;
 use std::collections::HashSet;
 
 /// Nanochat Data Loader.
@@ -42,27 +41,10 @@ fn main() -> anyhow::Result<()> {
 
     cache.load_shards(&shards)?;
 
-    let builder = cache.try_reader_builder(0, false)?;
-    let metadata = builder.metadata();
-
-    println!("num_row_groups: {}", metadata.num_row_groups());
-    println!(
-        "f: {:#?}",
-        metadata
-            .file_metadata()
-            .schema_descr()
-            .columns()
-            .iter()
-            .map(|c| c.name())
-            .collect::<Vec<_>>()
-    );
-
-    // Construct reader
-    let mut reader: ParquetRecordBatchReader = builder.build().unwrap();
-
-    // Read data
-    let _batch = reader.next().unwrap().unwrap();
-    println!("{:#?}", _batch);
+    let download = true;
+    let mut it = cache.read_batches(0, download)?;
+    let batch = it.next().unwrap()?;
+    println!("{:#?}", batch);
 
     Ok(())
 }

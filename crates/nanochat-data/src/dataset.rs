@@ -2,7 +2,7 @@
 
 use burn::config::Config;
 use downloader::{Download, Downloader};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
 use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
@@ -226,19 +226,45 @@ impl DatasetCache {
         Ok(paths)
     }
 
-    /// Construct a parquet reader builder for a shard.
-    pub fn try_reader_builder(
+    /// Get a shard path.
+    ///
+    /// # Arguments
+    /// * `shard` - the shard index.
+    /// * `download` - Whether to download the shard if not cached.
+    ///
+    /// # Returns
+    /// An `anyhow::Result<PathBuf>` containing the shard path.
+    pub fn get_shard(
         &mut self,
         shard: usize,
         download: bool,
-    ) -> anyhow::Result<ParquetRecordBatchReaderBuilder<File>> {
-        let path = if download {
-            self.load_shard(shard)?
+    ) -> anyhow::Result<PathBuf> {
+        if download {
+            self.load_shard(shard)
         } else {
-            self.try_shard_path(shard)?
-        };
+            self.try_shard_path(shard)
+        }
+    }
+
+    /// Read a shard as a parquet reader.
+    ///
+    /// # Arguments
+    /// * `shard` - The shard index.
+    /// * `download` - Whether to download the shard if not cached.
+    ///
+    /// # Returns
+    ///
+    /// An `Iterator<Item=Result<RecordBatch, ArrowError>>` reader.
+    pub fn read_batches(
+        &mut self,
+        shard: usize,
+        download: bool,
+    ) -> anyhow::Result<ParquetRecordBatchReader> {
+        let path = self.get_shard(shard, download)?;
         let file = File::open(path)?;
-        Ok(ParquetRecordBatchReaderBuilder::try_new(file)?)
+        let reader = ParquetRecordBatchReaderBuilder::try_new(file)?.build()?;
+
+        Ok(reader)
     }
 }
 

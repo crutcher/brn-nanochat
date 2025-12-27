@@ -5708,8 +5708,6 @@ dependencies = [
  "clap",
  "nanochat-data",
  "parquet",
- "shellexpand",
- "tempdir",
 ]
 
 [[package]]
