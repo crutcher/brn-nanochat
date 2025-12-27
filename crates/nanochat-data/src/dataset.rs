@@ -1,10 +1,10 @@
 //! # Nanochat Dataset Loader
 
 use burn::config::Config;
-use burn::tensor::Slice;
 use downloader::{Download, Downloader};
-use nanochat::burn_ext::slice_util::slice_to_indices;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use std::fs;
+use std::fs::File;
 use std::path::PathBuf;
 
 /// The upstream dataset URL.
@@ -115,7 +115,7 @@ impl DatasetCache {
         &self,
         index: usize,
     ) -> PathBuf {
-        let path: PathBuf = self.cache_dir.clone().into();
+        let path: PathBuf = self.cache_dir.clone();
         path.join(self.source.format_shard_filename(index))
     }
 
@@ -226,11 +226,19 @@ impl DatasetCache {
         Ok(paths)
     }
 
-    pub fn resolve_slice(
-        &self,
-        slice: Slice,
-    ) -> anyhow::Result<Vec<usize>> {
-        slice_to_indices(slice, self.source.max_shard)
+    /// Construct a parquet reader builder for a shard.
+    pub fn try_reader_builder(
+        &mut self,
+        shard: usize,
+        download: bool,
+    ) -> anyhow::Result<ParquetRecordBatchReaderBuilder<File>> {
+        let path = if download {
+            self.load_shard(shard)?
+        } else {
+            self.try_shard_path(shard)?
+        };
+        let file = File::open(path)?;
+        Ok(ParquetRecordBatchReaderBuilder::try_new(file)?)
     }
 }
 

@@ -5037,6 +5037,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nanochat-data"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "burn 0.20.0-pre.6",
+ "downloader",
+ "parquet",
+ "shellexpand",
+ "tempdir",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5689,13 +5701,12 @@ dependencies = [
 
 [[package]]
 name = "pull"
-version = "0.0.1"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "burn 0.20.0-pre.6",
  "clap",
- "downloader",
- "nanochat",
+ "nanochat-data",
  "parquet",
  "shellexpand",
  "tempdir",

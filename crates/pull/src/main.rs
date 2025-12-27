@@ -1,8 +1,9 @@
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
+use nanochat_data::dataset::DatasetCacheConfig;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReader;
 use std::collections::HashSet;
 
-pub mod dataset;
 /// Nanochat Data Loader.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -16,12 +17,11 @@ pub struct Args {
     pub dataset_dir: String,
 }
 
-#[allow(unused)]
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     println!("{:#?}", args);
 
-    let cache_config = dataset::DatasetCacheConfig::new().with_cache_dir(args.dataset_dir);
+    let cache_config = DatasetCacheConfig::new().with_cache_dir(args.dataset_dir);
     println!("{:#?}", cache_config);
 
     let shards: Vec<usize> = {
@@ -40,15 +40,29 @@ fn main() -> anyhow::Result<()> {
 
     let mut cache = cache_config.init()?;
 
-    /*
-    for shard in shards {
-        println!("Loading shard {}...", shard);
-        let path = cache.load_shard(shard)?;
-        println!("  {:?}", path);
-    }
-     */
-
     cache.load_shards(&shards)?;
+
+    let builder = cache.try_reader_builder(0, false)?;
+    let metadata = builder.metadata();
+
+    println!("num_row_groups: {}", metadata.num_row_groups());
+    println!(
+        "f: {:#?}",
+        metadata
+            .file_metadata()
+            .schema_descr()
+            .columns()
+            .iter()
+            .map(|c| c.name())
+            .collect::<Vec<_>>()
+    );
+
+    // Construct reader
+    let mut reader: ParquetRecordBatchReader = builder.build().unwrap();
+
+    // Read data
+    let _batch = reader.next().unwrap().unwrap();
+    println!("{:#?}", _batch);
 
     Ok(())
 }
