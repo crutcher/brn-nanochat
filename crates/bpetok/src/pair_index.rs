@@ -1,11 +1,7 @@
+//! Pair Count / Word Indexing
 use crate::token_types::Token;
 use crate::{Pair, Word};
 use ahash::{AHashMap, AHashSet};
-
-#[cfg(feature = "rayon")]
-const DEFAULT_PARALLEL: bool = true;
-#[cfg(not(feature = "rayon"))]
-const DEFAULT_PARALLEL: bool = false;
 
 /// Options for building a [`PairIndex`].
 #[derive(Debug, Clone, Copy)]
@@ -19,16 +15,27 @@ pub struct PairIndexOptions {
 impl Default for PairIndexOptions {
     fn default() -> Self {
         Self {
-            parallel: DEFAULT_PARALLEL,
+            parallel: crate::DEFAULT_PARALLEL,
         }
     }
+}
+
+/// Compute the word count table for a sequence of words.
+pub fn word_count_table<T: Token>(words: &[Word<T>]) -> Vec<usize> {
+    let mut word_counts: AHashMap<&Word<T>, usize> = Default::default();
+
+    words.iter().for_each(|w| {
+        *word_counts.entry(w).or_default() += 1;
+    });
+
+    words.iter().map(|w| word_counts[w]).collect()
 }
 
 /// An index of [`Pair`]s over a sequence of [`Word`]s.
 #[derive(Debug)]
 pub struct PairIndex<T: Token> {
     /// A map from pair to its total count across all words.
-    pub pair_count_map: AHashMap<Pair<T>, i32>,
+    pub pair_count_map: AHashMap<Pair<T>, usize>,
 
     /// A map from pair to the set of word indices that contain it.
     pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>>,
@@ -44,7 +51,7 @@ impl<T: Token> PairIndex<T> {
         words: &[Word<T>],
         options: PairIndexOptions,
     ) -> Self {
-        let mut word_counts: AHashMap<&Word<T>, i32> = Default::default();
+        let mut word_counts: AHashMap<&Word<T>, usize> = Default::default();
 
         words.iter().for_each(|w| {
             *word_counts.entry(w).or_default() += 1;
@@ -65,7 +72,7 @@ impl<T: Token> PairIndex<T> {
         count_fn: F,
     ) -> Self
     where
-        F: Fn(&Word<T>) -> i32,
+        F: Fn(&Word<T>) -> usize,
     {
         Self::for_words_with_count_table(
             words,
@@ -83,7 +90,7 @@ impl<T: Token> PairIndex<T> {
     pub fn for_words_with_count_table(
         words: &[Word<T>],
         options: PairIndexOptions,
-        word_counts: &[i32],
+        word_counts: &[usize],
     ) -> Self {
         if options.parallel {
             #[cfg(not(feature = "rayon"))]
@@ -108,9 +115,9 @@ impl<T: Token> PairIndex<T> {
     pub fn for_words_with_count_table_serial(
         words: &[Word<T>],
         _options: PairIndexOptions,
-        word_counts: &[i32],
+        word_counts: &[usize],
     ) -> Self {
-        let mut pair_count_map: AHashMap<Pair<T>, i32> = Default::default();
+        let mut pair_count_map: AHashMap<Pair<T>, usize> = Default::default();
         let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
 
         for (i, w) in words.iter().enumerate() {
@@ -142,7 +149,7 @@ impl<T: Token> PairIndex<T> {
     pub fn for_words_with_count_table_rayon(
         words: &[Word<T>],
         _options: PairIndexOptions,
-        word_counts: &[i32],
+        word_counts: &[usize],
     ) -> Self {
         use rayon::prelude::*;
 
@@ -150,7 +157,7 @@ impl<T: Token> PairIndex<T> {
             .par_iter()
             .enumerate()
             .map(|(i, w)| {
-                let mut local_pc: AHashMap<Pair<T>, i32> = AHashMap::new();
+                let mut local_pc: AHashMap<Pair<T>, usize> = AHashMap::new();
                 let mut local_wtu: AHashMap<Pair<T>, AHashSet<usize>> = AHashMap::new();
                 let wc = word_counts[i];
                 if wc != 0 && w.len() >= 2 {

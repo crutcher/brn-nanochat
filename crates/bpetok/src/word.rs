@@ -1,3 +1,5 @@
+//! # Word Structures
+
 use crate::Pair;
 use crate::token_types::Token;
 use core::hash::Hash;

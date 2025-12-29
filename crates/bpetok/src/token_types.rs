@@ -1,10 +1,14 @@
 use core::hash::Hash;
+use std::fmt::Debug;
 
 /// A type that can be used as a token in a BPE-based tokenizer.
-pub trait Token: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + Hash + Send + Sync {}
+pub trait Token:
+    Debug + Clone + Copy + PartialEq + Eq + PartialOrd + Ord + Hash + Send + Sync
+{
+}
 
 impl<T> Token for T where
-    T: Clone + Copy + PartialEq + Eq + PartialOrd + Ord + Hash + Send + Sized + Sync
+    T: Debug + Clone + Copy + PartialEq + Eq + PartialOrd + Ord + Hash + Send + Sized + Sync
 {
 }
 

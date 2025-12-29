@@ -25,11 +25,15 @@ doc_markdown = "warn"
 burn = "0.20.0-pre.6"
 bimm-contracts = "^0.19.1"
 
+log = "^0.4"
 clap = "^4.5"
 anyhow = "^1.0"
 shellexpand = "^3.1"
 
+num-traits = "0.2.19"
+dary_heap = "^0.3"
 ahash = "^0.8"
+
 rayon = { version = "^1.11" }
 
 downloader = "^0.2"
@@ -37,4 +41,6 @@ downloader = "^0.2"
 tempdir = "^0.3"
 
 parquet = "^57.1"
+
+fancy-regex = "^0.17"
 
