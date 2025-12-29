@@ -128,32 +128,32 @@ impl TokenizerOptions {
         let mut last_log_percent = 0;
 
         while merges_done < num_merges {
-            let Some(mut top) = heap.pop() else {
+            let Some(mut job) = heap.pop() else {
                 break;
             };
 
             // Lazy refresh
-            let current = *pair_counts.get(&top.pair).unwrap_or(&0);
-            if top.count != current {
-                top.count = current;
-                if top.count > 0 {
-                    heap.push(top);
+            let current = *pair_counts.get(&job.pair).unwrap_or(&0);
+            if job.count != current {
+                job.count = current;
+                if job.count > 0 {
+                    heap.push(job);
                 }
                 continue;
             }
-            if top.count == 0 {
+            if job.count == 0 {
                 break;
             }
 
             // Record merge
             let new_id: T = T::from_usize(256 + merges_done).expect("new_id is a valid T");
-            merges.insert(top.pair, new_id);
+            merges.insert(job.pair, new_id);
 
             // Merge this pair in all words where it occurs
             let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> = AHashMap::new();
-            for &word_idx in &top.word_indices {
+            for &word_idx in &job.word_indices {
                 // Apply merge to this word.
-                words[word_idx].merge_pair_cb(top.pair, new_id, &mut |pair, delta| {
+                words[word_idx].merge_pair_cb(job.pair, new_id, &mut |pair, delta| {
                     // Update global pair counts based on this word's count
                     if delta < 0 {
                         *pair_counts.entry(pair).or_default() -= 1;
@@ -187,9 +187,9 @@ impl TokenizerOptions {
                     current_percent,
                     merges_done,
                     num_merges,
-                    top.pair,
+                    job.pair,
                     new_id,
-                    top.count
+                    job.count
                 );
                 last_log_percent = current_percent;
             }
