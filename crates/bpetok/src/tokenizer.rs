@@ -277,7 +277,6 @@ pub struct Tokenizer<T: Token> {
     pub pattern: String,
 
     /// The compiled regex pattern.
-    #[allow(unused)]
     compiled_pattern: Regex,
 }
 
