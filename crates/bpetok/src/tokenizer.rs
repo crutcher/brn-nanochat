@@ -97,15 +97,17 @@ impl TokenizerOptions {
         let mut merges: HashMap<Pair<T>, T> = HashMap::new();
         let compiled_pattern = Regex::new(&self.pattern).unwrap();
 
-        let pi_options = PairIndexOptions {
-            parallel: self.parallel,
-        };
-
         log::info!("Building pair index...");
         let PairIndex {
             mut pair_counts,
             pair_to_word_index,
-        } = PairIndex::for_words_with_count_table(&words, pi_options, &word_counts);
+        } = PairIndex::for_words_with_count_table(
+            &words,
+            &word_counts,
+            PairIndexOptions {
+                parallel: self.parallel,
+            },
+        );
 
         // ---- Build heap ----
         log::info!("Building heap with {} unique pairs", pair_counts.len());

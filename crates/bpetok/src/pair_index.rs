@@ -76,8 +76,8 @@ impl<T: Token> PairIndex<T> {
     {
         Self::for_words_with_count_table(
             words,
-            options,
             &words.iter().map(count_fn).collect::<Vec<_>>(),
+            options,
         )
     }
 
@@ -85,21 +85,21 @@ impl<T: Token> PairIndex<T> {
     ///
     /// # Arguments
     /// * `words` - the slice of words.
-    /// * `options` - options for building the index.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    /// * `options` - options for building the index.
     pub fn for_words_with_count_table(
         words: &[Word<T>],
-        options: PairIndexOptions,
         word_counts: &[usize],
+        options: PairIndexOptions,
     ) -> Self {
         if options.parallel {
             #[cfg(not(feature = "rayon"))]
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
 
             #[cfg(feature = "rayon")]
-            Self::for_words_with_count_table_rayon(words, options, word_counts)
+            Self::for_words_with_count_table_rayon(words, word_counts, options)
         } else {
-            Self::for_words_with_count_table_serial(words, options, word_counts)
+            Self::for_words_with_count_table_serial(words, word_counts, options)
         }
     }
 
@@ -110,12 +110,12 @@ impl<T: Token> PairIndex<T> {
     ///
     /// # Arguments
     /// * `words` - the slice of words.
-    /// * `options` - options for building the index.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    /// * `options` - options for building the index.
     pub fn for_words_with_count_table_serial(
         words: &[Word<T>],
-        _options: PairIndexOptions,
         word_counts: &[usize],
+        _options: PairIndexOptions,
     ) -> Self {
         let mut pair_counts: AHashMap<Pair<T>, usize> = Default::default();
         let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
@@ -143,13 +143,13 @@ impl<T: Token> PairIndex<T> {
     ///
     /// # Arguments
     /// * `words` - the slice of words.
-    /// * `options` - options for building the index.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    /// * `options` - options for building the index.
     #[cfg(feature = "rayon")]
     pub fn for_words_with_count_table_rayon(
         words: &[Word<T>],
-        _options: PairIndexOptions,
         word_counts: &[usize],
+        _options: PairIndexOptions,
     ) -> Self {
         use rayon::prelude::*;
 
