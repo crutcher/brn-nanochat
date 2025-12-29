@@ -39,7 +39,7 @@ impl<T: Token> PairIndex<T> {
     /// * `words` - the slice of words; Words are assumed to be unique.
     /// * `word_counts` - `word_counts[i]` is the count of `words[i]`.
     /// * `options` - options for building the index.
-    pub fn index_unique_words_with_count_table(
+    pub fn index_unique_word_counts_table(
         words: &[Word<T>],
         word_counts: &[usize],
         options: PairIndexOptions,
@@ -49,9 +49,9 @@ impl<T: Token> PairIndex<T> {
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
 
             #[cfg(feature = "rayon")]
-            Self::index_unique_words_with_count_table_rayon(words, word_counts, options)
+            Self::index_unique_word_counts_table_rayon(words, word_counts, options)
         } else {
-            Self::index_unique_words_with_count_table_serial(words, word_counts, options)
+            Self::index_unique_word_counts_table_serial(words, word_counts, options)
         }
     }
 
@@ -64,7 +64,7 @@ impl<T: Token> PairIndex<T> {
     /// * `words` - the slice of words.
     /// * `words` - the slice of words; Words are assumed to be unique.
     /// * `options` - options for building the index.
-    pub fn index_unique_words_with_count_table_serial(
+    pub fn index_unique_word_counts_table_serial(
         words: &[Word<T>],
         word_counts: &[usize],
         _options: PairIndexOptions,
@@ -98,7 +98,7 @@ impl<T: Token> PairIndex<T> {
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
     /// * `options` - options for building the index.
     #[cfg(feature = "rayon")]
-    pub fn index_unique_words_with_count_table_rayon(
+    pub fn index_unique_word_counts_table_rayon(
         words: &[Word<T>],
         word_counts: &[usize],
         _options: PairIndexOptions,
@@ -158,7 +158,7 @@ mod tests {
             let options = PairIndexOptions { parallel };
 
             let index =
-                PairIndex::index_unique_words_with_count_table_rayon(&words, &word_counts, options);
+                PairIndex::index_unique_word_counts_table_rayon(&words, &word_counts, options);
 
             let PairIndex {
                 pair_counts,

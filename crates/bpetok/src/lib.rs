@@ -3,17 +3,17 @@
 
 mod merge_job;
 mod pair_index;
-mod split;
 mod token_types;
 mod tokenizer;
 mod word;
+mod word_count;
 
 pub use merge_job::*;
 pub use pair_index::*;
-pub use split::*;
 pub use token_types::*;
 pub use tokenizer::*;
 pub use word::*;
+pub use word_count::*;
 
 /// The default value for [`PairIndexOptions::parallel`].
 #[cfg(feature = "rayon")]

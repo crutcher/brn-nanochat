@@ -1,7 +1,10 @@
 //! # Tokenizer Structures
 
-use crate::{DEFAULT_PARALLEL, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word};
+use crate::{
+    DEFAULT_PARALLEL, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word, WordCounter,
+};
 use ahash::{AHashMap, AHashSet};
+use compact_str::CompactString;
 use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
 use std::collections::HashMap;
@@ -83,31 +86,63 @@ impl TokenizerOptions {
         Regex::new(&self.pattern).unwrap()
     }
 
-    /*
     /// Converts a sample iterator into a word iterator.
-    pub fn samples_to_words<T: Token, I: Iterator<Item = S>, S: AsRef<str>>(
+    pub fn samples_to_word_counts<T, I, S>(
         &self,
-        _samples: I,
-    ) -> Vec<Word<T>> {
+        samples: I,
+    ) -> AHashMap<Word<T>, usize>
+    where
+        T: Token,
+        I: Iterator<Item = S> + Send,
+        S: AsRef<str> + Send,
+    {
+        let mut counter: WordCounter<CompactString, usize> =
+            WordCounter::new(&self.pattern, self.parallel);
+        counter.update_from_samples(samples);
+        let _word_counts = counter.release();
+        // TODO: CompactString -> Word<T> ?
         todo!()
     }
 
     /// Trains a [`Tokenizer`] over a sample iterator.
-    pub fn train_from_sample_iterator<T: Token, I: Iterator<Item = S>, S: AsRef<str>>(
+    pub fn train_from_sample_iterator<T, I, S>(
         self,
         samples: I,
-    ) -> Tokenizer<T> {
-        let words = self.samples_to_words(samples);
-        self.train_from_words(words)
+    ) -> Tokenizer<T>
+    where
+        T: Token,
+        I: Iterator<Item = S> + Send,
+        S: AsRef<str> + Send,
+    {
+        let word_counts = self.samples_to_word_counts(samples);
+        self.train_from_word_counts_map(word_counts)
     }
-     */
+
+    /// Trains a [`Tokenizer`] over [`Word`]s.
+    ///
+    /// # Arguments
+    /// * `word_counts` - a ``{word: count}`` map.
+    pub fn train_from_word_counts_map<T: Token>(
+        self,
+        words: AHashMap<Word<T>, usize>,
+    ) -> Tokenizer<T> {
+        let mut ws: Vec<Word<T>> = Vec::with_capacity(words.len());
+        let mut cs: Vec<usize> = Vec::with_capacity(words.len());
+
+        words.into_iter().for_each(|(w, c)| {
+            ws.push(w);
+            cs.push(c);
+        });
+
+        self.train_from_word_counts_table(ws, &cs)
+    }
 
     /// Trains a [`Tokenizer`] over [`Word`]s.
     ///
     /// # Arguments
     /// * `words` - the words.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
-    pub fn train_from_words_with_count_table<T: Token>(
+    pub fn train_from_word_counts_table<T: Token>(
         self,
         mut words: Vec<Word<T>>,
         word_counts: &[usize],
@@ -127,7 +162,7 @@ impl TokenizerOptions {
         let PairIndex {
             mut pair_counts,
             pair_to_word_index,
-        } = PairIndex::index_unique_words_with_count_table(
+        } = PairIndex::index_unique_word_counts_table(
             &words,
             word_counts,
             PairIndexOptions {
