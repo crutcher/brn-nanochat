@@ -1,20 +1,14 @@
 //! # Tokenizer Structures
 
 use crate::{
-    DEFAULT_PARALLEL, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word, WordCounter,
-    WordCounterOptions,
+    DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word,
+    WordCounter, WordCounterOptions,
 };
 use ahash::{AHashMap, AHashSet};
 use compact_str::CompactString;
 use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
 use std::collections::HashMap;
-
-/// Default GPT-4 style regex pattern for splitting text
-pub const GPT4_PATTERN: &str = r"'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+";
-
-/// Default number of reserved tokens
-pub const DEFAULT_NUM_RESERVED: usize = 256;
 
 /// A builder for [`Tokenizer`]s.
 #[derive(Debug)]
@@ -35,7 +29,7 @@ pub struct TokenizerOptions {
 impl Default for TokenizerOptions {
     fn default() -> Self {
         Self {
-            pattern: GPT4_PATTERN.to_string(),
+            pattern: DEFAULT_PATTERN.to_string(),
             vocab_size: 0,
             num_reserved: 256,
             parallel: DEFAULT_PARALLEL,
