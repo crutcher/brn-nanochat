@@ -2,6 +2,7 @@
 
 use crate::{
     DEFAULT_PARALLEL, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word, WordCounter,
+    WordCounterOptions,
 };
 use ahash::{AHashMap, AHashSet};
 use compact_str::CompactString;
@@ -96,8 +97,11 @@ impl TokenizerOptions {
         I: Iterator<Item = S> + Send,
         S: AsRef<str> + Send,
     {
-        let mut counter: WordCounter<CompactString, usize> =
-            WordCounter::new(&self.pattern, self.parallel);
+        let mut counter: WordCounter<CompactString, usize> = WordCounter::new(
+            WordCounterOptions::default()
+                .with_pattern(&self.pattern)
+                .with_parallel(self.parallel),
+        );
         counter.update_from_samples(samples);
         let _word_counts = counter.release();
         // TODO: CompactString -> Word<T> ?
