@@ -1,8 +1,8 @@
 //! # Tokenizer Structures
 
 use crate::{
-    DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word,
-    WordCounter, WordCounterOptions,
+    DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions, TokenType,
+    Word, WordCounter, WordCounterOptions,
 };
 use ahash::{AHashMap, AHashSet};
 use compact_str::CompactString;
@@ -87,7 +87,7 @@ impl TokenizerOptions {
         samples: I,
     ) -> AHashMap<Word<T>, usize>
     where
-        T: Token,
+        T: TokenType,
         I: Iterator<Item = S> + Send,
         S: AsRef<str> + Send,
     {
@@ -111,7 +111,7 @@ impl TokenizerOptions {
         samples: I,
     ) -> Tokenizer<T>
     where
-        T: Token,
+        T: TokenType,
         I: Iterator<Item = S> + Send,
         S: AsRef<str> + Send,
     {
@@ -123,7 +123,7 @@ impl TokenizerOptions {
     ///
     /// # Arguments
     /// * `word_counts` - a ``{word: count}`` map.
-    pub fn train_from_word_counts_map<T: Token>(
+    pub fn train_from_word_counts_map<T: TokenType>(
         self,
         words: AHashMap<Word<T>, usize>,
     ) -> Tokenizer<T> {
@@ -143,7 +143,7 @@ impl TokenizerOptions {
     /// # Arguments
     /// * `words` - the words.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
-    pub fn train_from_word_counts_table<T: Token>(
+    pub fn train_from_word_counts_table<T: TokenType>(
         self,
         mut words: Vec<Word<T>>,
         word_counts: &[usize],
@@ -269,7 +269,7 @@ impl TokenizerOptions {
 
 /// A Byte Pair Encoding / Decoding Tokenizer.
 #[derive(Debug)]
-pub struct Tokenizer<T: Token> {
+pub struct Tokenizer<T: TokenType> {
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
     pub merges: HashMap<Pair<T>, T>,
 
@@ -280,7 +280,7 @@ pub struct Tokenizer<T: Token> {
     compiled_pattern: Regex,
 }
 
-impl<T: Token> Tokenizer<T> {
+impl<T: TokenType> Tokenizer<T> {
     /// Encode a string into token IDs
     pub fn encode(
         &self,

@@ -1,10 +1,8 @@
 //! # Text Splitting
 
+use crate::{ChunkType, CountType};
 use ahash::AHashMap;
-use num_traits::Num;
 use std::fmt::Debug;
-use std::hash::Hash;
-use std::ops::AddAssign;
 
 /// Split text into words and count occurrences using a regular expression.
 pub fn word_counts_from_text<S, K, C>(
@@ -13,8 +11,8 @@ pub fn word_counts_from_text<S, K, C>(
 ) -> anyhow::Result<AHashMap<K, C>>
 where
     S: AsRef<str>,
-    K: for<'a> From<&'a str> + Hash + Eq + Debug,
-    C: Num + AddAssign + Default,
+    K: ChunkType,
+    C: CountType,
 {
     let mut m: AHashMap<K, C> = Default::default();
     update_word_counts_from_text(&mut m, regex, text)?;
@@ -29,8 +27,8 @@ pub fn update_word_counts_from_text<S, K, C>(
 ) -> anyhow::Result<()>
 where
     S: AsRef<str>,
-    K: for<'a> From<&'a str> + Hash + Eq + Debug,
-    C: Num + AddAssign + Default,
+    K: ChunkType,
+    C: CountType,
 {
     for mat in regex.find_iter(text.as_ref()) {
         let piece = mat?.as_str();
@@ -45,8 +43,8 @@ pub fn update_word_counts<K, C>(
     word_counts: &mut AHashMap<K, C>,
     source: AHashMap<K, C>,
 ) where
-    K: for<'a> From<&'a str> + Hash + Eq + Debug,
-    C: Num + AddAssign + Default,
+    K: ChunkType,
+    C: CountType,
 {
     for (k, v) in source {
         *word_counts.entry(k).or_default() += v;
@@ -99,8 +97,8 @@ impl WordCounterOptions {
 #[derive(Debug)]
 pub struct WordCounter<K, C>
 where
-    K: for<'a> From<&'a str> + Hash + Eq + Debug,
-    C: Num + AddAssign + Default + Send,
+    K: ChunkType,
+    C: CountType,
 {
     /// Whether to use parallel processing for word counting.
     parallel: bool,
@@ -117,8 +115,8 @@ where
 
 impl<K, C> WordCounter<K, C>
 where
-    K: for<'a> From<&'a str> + Hash + Eq + Debug + Send,
-    C: Num + AddAssign + Default + Send,
+    K: ChunkType,
+    C: CountType,
 {
     /// Create a new word counter.
     pub fn new(options: WordCounterOptions) -> Self {
@@ -250,7 +248,6 @@ where
 mod tests {
     use super::*;
     use compact_str::CompactString;
-    use num_traits::FromPrimitive;
 
     const PATTERN: &str = r"\w+";
 
@@ -293,8 +290,8 @@ mod tests {
 
     fn check_common_counts<K, C>(counts: AHashMap<K, C>)
     where
-        K: for<'a> From<&'a str> + Hash + Eq + Ord + Debug,
-        C: Num + FromPrimitive + Default + Ord + Debug,
+        K: ChunkType,
+        C: CountType,
     {
         let mut counts: Vec<(K, C)> = counts.into_iter().collect::<Vec<_>>();
         counts.sort();

@@ -1,5 +1,5 @@
 //! Pair Count / Word Indexing
-use crate::token_types::Token;
+use crate::token_types::TokenType;
 use crate::{Pair, Word};
 use ahash::{AHashMap, AHashSet};
 
@@ -22,7 +22,7 @@ impl Default for PairIndexOptions {
 
 /// An index of [`Pair`]s over an index set of ``(word, count)``.
 #[derive(Debug)]
-pub struct PairIndex<T: Token> {
+pub struct PairIndex<T: TokenType> {
     /// A map from [`Pair`] to its occurrence count.
     ///
     /// ``sum(words[i].non_overlapping_count(pair) * word_counts[i]) for all i``
@@ -32,7 +32,7 @@ pub struct PairIndex<T: Token> {
     pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>>,
 }
 
-impl<T: Token> PairIndex<T> {
+impl<T: TokenType> PairIndex<T> {
     /// Build a [`PairIndex`] from a slice of [`Word`]s, using a count table.
     ///
     /// # Arguments

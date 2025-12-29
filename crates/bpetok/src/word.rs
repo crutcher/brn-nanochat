@@ -1,22 +1,22 @@
 //! # Word Structures
 
 use crate::Pair;
-use crate::token_types::Token;
+use crate::token_types::TokenType;
 use core::hash::Hash;
 
 /// A word in a BPE-based tokenizer.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Word<T: Token> {
+pub struct Word<T: TokenType> {
     tokens: Vec<T>,
 }
 
-impl<T: Token, S: AsRef<[T]>> From<S> for Word<T> {
+impl<T: TokenType, S: AsRef<[T]>> From<S> for Word<T> {
     fn from(tokens: S) -> Self {
         Self::from_tokens(tokens)
     }
 }
 
-impl<T: Token> Word<T> {
+impl<T: TokenType> Word<T> {
     /// Create a new word from a list of ids.
     pub fn from_tokens<S>(tokens: S) -> Self
     where

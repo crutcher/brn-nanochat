@@ -1,11 +1,11 @@
 use crate::Pair;
-use crate::token_types::Token;
+use crate::token_types::TokenType;
 use ahash::AHashSet;
 use core::cmp::Ordering;
 
 /// Info about a [`Pair`] that could be merged.
 #[derive(Debug, Eq)]
-pub struct MergeJob<T: Token> {
+pub struct MergeJob<T: TokenType> {
     /// The pair to merge.
     pub pair: Pair<T>,
 
@@ -16,7 +16,7 @@ pub struct MergeJob<T: Token> {
     pub word_indices: AHashSet<usize>,
 }
 
-impl<T: Token> MergeJob<T> {
+impl<T: TokenType> MergeJob<T> {
     /// The job key.
     ///
     /// Max-heap by count; tie-break to ascending pair order (deterministic)
@@ -25,7 +25,7 @@ impl<T: Token> MergeJob<T> {
     }
 }
 
-impl<T: Token> PartialEq for MergeJob<T> {
+impl<T: TokenType> PartialEq for MergeJob<T> {
     fn eq(
         &self,
         other: &Self,
@@ -34,7 +34,7 @@ impl<T: Token> PartialEq for MergeJob<T> {
     }
 }
 
-impl<T: Token> PartialOrd for MergeJob<T> {
+impl<T: TokenType> PartialOrd for MergeJob<T> {
     fn partial_cmp(
         &self,
         other: &Self,
@@ -43,7 +43,7 @@ impl<T: Token> PartialOrd for MergeJob<T> {
     }
 }
 
-impl<T: Token> Ord for MergeJob<T> {
+impl<T: TokenType> Ord for MergeJob<T> {
     fn cmp(
         &self,
         other: &Self,
