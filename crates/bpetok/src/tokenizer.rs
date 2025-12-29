@@ -1,8 +1,6 @@
 //! # Tokenizer Structures
 
-use crate::{
-    DEFAULT_PARALLEL, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word, word_count_table,
-};
+use crate::{DEFAULT_PARALLEL, MergeJob, Pair, PairIndex, PairIndexOptions, Token, Word};
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
@@ -80,10 +78,39 @@ impl TokenizerOptions {
         Self { parallel, ..self }
     }
 
-    /// Trains a [`Tokenizer`] over a word sequence.
-    pub fn train<T: Token>(
+    /// Returns the regex pattern as a [`Regex`] object.
+    pub fn get_regex(&self) -> Regex {
+        Regex::new(&self.pattern).unwrap()
+    }
+
+    /*
+    /// Converts a sample iterator into a word iterator.
+    pub fn samples_to_words<T: Token, I: Iterator<Item = S>, S: AsRef<str>>(
+        &self,
+        _samples: I,
+    ) -> Vec<Word<T>> {
+        todo!()
+    }
+
+    /// Trains a [`Tokenizer`] over a sample iterator.
+    pub fn train_from_sample_iterator<T: Token, I: Iterator<Item = S>, S: AsRef<str>>(
+        self,
+        samples: I,
+    ) -> Tokenizer<T> {
+        let words = self.samples_to_words(samples);
+        self.train_from_words(words)
+    }
+     */
+
+    /// Trains a [`Tokenizer`] over [`Word`]s.
+    ///
+    /// # Arguments
+    /// * `words` - the words.
+    /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    pub fn train_from_words_with_count_table<T: Token>(
         self,
         mut words: Vec<Word<T>>,
+        word_counts: &[usize],
     ) -> Tokenizer<T> {
         assert!(
             self.vocab_size >= self.num_reserved,
@@ -92,18 +119,17 @@ impl TokenizerOptions {
         let num_merges = self.vocab_size - 256;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
 
-        let word_counts = word_count_table(&words);
+        let compiled_pattern = self.get_regex();
 
         let mut merges: HashMap<Pair<T>, T> = HashMap::new();
-        let compiled_pattern = Regex::new(&self.pattern).unwrap();
 
         log::info!("Building pair index...");
         let PairIndex {
             mut pair_counts,
             pair_to_word_index,
-        } = PairIndex::for_words_with_count_table(
+        } = PairIndex::index_unique_words_with_count_table(
             &words,
-            &word_counts,
+            word_counts,
             PairIndexOptions {
                 parallel: self.parallel,
             },

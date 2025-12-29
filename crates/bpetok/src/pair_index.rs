@@ -20,74 +20,26 @@ impl Default for PairIndexOptions {
     }
 }
 
-/// Compute the word count table for a sequence of words.
-pub fn word_count_table<T: Token>(words: &[Word<T>]) -> Vec<usize> {
-    let mut word_counts: AHashMap<&Word<T>, usize> = Default::default();
-
-    words.iter().for_each(|w| {
-        *word_counts.entry(w).or_default() += 1;
-    });
-
-    words.iter().map(|w| word_counts[w]).collect()
-}
-
-/// An index of [`Pair`]s over a sequence of [`Word`]s.
+/// An index of [`Pair`]s over an index set of ``(word, count)``.
 #[derive(Debug)]
 pub struct PairIndex<T: Token> {
-    /// A map from pair to its total count across all words.
+    /// A map from [`Pair`] to its occurrence count.
+    ///
+    /// ``sum(words[i].non_overlapping_count(pair) * word_counts[i]) for all i``
     pub pair_counts: AHashMap<Pair<T>, usize>,
 
-    /// A map from pair to the set of word indices that contain it.
+    /// A map from [`Pair`] to indices over ``words``.
     pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>>,
 }
 
 impl<T: Token> PairIndex<T> {
-    /// Create a [`PairIndex`] from a sequence of [`Word`]s.
-    ///
-    /// # Arguments
-    /// * `words` - the slice of words.
-    /// * `options` - options for building the index.
-    pub fn for_words(
-        words: &[Word<T>],
-        options: PairIndexOptions,
-    ) -> Self {
-        let mut word_counts: AHashMap<&Word<T>, usize> = Default::default();
-
-        words.iter().for_each(|w| {
-            *word_counts.entry(w).or_default() += 1;
-        });
-
-        Self::for_words_with_count_fn(words, options, |w| word_counts[w])
-    }
-
-    /// Create a [`PairIndex`] from a sequence of [`Word`]s, using a count function.
-    ///
-    /// # Arguments
-    /// * `words` - the slice of words.
-    /// * `options` - options for building the index.
-    /// * `count_fn` - `count_fn(&word)` is the duplication count of `&word`.
-    pub fn for_words_with_count_fn<F>(
-        words: &[Word<T>],
-        options: PairIndexOptions,
-        count_fn: F,
-    ) -> Self
-    where
-        F: Fn(&Word<T>) -> usize,
-    {
-        Self::for_words_with_count_table(
-            words,
-            &words.iter().map(count_fn).collect::<Vec<_>>(),
-            options,
-        )
-    }
-
     /// Build a [`PairIndex`] from a slice of [`Word`]s, using a count table.
     ///
     /// # Arguments
-    /// * `words` - the slice of words.
-    /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    /// * `words` - the slice of words; Words are assumed to be unique.
+    /// * `word_counts` - `word_counts[i]` is the count of `words[i]`.
     /// * `options` - options for building the index.
-    pub fn for_words_with_count_table(
+    pub fn index_unique_words_with_count_table(
         words: &[Word<T>],
         word_counts: &[usize],
         options: PairIndexOptions,
@@ -97,9 +49,9 @@ impl<T: Token> PairIndex<T> {
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
 
             #[cfg(feature = "rayon")]
-            Self::for_words_with_count_table_rayon(words, word_counts, options)
+            Self::index_unique_words_with_count_table_rayon(words, word_counts, options)
         } else {
-            Self::for_words_with_count_table_serial(words, word_counts, options)
+            Self::index_unique_words_with_count_table_serial(words, word_counts, options)
         }
     }
 
@@ -110,9 +62,9 @@ impl<T: Token> PairIndex<T> {
     ///
     /// # Arguments
     /// * `words` - the slice of words.
-    /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    /// * `words` - the slice of words; Words are assumed to be unique.
     /// * `options` - options for building the index.
-    pub fn for_words_with_count_table_serial(
+    pub fn index_unique_words_with_count_table_serial(
         words: &[Word<T>],
         word_counts: &[usize],
         _options: PairIndexOptions,
@@ -142,11 +94,11 @@ impl<T: Token> PairIndex<T> {
     /// this ignores the `options.parallel` flag.
     ///
     /// # Arguments
-    /// * `words` - the slice of words.
+    /// * `words` - the slice of words; Words are assumed to be unique.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
     /// * `options` - options for building the index.
     #[cfg(feature = "rayon")]
-    pub fn for_words_with_count_table_rayon(
+    pub fn index_unique_words_with_count_table_rayon(
         words: &[Word<T>],
         word_counts: &[usize],
         _options: PairIndexOptions,
@@ -200,10 +152,13 @@ mod tests {
             Word::from(['h' as u8, 'e' as u8, 'l' as u8, 'p' as u8]),
         ];
 
+        let word_counts = vec![1, 2, 3];
+
         for parallel in [true, false] {
             let options = PairIndexOptions { parallel };
 
-            let index = PairIndex::for_words(&words, options);
+            let index =
+                PairIndex::index_unique_words_with_count_table_rayon(&words, &word_counts, options);
 
             let PairIndex {
                 pair_counts,
@@ -215,15 +170,15 @@ mod tests {
             assert_eq!(
                 pair_counts,
                 vec![
-                    (('e' as u8, 'l' as u8), 2),
-                    (('h' as u8, 'e' as u8), 2),
-                    (('l' as u8, 'd' as u8), 1),
+                    (('e' as u8, 'l' as u8), 4),
+                    (('h' as u8, 'e' as u8), 4),
+                    (('l' as u8, 'd' as u8), 2),
                     (('l' as u8, 'l' as u8), 1),
                     (('l' as u8, 'o' as u8), 1),
-                    (('l' as u8, 'p' as u8), 1),
-                    (('o' as u8, 'r' as u8), 1),
-                    (('r' as u8, 'l' as u8), 1),
-                    (('w' as u8, 'o' as u8), 1),
+                    (('l' as u8, 'p' as u8), 3),
+                    (('o' as u8, 'r' as u8), 2),
+                    (('r' as u8, 'l' as u8), 2),
+                    (('w' as u8, 'o' as u8), 2),
                 ]
             );
 
