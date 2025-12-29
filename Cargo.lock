@@ -586,6 +586,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bpetok"
+version = "0.0.1"
+dependencies = [
+ "ahash",
+ "rayon",
+]
+
+[[package]]
 name = "brotli"
 version = "8.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

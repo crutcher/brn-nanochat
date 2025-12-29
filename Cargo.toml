@@ -29,9 +29,12 @@ clap = "^4.5"
 anyhow = "^1.0"
 shellexpand = "^3.1"
 
+ahash = "^0.8"
+rayon = { version = "^1.11" }
+
 downloader = "^0.2"
 
-tempdir = "^0.3.7"
+tempdir = "^0.3"
 
-parquet = "^57.1.0"
+parquet = "^57.1"
 

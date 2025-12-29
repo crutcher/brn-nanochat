@@ -1,0 +1,18 @@
+[package]
+name = "bpetok"
+version.workspace = true
+license.workspace = true
+
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["rayon"]
+rayon = ["dep:rayon"]
+
+[dependencies]
+ahash = { workspace = true }
+rayon = { workspace = true, optional = true }

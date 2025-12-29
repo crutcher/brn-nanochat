@@ -6,8 +6,10 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/pull/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/poke/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/bpetok/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/crates/nanochat/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/bpetok/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
