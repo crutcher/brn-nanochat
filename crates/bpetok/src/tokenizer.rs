@@ -11,6 +11,9 @@ use std::collections::HashMap;
 /// Default GPT-4 style regex pattern for splitting text
 pub const GPT4_PATTERN: &str = r"'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+";
 
+/// Default number of reserved tokens
+pub const DEFAULT_NUM_RESERVED: usize = 256;
+
 /// A builder for [`Tokenizer`]s.
 #[derive(Debug)]
 pub struct TokenizerOptions {
@@ -19,6 +22,9 @@ pub struct TokenizerOptions {
 
     /// The vocab size.
     pub vocab_size: usize,
+
+    /// The number of reserved tokens.
+    pub num_reserved: usize,
 
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
@@ -29,6 +35,7 @@ impl Default for TokenizerOptions {
         Self {
             pattern: GPT4_PATTERN.to_string(),
             vocab_size: 0,
+            num_reserved: 256,
             parallel: DEFAULT_PARALLEL,
         }
     }
@@ -54,16 +61,33 @@ impl TokenizerOptions {
         Self { vocab_size, ..self }
     }
 
+    /// Sets the number of reserved tokens.
+    pub fn with_num_reserved(
+        self,
+        num_reserved: usize,
+    ) -> Self {
+        Self {
+            num_reserved,
+            ..self
+        }
+    }
+
+    /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
+    pub fn with_parallel(
+        self,
+        parallel: bool,
+    ) -> Self {
+        Self { parallel, ..self }
+    }
+
     /// Trains a [`Tokenizer`] over a word sequence.
     pub fn train<T: Token>(
         self,
         mut words: Vec<Word<T>>,
     ) -> Tokenizer<T> {
-        #![allow(unused)]
-
         assert!(
-            self.vocab_size >= 256,
-            "vocab_size must be at least 256: {self:#?}"
+            self.vocab_size >= self.num_reserved,
+            "vocab_size must be >= num_reserved: {self:#?}"
         );
         let num_merges = self.vocab_size - 256;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
@@ -79,15 +103,15 @@ impl TokenizerOptions {
 
         log::info!("Building pair index...");
         let PairIndex {
-            mut pair_count_map,
+            mut pair_counts,
             pair_to_word_index,
         } = PairIndex::for_words_with_count_table(&words, pi_options, &word_counts);
 
         // ---- Build heap ----
-        log::info!("Building heap with {} unique pairs", pair_count_map.len());
-        let mut heap = OctonaryHeap::with_capacity(pair_count_map.len());
+        log::info!("Building heap with {} unique pairs", pair_counts.len());
+        let mut heap = OctonaryHeap::with_capacity(pair_counts.len());
         for (pair, word_indices) in pair_to_word_index.into_iter() {
-            let count = *pair_count_map.get(&pair).unwrap_or(&0);
+            let count = *pair_counts.get(&pair).unwrap_or(&0);
             if count > 0 {
                 heap.push(MergeJob {
                     pair,
@@ -107,7 +131,7 @@ impl TokenizerOptions {
             };
 
             // Lazy refresh
-            let current = *pair_count_map.get(&top.pair).unwrap_or(&0);
+            let current = *pair_counts.get(&top.pair).unwrap_or(&0);
             if top.count != current {
                 top.count = current;
                 if top.count > 0 {
@@ -120,8 +144,7 @@ impl TokenizerOptions {
             }
 
             // Record merge
-            // FIXME: this conversion is broken wrt T.
-            let new_id: T = (256 + merges_done).into();
+            let new_id: T = T::from_usize(256 + merges_done).expect("new_id is a valid T");
             merges.insert(top.pair, new_id);
 
             // Merge this pair in all words where it occurs
@@ -131,10 +154,10 @@ impl TokenizerOptions {
                 words[word_idx].merge_pair_cb(top.pair, new_id, &mut |pair, delta| {
                     // Update global pair counts based on this word's count
                     if delta < 0 {
-                        *pair_count_map.entry(pair).or_default() -= 1;
+                        *pair_counts.entry(pair).or_default() -= 1;
                     }
                     if delta > 0 {
-                        *pair_count_map.entry(pair).or_default() += 1;
+                        *pair_counts.entry(pair).or_default() += 1;
                         local_pos_updates.entry(pair).or_default().insert(word_idx);
                     }
                 });
@@ -142,7 +165,7 @@ impl TokenizerOptions {
 
             // Add the updated pair counts back to the heap
             for (pair, word_indices) in local_pos_updates {
-                let count = *pair_count_map.get(&pair).unwrap_or(&0);
+                let count = *pair_counts.get(&pair).unwrap_or(&0);
                 if count > 0 {
                     heap.push(MergeJob {
                         pair,
