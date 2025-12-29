@@ -218,3 +218,49 @@ pub struct Tokenizer<T: Token> {
     #[allow(unused)]
     compiled_pattern: Regex,
 }
+
+impl<T: Token> Tokenizer<T> {
+    /// Encode a string into token IDs
+    pub fn encode(
+        &self,
+        text: &str,
+    ) -> Vec<T> {
+        let mut all_ids: Vec<T> = Vec::new();
+
+        // Split text using the regex pattern
+        for m in self.compiled_pattern.find_iter(text) {
+            let chunk = m.expect("regex match failed").as_str();
+
+            // Convert chunk to bytes then to u32 IDs
+            let mut ids: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();
+
+            // Apply merges iteratively
+            while ids.len() >= 2 {
+                // Find the best pair to merge
+                let mut best_pair: Option<(usize, Pair<T>, T)> = None;
+
+                for i in 0..ids.len() - 1 {
+                    let pair: Pair<T> = (ids[i], ids[i + 1]);
+                    if let Some(&new_id) = self.merges.get(&pair)
+                        && (best_pair.is_none() || new_id < best_pair.unwrap().2)
+                    {
+                        best_pair = Some((i, pair, new_id));
+                    }
+                }
+
+                // If we found a pair to merge, apply it
+                if let Some((idx, _pair, new_id)) = best_pair {
+                    ids[idx] = new_id;
+                    ids.remove(idx + 1);
+                } else {
+                    // No more merges possible
+                    break;
+                }
+            }
+
+            all_ids.extend(ids);
+        }
+
+        all_ids
+    }
+}
