@@ -97,9 +97,12 @@ impl TokenizerOptions {
                 .with_parallel(self.parallel),
         );
         counter.update_from_samples(samples);
-        let _word_counts = counter.release();
-        // TODO: CompactString -> Word<T> ?
-        todo!()
+
+        counter
+            .release()
+            .into_iter()
+            .map(|(word, count)| (Word::from_string(word), count))
+            .collect()
     }
 
     /// Trains a [`Tokenizer`] over a sample iterator.

@@ -147,9 +147,9 @@ mod tests {
     #[test]
     fn test_pair_index() {
         let words = vec![
-            Word::from(['h' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8]),
-            Word::from(['w' as u8, 'o' as u8, 'r' as u8, 'l' as u8, 'd' as u8]),
-            Word::from(['h' as u8, 'e' as u8, 'l' as u8, 'p' as u8]),
+            Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8]),
+            Word::from_tokens(['w' as u8, 'o' as u8, 'r' as u8, 'l' as u8, 'd' as u8]),
+            Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'p' as u8]),
         ];
 
         let word_counts = vec![1, 2, 3];

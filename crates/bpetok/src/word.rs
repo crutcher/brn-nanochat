@@ -7,44 +7,55 @@ use core::hash::Hash;
 /// A word in a BPE-based tokenizer.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Word<T: Token> {
-    ids: Vec<T>,
+    tokens: Vec<T>,
 }
 
 impl<T: Token, S: AsRef<[T]>> From<S> for Word<T> {
-    fn from(ids: S) -> Self {
-        Self::new(ids)
+    fn from(tokens: S) -> Self {
+        Self::from_tokens(tokens)
     }
 }
 
 impl<T: Token> Word<T> {
     /// Create a new word from a list of ids.
-    pub fn new<S>(ids: S) -> Self
+    pub fn from_tokens<S>(tokens: S) -> Self
     where
         S: AsRef<[T]>,
     {
-        let tokens = ids.as_ref().to_vec();
-        Self { ids: tokens }
+        let tokens = tokens.as_ref().to_vec();
+        Self { tokens }
+    }
+
+    /// Create a new word from a byte slice.
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let tokens: Vec<T> = bytes.iter().map(|&b| T::from_u8(b).unwrap()).collect();
+        Self { tokens }
+    }
+
+    /// Create a new word from a string slice.
+    pub fn from_string<S: AsRef<str>>(s: S) -> Self {
+        Self::from_bytes(s.as_ref().as_bytes())
     }
 
     /// Get a list of ids that make up this word.
-    pub fn ids(&self) -> &[T] {
-        &self.ids
+    pub fn tokens(&self) -> &[T] {
+        &self.tokens
     }
 
     /// Get the number of ids in this word.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.ids.len()
+        self.tokens.len()
     }
 
     /// Get an iterator over pairs of ids in this word.
     pub fn pairs<'a>(&'a self) -> impl Iterator<Item = Pair<T>> + 'a {
-        self.ids.windows(2).map(|w| (w[0], w[1]))
+        self.tokens.windows(2).map(|w| (w[0], w[1]))
     }
 
     /// Reduce the capacity of the internal vector to fit its contents.
     pub fn shrink_to_fit(&mut self) {
-        self.ids.shrink_to_fit();
+        self.tokens.shrink_to_fit();
     }
 
     const INC: i32 = 1;
@@ -68,22 +79,22 @@ impl<T: Token> Word<T> {
         F: FnMut(Pair<T>, i32),
     {
         let (a, b) = pair;
-        let n = self.ids.len();
+        let n = self.tokens.len();
 
         if n < 2 {
             // Single-token words have no pairs to merge.
             return;
         }
 
-        let mut new_ids: Vec<T> = Vec::with_capacity(n);
+        let mut new_tokens: Vec<T> = Vec::with_capacity(n);
 
         let mut i = 0;
         while i < n {
-            let current = self.ids[i];
+            let current = self.tokens[i];
 
-            if i + 1 < n && pair == (current, self.ids[i + 1]) {
+            if i + 1 < n && pair == (current, self.tokens[i + 1]) {
                 // Remove Previous Pair?
-                if let Some(&x) = new_ids.last() {
+                if let Some(&x) = new_tokens.last() {
                     on_merge((x, a), Self::DEC);
                     on_merge((x, replacement), Self::INC);
                 }
@@ -93,22 +104,22 @@ impl<T: Token> Word<T> {
 
                 // Remove Next Pair?
                 if i + 2 < n {
-                    let y = self.ids[i + 2];
+                    let y = self.tokens[i + 2];
                     on_merge((b, y), Self::DEC);
                     on_merge((replacement, y), Self::INC);
                 };
 
-                new_ids.push(replacement);
+                new_tokens.push(replacement);
 
                 // Skip 'a' and 'b'.
                 i += 2;
             } else {
-                new_ids.push(current);
+                new_tokens.push(current);
                 i += 1;
             }
         }
 
-        self.ids = new_ids;
+        self.tokens = new_tokens;
     }
 
     /// Merge all non-overlapping occurrences of `pair -> replacement`.
@@ -138,35 +149,41 @@ mod tests {
 
     #[test]
     fn test_word_constructor() {
-        let word = Word::new(vec![1, 2, 3]);
-        assert_eq!(word.ids(), &[1, 2, 3]);
+        let word = Word::from_tokens(vec![1, 2, 3]);
+        assert_eq!(word.tokens(), &[1, 2, 3]);
         assert_eq!(word.len(), 3);
     }
 
     #[test]
     fn test_word_from() {
         let word: Word<i32> = vec![1, 2, 3].into();
-        assert_eq!(word.ids(), &[1, 2, 3]);
+        assert_eq!(word.tokens(), &[1, 2, 3]);
 
         let word: Word<i32> = [1, 2, 3].into();
-        assert_eq!(word.ids(), &[1, 2, 3]);
+        assert_eq!(word.tokens(), &[1, 2, 3]);
 
         let word: Word<i32> = (&[1, 2, 3]).into();
-        assert_eq!(word.ids(), &[1, 2, 3]);
+        assert_eq!(word.tokens(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn test_word_from_str() {
+        let word: Word<i32> = Word::from_string("hello");
+        assert_eq!(word.tokens(), &[104, 101, 108, 108, 111]);
     }
 
     #[test]
     fn test_word_pairs() {
-        let word = Word::new(vec![1, 2, 3]);
+        let word = Word::from_tokens(vec![1, 2, 3]);
         assert_eq!(word.pairs().collect::<Vec<_>>(), vec![(1, 2), (2, 3)]);
     }
 
     #[test]
     fn test_word_merge_pair() {
-        let mut word = Word::new(vec![1, 2, 3, 1, 2, 2, 1]);
+        let mut word = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
 
         let deltas = word.merge_pair((1, 2), 1);
-        assert_eq!(word.ids(), &[1, 3, 1, 2, 1]);
+        assert_eq!(word.tokens(), &[1, 3, 1, 2, 1]);
 
         assert_eq!(
             deltas,
@@ -188,13 +205,13 @@ mod tests {
 
     #[test]
     fn test_word_merge_pair_cb() {
-        let mut word = Word::new(vec![1, 2, 3, 1, 2, 2, 1]);
+        let mut word = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
         let mut deltas = Vec::new();
 
         word.merge_pair_cb((1, 2), 1, &mut |p, d| {
             deltas.push((p, d));
         });
-        assert_eq!(word.ids(), &[1, 3, 1, 2, 1]);
+        assert_eq!(word.tokens(), &[1, 3, 1, 2, 1]);
 
         assert_eq!(
             deltas,
