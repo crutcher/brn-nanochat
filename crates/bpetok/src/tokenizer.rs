@@ -274,6 +274,7 @@ impl TokenizerOptions {
         log::info!("Finished training: {} merges completed", merges_done);
 
         Tokenizer {
+            num_reserved: self.num_reserved,
             merges,
             pattern: self.pattern,
             compiled_pattern,
@@ -284,6 +285,9 @@ impl TokenizerOptions {
 /// A Byte Pair Encoding / Decoding Tokenizer.
 #[derive(Debug)]
 pub struct Tokenizer<T: TokenType> {
+    /// The number of reserved tokens, i.e. tokens with IDs in [0, `num_reserved`]
+    pub num_reserved: usize,
+
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
     pub merges: HashMap<Pair<T>, T>,
 
