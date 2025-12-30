@@ -12,6 +12,19 @@ use std::collections::HashMap;
 /// The size of the u8 space.
 const U8_SIZE: usize = 256;
 
+fn expect_vocab_size(vocab_size: usize) -> usize {
+    assert!(
+        vocab_size >= U8_SIZE,
+        "vocab_size ({vocab_size}) must be >= 256 (the size of the u8 space)"
+    );
+    vocab_size
+}
+
+fn expect_regex<S: AsRef<str>>(pattern: S) -> Regex {
+    let pattern = pattern.as_ref();
+    Regex::new(pattern).unwrap_or_else(|_| panic!("regex pattern compilation failed: {}", pattern))
+}
+
 /// A builder for [`Tokenizer`]s.
 #[derive(Debug)]
 pub struct TokenizerOptions {
@@ -25,34 +38,44 @@ pub struct TokenizerOptions {
     pub parallel: bool,
 }
 
-impl Default for TokenizerOptions {
-    fn default() -> Self {
+impl TokenizerOptions {
+    /// Creates a new [`TokenizerOptions`].
+    ///
+    /// # Arguments
+    /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
+    pub fn with_capacity(vocab_size: usize) -> Self {
         Self {
             pattern: DEFAULT_PATTERN.to_string(),
-            vocab_size: 0,
+            vocab_size: expect_vocab_size(vocab_size),
             parallel: DEFAULT_PARALLEL,
         }
     }
 }
 
 impl TokenizerOptions {
+    /// Sets the vocab size.
+    ///
+    /// # Arguments
+    /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
+    pub fn with_vocab_size(
+        self,
+        vocab_size: usize,
+    ) -> Self {
+        Self {
+            vocab_size: expect_vocab_size(vocab_size),
+            ..self
+        }
+    }
+
     /// Sets the regex pattern used for text splitting.
     pub fn with_pattern(
         self,
         pattern: impl Into<String>,
     ) -> Self {
-        Self {
-            pattern: pattern.into(),
-            ..self
-        }
-    }
+        let pattern = pattern.into();
+        expect_regex(&pattern);
 
-    /// Sets the vocab size.
-    pub fn with_vocab_size(
-        self,
-        vocab_size: usize,
-    ) -> Self {
-        Self { vocab_size, ..self }
+        Self { pattern, ..self }
     }
 
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
@@ -63,50 +86,25 @@ impl TokenizerOptions {
         Self { parallel, ..self }
     }
 
-    /// Returns the regex pattern as a [`Regex`] object.
-    pub fn get_regex(&self) -> Regex {
-        Regex::new(&self.pattern).unwrap()
-    }
-
-    /// Converts a sample iterator into a word iterator.
-    pub fn samples_to_word_counts<T, I, S, K, C>(
-        &self,
-        samples: I,
-    ) -> AHashMap<Word<T>, C>
-    where
-        T: TokenType,
-        I: Iterator<Item = S> + Send,
-        S: AsRef<str> + Send,
-        K: StringChunkType,
-        C: CountType,
-    {
-        let mut counter: WordCounter<K, C> = WordCounter::new(
-            WordCounterOptions::default()
-                .with_pattern(&self.pattern)
-                .with_parallel(self.parallel),
-        );
-        counter.update_from_samples(samples);
-
-        counter
-            .release()
-            .into_iter()
-            .map(|(word, count)| (Word::from_string(word), count))
-            .collect()
-    }
-
     /// Trains a [`Tokenizer`] over a sample iterator.
-    pub fn train_from_sample_iterator<T, I, S, K, C>(
+    pub fn train_from_sample_iterator<T, C, K, I, S>(
         self,
         samples: I,
     ) -> Tokenizer<T>
     where
         T: TokenType,
+        C: CountType,
+        K: StringChunkType,
         I: Iterator<Item = S> + Send,
         S: AsRef<str> + Send,
-        K: StringChunkType,
-        C: CountType,
     {
-        let word_counts = self.samples_to_word_counts::<T, I, S, K, C>(samples);
+        let word_counts = WordCounter::<K, C>::samples_to_word_counts(
+            samples,
+            WordCounterOptions::default()
+                .with_pattern(&self.pattern)
+                .with_parallel(self.parallel),
+        );
+
         self.train_from_word_counts_map(word_counts)
     }
 
@@ -122,14 +120,7 @@ impl TokenizerOptions {
         T: TokenType,
         C: CountType,
     {
-        let mut ws: Vec<Word<T>> = Vec::with_capacity(words.len());
-        let mut cs: Vec<C> = Vec::with_capacity(words.len());
-
-        words.into_iter().for_each(|(w, c)| {
-            ws.push(w);
-            cs.push(c);
-        });
-
+        let (ws, cs): (Vec<Word<T>>, Vec<C>) = words.into_iter().unzip();
         self.train_from_word_counts_table(ws, &cs)
     }
 
@@ -147,15 +138,13 @@ impl TokenizerOptions {
         T: TokenType,
         C: CountType,
     {
-        assert!(
-            self.vocab_size >= U8_SIZE,
-            "vocab_size must be >= 256 (the size of the u8 space): {self:#?}"
-        );
+        expect_vocab_size(self.vocab_size);
+
         let num_merges = self.vocab_size - U8_SIZE;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
 
         // Prefer to fail before we do all the work below.
-        let compiled_pattern = self.get_regex();
+        let compiled_pattern = expect_regex(&self.pattern);
 
         let mut merges: HashMap<Pair<T>, T> = HashMap::new();
 
@@ -343,5 +332,39 @@ impl<T: TokenType> Tokenizer<T> {
         }
 
         all_ids
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tokenizer_options() {
+        let options = TokenizerOptions::with_capacity(1000);
+        assert_eq!(options.vocab_size, 1000);
+        assert_eq!(options.pattern, DEFAULT_PATTERN);
+        assert_eq!(options.parallel, DEFAULT_PARALLEL);
+
+        let options = options
+            .with_vocab_size(2000)
+            .with_pattern(r"\S+")
+            .with_parallel(true);
+
+        assert_eq!(options.vocab_size, 2000);
+        assert_eq!(options.pattern, r"\S+");
+        assert_eq!(options.parallel, true);
+    }
+
+    #[test]
+    #[should_panic(expected = "vocab_size (255) must be >= 256 (the size of the u8 space)")]
+    fn test_tokenizer_options_vocab_size_too_small() {
+        let _ = TokenizerOptions::with_capacity(U8_SIZE - 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "regex pattern compilation failed")]
+    fn test_tokenizer_options_bad_pattern() {
+        let _ = TokenizerOptions::with_capacity(1000).with_pattern(r"(");
     }
 }

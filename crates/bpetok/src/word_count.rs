@@ -1,6 +1,6 @@
 //! # Text Splitting
 
-use crate::{CountType, StringChunkType};
+use crate::{CountType, StringChunkType, TokenType, Word};
 use ahash::AHashMap;
 use std::fmt::Debug;
 
@@ -242,6 +242,26 @@ where
     ) {
         update_word_counts(&mut self.word_counts, word_counts);
     }
+
+    /// Ingests samples into the word counter; then export to a [`Word<T>`] count.
+    pub fn samples_to_word_counts<T, I, S>(
+        samples: I,
+        options: WordCounterOptions,
+    ) -> AHashMap<Word<T>, C>
+    where
+        T: TokenType,
+        I: Iterator<Item = S> + Send,
+        S: AsRef<str> + Send,
+    {
+        let mut counter = Self::new(options);
+        counter.update_from_samples(samples);
+
+        counter
+            .release()
+            .into_iter()
+            .map(|(word, count)| (Word::from_string(word), count))
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -304,5 +324,31 @@ mod tests {
                 ("world".into(), C::from_usize(3).unwrap()),
             ]
         );
+    }
+
+    #[test]
+    fn test_samples_to_word_counts() {
+        let options = WordCounterOptions::default().with_pattern(PATTERN);
+
+        let samples = vec!["Hello world", "Foo world bar world"];
+
+        type K = String;
+        type T = usize;
+        type C = u64;
+
+        let counts: AHashMap<Word<T>, C> =
+            WordCounter::<K, C>::samples_to_word_counts(samples.iter(), options);
+        let mut counts = counts.into_iter().collect::<Vec<_>>();
+        counts.sort();
+
+        let mut expected = AHashMap::new();
+        expected.insert(Word::from_string("Hello"), 1);
+        expected.insert(Word::from_string("Foo"), 1);
+        expected.insert(Word::from_string("bar"), 1);
+        expected.insert(Word::from_string("world"), 3);
+        let mut expected: Vec<_> = expected.into_iter().collect();
+        expected.sort();
+
+        assert_eq!(counts, expected);
     }
 }
