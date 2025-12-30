@@ -9,6 +9,9 @@ use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
 use std::collections::HashMap;
 
+/// The size of the u8 space.
+const U8_SIZE: usize = 256;
+
 /// A builder for [`Tokenizer`]s.
 #[derive(Debug)]
 pub struct TokenizerOptions {
@@ -17,9 +20,6 @@ pub struct TokenizerOptions {
 
     /// The vocab size.
     pub vocab_size: usize,
-
-    /// The number of reserved tokens.
-    pub num_reserved: usize,
 
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
@@ -30,7 +30,6 @@ impl Default for TokenizerOptions {
         Self {
             pattern: DEFAULT_PATTERN.to_string(),
             vocab_size: 0,
-            num_reserved: 256,
             parallel: DEFAULT_PARALLEL,
         }
     }
@@ -54,17 +53,6 @@ impl TokenizerOptions {
         vocab_size: usize,
     ) -> Self {
         Self { vocab_size, ..self }
-    }
-
-    /// Sets the number of reserved tokens.
-    pub fn with_num_reserved(
-        self,
-        num_reserved: usize,
-    ) -> Self {
-        Self {
-            num_reserved,
-            ..self
-        }
     }
 
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
@@ -160,10 +148,10 @@ impl TokenizerOptions {
         C: CountType,
     {
         assert!(
-            self.vocab_size >= self.num_reserved,
-            "vocab_size must be >= num_reserved: {self:#?}"
+            self.vocab_size >= U8_SIZE,
+            "vocab_size must be >= 256 (the size of the u8 space): {self:#?}"
         );
-        let num_merges = self.vocab_size - 256;
+        let num_merges = self.vocab_size - U8_SIZE;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
 
         // Prefer to fail before we do all the work below.
@@ -204,6 +192,8 @@ impl TokenizerOptions {
         let mut merges_done = 0;
         let mut last_log_percent = 0;
 
+        let mut next_token_index = U8_SIZE;
+
         while merges_done < num_merges {
             let Some(mut job) = heap.pop() else {
                 // No more pairs to merge
@@ -228,8 +218,8 @@ impl TokenizerOptions {
             }
 
             // Generate a new token ID for this merge
-            let new_token = self.num_reserved + merges_done;
-            let new_token = T::from_usize(new_token).expect("new_token is a valid T");
+            let new_token = T::from_usize(next_token_index).expect("new_token is a valid T");
+            next_token_index += 1;
 
             // Record merge
             merges.insert(job.pair, new_token);
@@ -283,7 +273,6 @@ impl TokenizerOptions {
         log::info!("Finished training: {} merges completed", merges_done);
 
         Tokenizer {
-            num_reserved: self.num_reserved,
             merges,
             pattern: self.pattern,
             compiled_pattern,
@@ -294,9 +283,6 @@ impl TokenizerOptions {
 /// A Byte Pair Encoding / Decoding Tokenizer.
 #[derive(Debug)]
 pub struct Tokenizer<T: TokenType> {
-    /// The number of reserved tokens, i.e. tokens with IDs in [0, `num_reserved`]
-    pub num_reserved: usize,
-
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
     pub merges: HashMap<Pair<T>, T>,
 
@@ -308,6 +294,11 @@ pub struct Tokenizer<T: TokenType> {
 }
 
 impl<T: TokenType> Tokenizer<T> {
+    /// Vocab Size.
+    pub fn vocab_size(&self) -> usize {
+        U8_SIZE + self.merges.len()
+    }
+
     /// Encode a string into token IDs
     pub fn encode<S: AsRef<str>>(
         &self,
