@@ -166,6 +166,7 @@ impl TokenizerOptions {
         let num_merges = self.vocab_size - 256;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
 
+        // Prefer to fail before we do all the work below.
         let compiled_pattern = self.get_regex();
 
         let mut merges: HashMap<Pair<T>, T> = HashMap::new();
