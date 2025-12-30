@@ -1,6 +1,6 @@
 //! Pair Count / Word Indexing
 use crate::token_types::TokenType;
-use crate::{Pair, Word};
+use crate::{CountType, Pair, Word};
 use ahash::{AHashMap, AHashSet};
 
 /// Options for building a [`PairIndex`].
@@ -22,17 +22,17 @@ impl Default for PairIndexOptions {
 
 /// An index of [`Pair`]s over an index set of ``(word, count)``.
 #[derive(Debug)]
-pub struct PairIndex<T: TokenType> {
+pub struct PairIndex<T: TokenType, C: CountType> {
     /// A map from [`Pair`] to its occurrence count.
     ///
     /// ``sum(words[i].non_overlapping_count(pair) * word_counts[i]) for all i``
-    pub pair_counts: AHashMap<Pair<T>, usize>,
+    pub pair_counts: AHashMap<Pair<T>, C>,
 
     /// A map from [`Pair`] to indices over ``words``.
-    pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>>,
+    pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<C>>,
 }
 
-impl<T: TokenType> PairIndex<T> {
+impl<T: TokenType, C: CountType> PairIndex<T, C> {
     /// Build a [`PairIndex`] from a slice of [`Word`]s, using a count table.
     ///
     /// # Arguments
@@ -41,7 +41,7 @@ impl<T: TokenType> PairIndex<T> {
     /// * `options` - options for building the index.
     pub fn index_unique_word_counts_table(
         words: &[Word<T>],
-        word_counts: &[usize],
+        word_counts: &[C],
         options: PairIndexOptions,
     ) -> Self {
         if options.parallel {
@@ -52,6 +52,24 @@ impl<T: TokenType> PairIndex<T> {
             Self::index_unique_word_counts_table_rayon(words, word_counts, options)
         } else {
             Self::index_unique_word_counts_table_serial(words, word_counts, options)
+        }
+    }
+
+    fn observe_word(
+        pair_counts: &mut AHashMap<Pair<T>, C>,
+        pair_to_word_index: &mut AHashMap<Pair<T>, AHashSet<C>>,
+        index: usize,
+        w: &Word<T>,
+        word_count: C,
+    ) {
+        if word_count != C::zero() && w.len() >= 2 {
+            for p in w.pairs() {
+                *pair_counts.entry(p).or_default() += word_count;
+                pair_to_word_index
+                    .entry(p)
+                    .or_default()
+                    .insert(C::from_usize(index).unwrap());
+            }
         }
     }
 
@@ -66,20 +84,20 @@ impl<T: TokenType> PairIndex<T> {
     /// * `options` - options for building the index.
     pub fn index_unique_word_counts_table_serial(
         words: &[Word<T>],
-        word_counts: &[usize],
+        word_counts: &[C],
         _options: PairIndexOptions,
     ) -> Self {
-        let mut pair_counts: AHashMap<Pair<T>, usize> = Default::default();
-        let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
+        let mut pair_counts: AHashMap<Pair<T>, C> = Default::default();
+        let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<C>> = Default::default();
 
-        for (i, w) in words.iter().enumerate() {
-            let wc = word_counts[i];
-            if wc != 0 && w.len() >= 2 {
-                for p in w.pairs() {
-                    *pair_counts.entry(p).or_default() += wc;
-                    pair_to_word_index.entry(p).or_default().insert(i);
-                }
-            }
+        for (word_index, word) in words.iter().enumerate() {
+            Self::observe_word(
+                &mut pair_counts,
+                &mut pair_to_word_index,
+                word_index,
+                word,
+                word_counts[word_index],
+            );
         }
 
         Self {
@@ -100,7 +118,7 @@ impl<T: TokenType> PairIndex<T> {
     #[cfg(feature = "rayon")]
     pub fn index_unique_word_counts_table_rayon(
         words: &[Word<T>],
-        word_counts: &[usize],
+        word_counts: &[C],
         _options: PairIndexOptions,
     ) -> Self {
         use rayon::prelude::*;
@@ -108,16 +126,16 @@ impl<T: TokenType> PairIndex<T> {
         let (pair_counts, pair_to_word_index) = words
             .par_iter()
             .enumerate()
-            .map(|(i, w)| {
-                let mut local_pc: AHashMap<Pair<T>, usize> = AHashMap::new();
-                let mut local_wtu: AHashMap<Pair<T>, AHashSet<usize>> = AHashMap::new();
-                let wc = word_counts[i];
-                if wc != 0 && w.len() >= 2 {
-                    for p in w.pairs() {
-                        *local_pc.entry(p).or_default() += word_counts[i];
-                        local_wtu.entry(p).or_default().insert(i);
-                    }
-                }
+            .map(|(word_index, word)| {
+                let mut local_pc: AHashMap<Pair<T>, C> = AHashMap::new();
+                let mut local_wtu: AHashMap<Pair<T>, AHashSet<C>> = AHashMap::new();
+                Self::observe_word(
+                    &mut local_pc,
+                    &mut local_wtu,
+                    word_index,
+                    word,
+                    word_counts[word_index],
+                );
                 (local_pc, local_wtu)
             })
             .reduce(
