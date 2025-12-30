@@ -1,6 +1,6 @@
 //! # Text Splitting
 
-use crate::{ChunkType, CountType};
+use crate::{CountType, StringChunkType};
 use ahash::AHashMap;
 use std::fmt::Debug;
 
@@ -11,7 +11,7 @@ pub fn word_counts_from_text<S, K, C>(
 ) -> anyhow::Result<AHashMap<K, C>>
 where
     S: AsRef<str>,
-    K: ChunkType,
+    K: StringChunkType,
     C: CountType,
 {
     let mut m: AHashMap<K, C> = Default::default();
@@ -27,7 +27,7 @@ pub fn update_word_counts_from_text<S, K, C>(
 ) -> anyhow::Result<()>
 where
     S: AsRef<str>,
-    K: ChunkType,
+    K: StringChunkType,
     C: CountType,
 {
     for mat in regex.find_iter(text.as_ref()) {
@@ -43,7 +43,7 @@ pub fn update_word_counts<K, C>(
     word_counts: &mut AHashMap<K, C>,
     source: AHashMap<K, C>,
 ) where
-    K: ChunkType,
+    K: StringChunkType,
     C: CountType,
 {
     for (k, v) in source {
@@ -97,7 +97,7 @@ impl WordCounterOptions {
 #[derive(Debug)]
 pub struct WordCounter<K, C>
 where
-    K: ChunkType,
+    K: StringChunkType,
     C: CountType,
 {
     /// Whether to use parallel processing for word counting.
@@ -115,7 +115,7 @@ where
 
 impl<K, C> WordCounter<K, C>
 where
-    K: ChunkType,
+    K: StringChunkType,
     C: CountType,
 {
     /// Create a new word counter.
@@ -290,7 +290,7 @@ mod tests {
 
     fn check_common_counts<K, C>(counts: AHashMap<K, C>)
     where
-        K: ChunkType,
+        K: StringChunkType,
         C: CountType,
     {
         let mut counts: Vec<(K, C)> = counts.into_iter().collect::<Vec<_>>();

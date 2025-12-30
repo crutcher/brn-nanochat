@@ -1,31 +1,31 @@
-use crate::Pair;
 use crate::token_types::TokenType;
+use crate::{CountType, Pair};
 use ahash::AHashSet;
 use core::cmp::Ordering;
 
 /// Info about a [`Pair`] that could be merged.
 #[derive(Debug, Eq)]
-pub struct MergeJob<T: TokenType> {
+pub struct MergeJob<T: TokenType, C: CountType> {
     /// The pair to merge.
     pub pair: Pair<T>,
 
     /// The number of instances of this pair in the corpus.
-    pub count: usize,
+    pub count: C,
 
     /// Word indices that may contain this pair.
     pub word_indices: AHashSet<usize>,
 }
 
-impl<T: TokenType> MergeJob<T> {
+impl<T: TokenType, C: CountType> MergeJob<T, C> {
     /// The job key.
     ///
     /// Max-heap by count; tie-break to ascending pair order (deterministic)
-    pub fn heap_key(&self) -> (usize, Pair<T>) {
+    pub fn heap_key(&self) -> (C, Pair<T>) {
         (self.count, self.pair)
     }
 }
 
-impl<T: TokenType> PartialEq for MergeJob<T> {
+impl<T: TokenType, C: CountType> PartialEq for MergeJob<T, C> {
     fn eq(
         &self,
         other: &Self,
@@ -34,7 +34,7 @@ impl<T: TokenType> PartialEq for MergeJob<T> {
     }
 }
 
-impl<T: TokenType> PartialOrd for MergeJob<T> {
+impl<T: TokenType, C: CountType> PartialOrd for MergeJob<T, C> {
     fn partial_cmp(
         &self,
         other: &Self,
@@ -43,7 +43,7 @@ impl<T: TokenType> PartialOrd for MergeJob<T> {
     }
 }
 
-impl<T: TokenType> Ord for MergeJob<T> {
+impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
     fn cmp(
         &self,
         other: &Self,

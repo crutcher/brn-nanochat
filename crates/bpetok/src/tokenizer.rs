@@ -1,11 +1,10 @@
 //! # Tokenizer Structures
 
 use crate::{
-    DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions, TokenType,
-    Word, WordCounter, WordCounterOptions,
+    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions,
+    StringChunkType, TokenType, Word, WordCounter, WordCounterOptions,
 };
 use ahash::{AHashMap, AHashSet};
-use compact_str::CompactString;
 use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
 use std::collections::HashMap;
@@ -82,16 +81,18 @@ impl TokenizerOptions {
     }
 
     /// Converts a sample iterator into a word iterator.
-    pub fn samples_to_word_counts<T, I, S>(
+    pub fn samples_to_word_counts<T, I, S, K, C>(
         &self,
         samples: I,
-    ) -> AHashMap<Word<T>, usize>
+    ) -> AHashMap<Word<T>, C>
     where
         T: TokenType,
         I: Iterator<Item = S> + Send,
         S: AsRef<str> + Send,
+        K: StringChunkType,
+        C: CountType,
     {
-        let mut counter: WordCounter<CompactString, usize> = WordCounter::new(
+        let mut counter: WordCounter<K, C> = WordCounter::new(
             WordCounterOptions::default()
                 .with_pattern(&self.pattern)
                 .with_parallel(self.parallel),
@@ -106,7 +107,7 @@ impl TokenizerOptions {
     }
 
     /// Trains a [`Tokenizer`] over a sample iterator.
-    pub fn train_from_sample_iterator<T, I, S>(
+    pub fn train_from_sample_iterator<T, I, S, K, C>(
         self,
         samples: I,
     ) -> Tokenizer<T>
@@ -114,8 +115,10 @@ impl TokenizerOptions {
         T: TokenType,
         I: Iterator<Item = S> + Send,
         S: AsRef<str> + Send,
+        K: StringChunkType,
+        C: CountType,
     {
-        let word_counts = self.samples_to_word_counts(samples);
+        let word_counts = self.samples_to_word_counts::<T, I, S, K, C>(samples);
         self.train_from_word_counts_map(word_counts)
     }
 
@@ -123,12 +126,16 @@ impl TokenizerOptions {
     ///
     /// # Arguments
     /// * `word_counts` - a ``{word: count}`` map.
-    pub fn train_from_word_counts_map<T: TokenType>(
+    pub fn train_from_word_counts_map<T, C>(
         self,
-        words: AHashMap<Word<T>, usize>,
-    ) -> Tokenizer<T> {
+        words: AHashMap<Word<T>, C>,
+    ) -> Tokenizer<T>
+    where
+        T: TokenType,
+        C: CountType,
+    {
         let mut ws: Vec<Word<T>> = Vec::with_capacity(words.len());
-        let mut cs: Vec<usize> = Vec::with_capacity(words.len());
+        let mut cs: Vec<C> = Vec::with_capacity(words.len());
 
         words.into_iter().for_each(|(w, c)| {
             ws.push(w);
@@ -143,11 +150,15 @@ impl TokenizerOptions {
     /// # Arguments
     /// * `words` - the words.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
-    pub fn train_from_word_counts_table<T: TokenType>(
+    pub fn train_from_word_counts_table<T, C>(
         self,
         mut words: Vec<Word<T>>,
-        word_counts: &[usize],
-    ) -> Tokenizer<T> {
+        word_counts: &[C],
+    ) -> Tokenizer<T>
+    where
+        T: TokenType,
+        C: CountType,
+    {
         assert!(
             self.vocab_size >= self.num_reserved,
             "vocab_size must be >= num_reserved: {self:#?}"
@@ -171,12 +182,15 @@ impl TokenizerOptions {
             },
         );
 
+        let zero = C::zero();
+        let one = C::one();
+
         // ---- Build heap ----
         log::info!("Building heap with {} unique pairs", pair_counts.len());
         let mut heap = OctonaryHeap::with_capacity(pair_counts.len());
         for (pair, word_indices) in pair_to_word_index.into_iter() {
-            let count = *pair_counts.get(&pair).unwrap_or(&0);
-            if count > 0 {
+            let count = *pair_counts.get(&pair).unwrap_or(&zero);
+            if count > zero {
                 heap.push(MergeJob {
                     pair,
                     count,
@@ -195,15 +209,15 @@ impl TokenizerOptions {
             };
 
             // Lazy refresh
-            let current = *pair_counts.get(&job.pair).unwrap_or(&0);
+            let current = *pair_counts.get(&job.pair).unwrap_or(&zero);
             if job.count != current {
                 job.count = current;
-                if job.count > 0 {
+                if job.count > zero {
                     heap.push(job);
                 }
                 continue;
             }
-            if job.count == 0 {
+            if job.count == zero {
                 break;
             }
 
@@ -218,10 +232,10 @@ impl TokenizerOptions {
                 words[word_idx].merge_pair_cb(job.pair, new_id, &mut |pair, delta| {
                     // Update global pair counts based on this word's count
                     if delta < 0 {
-                        *pair_counts.entry(pair).or_default() -= 1;
+                        *pair_counts.entry(pair).or_default() -= one;
                     }
                     if delta > 0 {
-                        *pair_counts.entry(pair).or_default() += 1;
+                        *pair_counts.entry(pair).or_default() += one;
                         local_pos_updates.entry(pair).or_default().insert(word_idx);
                     }
                 });
@@ -229,8 +243,8 @@ impl TokenizerOptions {
 
             // Add the updated pair counts back to the heap
             for (pair, word_indices) in local_pos_updates {
-                let count = *pair_counts.get(&pair).unwrap_or(&0);
-                if count > 0 {
+                let count = *pair_counts.get(&pair).unwrap_or(&zero);
+                if count > zero {
                     heap.push(MergeJob {
                         pair,
                         count,

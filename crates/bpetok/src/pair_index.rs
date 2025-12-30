@@ -29,7 +29,7 @@ pub struct PairIndex<T: TokenType, C: CountType> {
     pub pair_counts: AHashMap<Pair<T>, C>,
 
     /// A map from [`Pair`] to indices over ``words``.
-    pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<C>>,
+    pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>>,
 }
 
 impl<T: TokenType, C: CountType> PairIndex<T, C> {
@@ -57,7 +57,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 
     fn observe_word(
         pair_counts: &mut AHashMap<Pair<T>, C>,
-        pair_to_word_index: &mut AHashMap<Pair<T>, AHashSet<C>>,
+        pair_to_word_index: &mut AHashMap<Pair<T>, AHashSet<usize>>,
         index: usize,
         w: &Word<T>,
         word_count: C,
@@ -65,10 +65,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
         if word_count != C::zero() && w.len() >= 2 {
             for p in w.pairs() {
                 *pair_counts.entry(p).or_default() += word_count;
-                pair_to_word_index
-                    .entry(p)
-                    .or_default()
-                    .insert(C::from_usize(index).unwrap());
+                pair_to_word_index.entry(p).or_default().insert(index);
             }
         }
     }
@@ -88,7 +85,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
         _options: PairIndexOptions,
     ) -> Self {
         let mut pair_counts: AHashMap<Pair<T>, C> = Default::default();
-        let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<C>> = Default::default();
+        let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
 
         for (word_index, word) in words.iter().enumerate() {
             Self::observe_word(
@@ -128,7 +125,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
             .enumerate()
             .map(|(word_index, word)| {
                 let mut local_pc: AHashMap<Pair<T>, C> = AHashMap::new();
-                let mut local_wtu: AHashMap<Pair<T>, AHashSet<C>> = AHashMap::new();
+                let mut local_wtu: AHashMap<Pair<T>, AHashSet<usize>> = AHashMap::new();
                 Self::observe_word(
                     &mut local_pc,
                     &mut local_wtu,
