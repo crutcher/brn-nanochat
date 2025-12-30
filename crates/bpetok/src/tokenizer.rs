@@ -309,17 +309,19 @@ pub struct Tokenizer<T: TokenType> {
 
 impl<T: TokenType> Tokenizer<T> {
     /// Encode a string into token IDs
-    pub fn encode(
+    pub fn encode<S: AsRef<str>>(
         &self,
-        text: &str,
+        text: S,
     ) -> Vec<T> {
         let mut all_ids: Vec<T> = Vec::new();
+
+        let text = text.as_ref();
 
         // Split text using the regex pattern
         for m in self.compiled_pattern.find_iter(text) {
             let chunk = m.expect("regex match failed").as_str();
 
-            // Convert chunk to bytes then to u32 IDs
+            // Convert chunk to bytes then to tokens.
             let mut ids: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();
 
             // Apply merges iteratively
