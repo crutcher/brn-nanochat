@@ -172,12 +172,12 @@ where
     }
 
     /// Update word counts inplace from a sample iterator.
-    pub fn update_from_samples<S, I>(
+    pub fn update_from_samples<I>(
         &mut self,
         samples: I,
     ) where
-        S: AsRef<str> + Send,
-        I: Iterator<Item = S> + Send,
+        I: Iterator + Send,
+        I::Item: AsRef<str> + Send,
     {
         if self.parallel {
             #[cfg(not(feature = "rayon"))]
@@ -193,12 +193,12 @@ where
     /// Update word counts inplace from a sample iterator.
     ///
     /// Uses serial processing, ignoring the `parallel` flag.
-    pub fn update_from_samples_serial<S, I>(
+    pub fn update_from_samples_serial<I>(
         &mut self,
         samples: I,
     ) where
-        S: AsRef<str> + Send,
-        I: Iterator<Item = S>,
+        I: Iterator,
+        I::Item: AsRef<str> + Send,
     {
         for sample in samples {
             self.update_from_text(sample);
@@ -209,12 +209,12 @@ where
     ///
     /// Uses parallel processing, ignoring the `parallel` flag.
     #[cfg(feature = "rayon")]
-    pub fn update_from_samples_rayon<S, I>(
+    pub fn update_from_samples_rayon<I>(
         &mut self,
         samples: I,
     ) where
-        S: AsRef<str> + Send,
-        I: Iterator<Item = S> + Send,
+        I: Iterator + Send,
+        I::Item: AsRef<str> + Send,
     {
         use rayon::iter::ParallelBridge;
         use rayon::prelude::*;
@@ -244,14 +244,14 @@ where
     }
 
     /// Ingests samples into the word counter; then export to a [`Word<T>`] count.
-    pub fn samples_to_word_counts<T, I, S>(
+    pub fn samples_to_word_counts<T, I>(
         samples: I,
         options: WordCounterOptions,
     ) -> AHashMap<Word<T>, C>
     where
         T: TokenType,
-        I: Iterator<Item = S> + Send,
-        S: AsRef<str> + Send,
+        I: Iterator + Send,
+        I::Item: AsRef<str> + Send,
     {
         let mut counter = Self::new(options);
         counter.update_from_samples(samples);

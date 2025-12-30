@@ -87,16 +87,16 @@ impl TokenizerOptions {
     }
 
     /// Trains a [`Tokenizer`] over a sample iterator.
-    pub fn train_from_sample_iterator<T, C, K, I, S>(
+    pub fn train_from_sample_iterator<T, K, C, I>(
         self,
         samples: I,
     ) -> Tokenizer<T>
     where
         T: TokenType,
-        C: CountType,
         K: StringChunkType,
-        I: Iterator<Item = S> + Send,
-        S: AsRef<str> + Send,
+        C: CountType,
+        I: Iterator + Send,
+        I::Item: AsRef<str> + Send,
     {
         let word_counts = WordCounter::<K, C>::samples_to_word_counts(
             samples,
@@ -338,6 +338,7 @@ impl<T: TokenType> Tokenizer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use compact_str::CompactString;
 
     #[test]
     fn test_tokenizer_options() {
@@ -366,5 +367,23 @@ mod tests {
     #[should_panic(expected = "regex pattern compilation failed")]
     fn test_tokenizer_options_bad_pattern() {
         let _ = TokenizerOptions::with_capacity(1000).with_pattern(r"(");
+    }
+
+    #[test]
+    fn test_train_tokenizer() {
+        let samples = vec!["hello world"];
+
+        type T = usize;
+        type C = u32;
+        type K = CompactString;
+
+        let options = TokenizerOptions::with_capacity(1000);
+        let tokenizer: Tokenizer<T> =
+            options.train_from_sample_iterator::<T, K, C, _>(samples.into_iter());
+
+        assert_eq!(tokenizer.vocab_size(), 265);
+
+        assert_eq!(tokenizer.encode("hello"), vec![263]);
+        assert_eq!(tokenizer.encode("hello world"), vec![263, 264]);
     }
 }
