@@ -20,6 +20,16 @@ impl Default for PairIndexOptions {
     }
 }
 
+impl PairIndexOptions {
+    /// Sets the parallel processing flag.
+    pub fn with_parallel(
+        self,
+        parallel: bool,
+    ) -> Self {
+        Self { parallel }
+    }
+}
+
 /// An index of [`Pair`]s over an index set of ``(word, count)``.
 #[derive(Debug)]
 pub struct PairIndex<T: TokenType, C: CountType> {
@@ -179,7 +189,7 @@ mod tests {
 
         let word_counts = vec![1, 2, 3];
 
-        let options = PairIndexOptions { parallel };
+        let options = PairIndexOptions::default().with_parallel(parallel);
 
         let index = PairIndex::index_unique_word_counts_table(&words, &word_counts, options);
 

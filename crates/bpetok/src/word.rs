@@ -229,5 +229,8 @@ mod tests {
                 ((1, 2), 1),
             ]
         );
+
+        word.shrink_to_fit();
+        assert_eq!(word.tokens().len(), word.tokens.capacity());
     }
 }

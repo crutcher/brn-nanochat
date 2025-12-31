@@ -101,16 +101,16 @@ where
     C: CountType,
 {
     /// Whether to use parallel processing for word counting.
-    parallel: bool,
+    pub parallel: bool,
 
     /// The regex pattern used for text splitting.
-    pattern: String,
+    pub pattern: String,
 
     /// The compiled regex pattern.
-    regex: fancy_regex::Regex,
+    pub regex: fancy_regex::Regex,
 
     /// The word counts.
-    word_counts: AHashMap<K, C>,
+    pub word_counts: AHashMap<K, C>,
 }
 
 impl<K, C> WordCounter<K, C>
@@ -136,26 +136,6 @@ where
             regex,
             word_counts: Default::default(),
         }
-    }
-
-    /// Get the parallel processing flag.
-    pub fn parallel(&self) -> bool {
-        self.parallel
-    }
-
-    /// Get the regex pattern used for text splitting.
-    pub fn pattern(&self) -> &str {
-        &self.pattern
-    }
-
-    /// Get the compiled regex pattern.
-    pub fn regex(&self) -> &fancy_regex::Regex {
-        &self.regex
-    }
-
-    /// Get the word counts.
-    pub fn word_counts(&self) -> &AHashMap<K, C> {
-        &self.word_counts
     }
 
     /// Release the word counts and return them.

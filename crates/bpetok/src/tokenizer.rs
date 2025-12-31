@@ -462,10 +462,16 @@ mod tests {
 
         let tokenizer: Tokenizer<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+
+        // compile time checks.
         check_is_send(&tokenizer);
         check_is_sync(&tokenizer);
 
+        assert_eq!(tokenizer.vocab_size(), 293);
+
         let decoder = tokenizer.to_decoder();
+
+        // compile time checks.
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
