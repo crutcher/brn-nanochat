@@ -42,6 +42,7 @@ downloader = "^0.2"
 tempdir = "^0.3"
 
 parquet = "^57.1"
+arrow = "^57.1"
 
 fancy-regex = "^0.17"
 

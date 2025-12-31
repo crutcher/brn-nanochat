@@ -1,5 +1,8 @@
+use arrow::array::StringArray;
+use bpetok::{Tokenizer, TokenizerOptions};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
+use compact_str::CompactString;
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 
@@ -14,6 +17,14 @@ pub struct Args {
     /// Path to dataset directory.
     #[arg(long)]
     pub dataset_dir: String,
+
+    /// Train a tokenizer.
+    #[arg(long, default_value = "false")]
+    pub train_tokenizer: bool,
+
+    /// Vocab size.
+    #[arg(long, default_value = "1000000")]
+    pub vocab_size: usize,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -41,10 +52,45 @@ fn main() -> anyhow::Result<()> {
 
     cache.load_shards(&shards)?;
 
+    if args.train_tokenizer {
+        type T = u32;
+        type C = u32;
+        type K = CompactString;
+
+        let options = TokenizerOptions::with_capacity(args.vocab_size);
+
+        let download = true;
+        let samples = shards.iter().flat_map(|&shard| {
+            cache
+                .read_batches(shard, download)
+                .expect("failed to read batch")
+                .flat_map(|batch| {
+                    batch
+                        .iter()
+                        .flat_map(|sample| {
+                            let text = sample
+                                .column(0)
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            text.iter()
+                                .map(|s| s.unwrap().to_string())
+                                .collect::<Vec<_>>()
+                        })
+                        .collect::<Vec<_>>()
+                })
+        });
+
+        let tokenizer: Tokenizer<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
+        println!("vocab_size: {:#?}", tokenizer.vocab_size());
+    }
+
+    /*
     let download = true;
     let mut it = cache.read_batches(0, download)?;
     let batch = it.next().unwrap()?;
     println!("{:#?}", batch);
+     */
 
     Ok(())
 }

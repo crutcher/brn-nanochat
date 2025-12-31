@@ -12,8 +12,11 @@ workspace = true
 [dependencies]
 burn = { workspace = true, features = ["network"] }
 nanochat-data = { path = "../nanochat-data" }
+bpetok = { path = "../bpetok", features = ["rayon"] }
+compact_str = { workspace = true }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 
 parquet = { workspace = true, features = ["arrow"] }
+arrow = { workspace = true }
