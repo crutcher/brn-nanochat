@@ -385,7 +385,7 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        type T = usize;
+        type T = u16;
         type C = u32;
         type K = CompactString;
 
