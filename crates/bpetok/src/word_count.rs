@@ -327,8 +327,20 @@ mod tests {
     }
 
     #[test]
-    fn test_samples_to_word_counts() {
-        let options = WordCounterOptions::default().with_pattern(PATTERN);
+    fn test_samples_to_word_counts_serial() {
+        test_samples_to_word_counts(false);
+    }
+
+    #[test]
+    #[cfg(feature = "rayon")]
+    fn test_samples_to_word_counts_parallel() {
+        test_samples_to_word_counts(true);
+    }
+
+    fn test_samples_to_word_counts(parallel: bool) {
+        let options = WordCounterOptions::default()
+            .with_pattern(PATTERN)
+            .with_parallel(parallel);
 
         let samples = vec!["Hello world", "Foo world bar world"];
 

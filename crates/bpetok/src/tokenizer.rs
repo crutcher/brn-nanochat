@@ -264,6 +264,7 @@ impl TokenizerOptions {
         Tokenizer {
             merges,
             pattern: self.pattern,
+            parallel: self.parallel,
             compiled_pattern,
         }
     }
@@ -278,6 +279,9 @@ pub struct Tokenizer<T: TokenType> {
     /// The regex pattern used for text splitting.
     pub pattern: String,
 
+    /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
+    pub parallel: bool,
+
     /// The compiled regex pattern.
     compiled_pattern: Regex,
 }
@@ -288,50 +292,106 @@ impl<T: TokenType> Tokenizer<T> {
         U8_SIZE + self.merges.len()
     }
 
+    /// Encode a chunk of text into token IDs.
+    pub fn encode_chunk(
+        &self,
+        chunk: &str,
+    ) -> Vec<T> {
+        // Convert chunk to bytes then to tokens.
+        let mut chunk_tokens: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();
+
+        // Apply merges iteratively
+        while chunk_tokens.len() >= 2 {
+            // Find the best pair to merge
+            let mut best_pair: Option<(usize, Pair<T>, T)> = None;
+
+            for i in 0..chunk_tokens.len() - 1 {
+                let pair: Pair<T> = (chunk_tokens[i], chunk_tokens[i + 1]);
+                if let Some(&new_id) = self.merges.get(&pair)
+                    && (best_pair.is_none() || new_id < best_pair.unwrap().2)
+                {
+                    best_pair = Some((i, pair, new_id));
+                }
+            }
+
+            // If we found a pair to merge, apply it
+            if let Some((idx, _pair, new_id)) = best_pair {
+                chunk_tokens[idx] = new_id;
+                chunk_tokens.remove(idx + 1);
+            } else {
+                // No more merges possible
+                break;
+            }
+        }
+
+        chunk_tokens
+    }
+
     /// Encode a string into token IDs
     pub fn encode<S: AsRef<str>>(
         &self,
         text: S,
     ) -> Vec<T> {
-        let mut all_ids: Vec<T> = Vec::new();
+        if self.parallel {
+            #[cfg(not(feature = "rayon"))]
+            panic!("Parallel processing requires the `rayon` feature to be enabled.");
+
+            #[cfg(feature = "rayon")]
+            self.encode_rayon(text)
+        } else {
+            self.encode_serial(text)
+        }
+    }
+
+    /// Encode a string into token IDs in parallel.
+    ///
+    /// Uses parallel processing, ignoring the `parallel` flag.
+    pub fn encode_rayon<S: AsRef<str>>(
+        &self,
+        text: S,
+    ) -> Vec<T> {
+        use rayon::prelude::*;
 
         let text = text.as_ref();
 
-        // Split text using the regex pattern
+        let mut chunks = self
+            .compiled_pattern
+            .find_iter(text)
+            .enumerate()
+            .par_bridge()
+            .map(|(i, m)| {
+                let chunk = m.expect("regex match failed").as_str();
+                (i, self.encode_chunk(chunk))
+            })
+            .collect::<Vec<_>>();
+
+        chunks.sort_by_key(|(i, _)| *i);
+
+        let total_size = chunks.iter().map(|(_, c)| c.len()).sum::<usize>();
+        let mut all_tokens: Vec<T> = Vec::with_capacity(total_size);
+        for (_, c) in chunks {
+            all_tokens.extend(c);
+        }
+        all_tokens
+    }
+
+    /// Encode a string into token IDs serially.
+    ///
+    /// Uses serial processing, ignoring the `parallel` flag.
+    pub fn encode_serial<S: AsRef<str>>(
+        &self,
+        text: S,
+    ) -> Vec<T> {
+        let text = text.as_ref();
+
+        let mut all_tokens: Vec<T> = Vec::new();
         for m in self.compiled_pattern.find_iter(text) {
             let chunk = m.expect("regex match failed").as_str();
 
-            // Convert chunk to bytes then to tokens.
-            let mut ids: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();
-
-            // Apply merges iteratively
-            while ids.len() >= 2 {
-                // Find the best pair to merge
-                let mut best_pair: Option<(usize, Pair<T>, T)> = None;
-
-                for i in 0..ids.len() - 1 {
-                    let pair: Pair<T> = (ids[i], ids[i + 1]);
-                    if let Some(&new_id) = self.merges.get(&pair)
-                        && (best_pair.is_none() || new_id < best_pair.unwrap().2)
-                    {
-                        best_pair = Some((i, pair, new_id));
-                    }
-                }
-
-                // If we found a pair to merge, apply it
-                if let Some((idx, _pair, new_id)) = best_pair {
-                    ids[idx] = new_id;
-                    ids.remove(idx + 1);
-                } else {
-                    // No more merges possible
-                    break;
-                }
-            }
-
-            all_ids.extend(ids);
+            all_tokens.extend(self.encode_chunk(chunk));
         }
 
-        all_ids
+        all_tokens
     }
 
     /// Build a [`TokenDecoder`] from this [`Tokenizer`].
@@ -378,7 +438,17 @@ mod tests {
     fn check_is_sync<S: Sync>(_: S) {}
 
     #[test]
-    fn test_train_tokenizer() {
+    #[cfg(feature = "rayon")]
+    fn test_train_tokenizer_parallel() {
+        test_train_tokenizer(true);
+    }
+
+    #[test]
+    fn test_train_tokenizer_serial() {
+        test_train_tokenizer(false);
+    }
+
+    fn test_train_tokenizer(parallel: bool) {
         let samples = vec![
             "hello world",
             "hello san francisco",
@@ -389,7 +459,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerOptions::with_capacity(1000);
+        let options = TokenizerOptions::with_capacity(1000).with_parallel(parallel);
         let tokenizer: Tokenizer<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
         check_is_send(&tokenizer);

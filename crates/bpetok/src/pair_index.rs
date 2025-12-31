@@ -160,7 +160,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pair_index() {
+    fn test_pair_index_serial() {
+        test_pair_index(false);
+    }
+
+    #[test]
+    #[cfg(feature = "rayon")]
+    fn test_pair_index_parallel() {
+        test_pair_index(true);
+    }
+
+    fn test_pair_index(parallel: bool) {
         let words = vec![
             Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8]),
             Word::from_tokens(['w' as u8, 'o' as u8, 'r' as u8, 'l' as u8, 'd' as u8]),
@@ -169,57 +179,54 @@ mod tests {
 
         let word_counts = vec![1, 2, 3];
 
-        for parallel in [true, false] {
-            let options = PairIndexOptions { parallel };
+        let options = PairIndexOptions { parallel };
 
-            let index =
-                PairIndex::index_unique_word_counts_table_rayon(&words, &word_counts, options);
+        let index = PairIndex::index_unique_word_counts_table(&words, &word_counts, options);
 
-            let PairIndex {
-                pair_counts,
-                pair_to_word_index,
-            } = index;
+        let PairIndex {
+            pair_counts,
+            pair_to_word_index,
+        } = index;
 
-            let mut pair_counts: Vec<_> = pair_counts.into_iter().collect();
-            pair_counts.sort();
-            assert_eq!(
-                pair_counts,
-                vec![
-                    (('e' as u8, 'l' as u8), 4),
-                    (('h' as u8, 'e' as u8), 4),
-                    (('l' as u8, 'd' as u8), 2),
-                    (('l' as u8, 'l' as u8), 1),
-                    (('l' as u8, 'o' as u8), 1),
-                    (('l' as u8, 'p' as u8), 3),
-                    (('o' as u8, 'r' as u8), 2),
-                    (('r' as u8, 'l' as u8), 2),
-                    (('w' as u8, 'o' as u8), 2),
-                ]
-            );
+        let mut pair_counts: Vec<_> = pair_counts.into_iter().collect();
+        pair_counts.sort();
+        assert_eq!(
+            pair_counts,
+            vec![
+                (('e' as u8, 'l' as u8), 4),
+                (('h' as u8, 'e' as u8), 4),
+                (('l' as u8, 'd' as u8), 2),
+                (('l' as u8, 'l' as u8), 1),
+                (('l' as u8, 'o' as u8), 1),
+                (('l' as u8, 'p' as u8), 3),
+                (('o' as u8, 'r' as u8), 2),
+                (('r' as u8, 'l' as u8), 2),
+                (('w' as u8, 'o' as u8), 2),
+            ]
+        );
 
-            let mut pair_to_word_index: Vec<_> = pair_to_word_index
-                .into_iter()
-                .map(|(p, wi)| {
-                    let mut wi = wi.into_iter().collect::<Vec<_>>();
-                    wi.sort();
-                    (p, wi)
-                })
-                .collect();
-            pair_to_word_index.sort_by_key(|(p, _)| *p);
-            assert_eq!(
-                pair_to_word_index,
-                vec![
-                    (('e' as u8, 'l' as u8), vec![0, 2]),
-                    (('h' as u8, 'e' as u8), vec![0, 2]),
-                    (('l' as u8, 'd' as u8), vec![1]),
-                    (('l' as u8, 'l' as u8), vec![0]),
-                    (('l' as u8, 'o' as u8), vec![0]),
-                    (('l' as u8, 'p' as u8), vec![2]),
-                    (('o' as u8, 'r' as u8), vec![1]),
-                    (('r' as u8, 'l' as u8), vec![1]),
-                    (('w' as u8, 'o' as u8), vec![1]),
-                ]
-            );
-        }
+        let mut pair_to_word_index: Vec<_> = pair_to_word_index
+            .into_iter()
+            .map(|(p, wi)| {
+                let mut wi = wi.into_iter().collect::<Vec<_>>();
+                wi.sort();
+                (p, wi)
+            })
+            .collect();
+        pair_to_word_index.sort_by_key(|(p, _)| *p);
+        assert_eq!(
+            pair_to_word_index,
+            vec![
+                (('e' as u8, 'l' as u8), vec![0, 2]),
+                (('h' as u8, 'e' as u8), vec![0, 2]),
+                (('l' as u8, 'd' as u8), vec![1]),
+                (('l' as u8, 'l' as u8), vec![0]),
+                (('l' as u8, 'o' as u8), vec![0]),
+                (('l' as u8, 'p' as u8), vec![2]),
+                (('o' as u8, 'r' as u8), vec![1]),
+                (('r' as u8, 'l' as u8), vec![1]),
+                (('w' as u8, 'o' as u8), vec![1]),
+            ]
+        );
     }
 }
