@@ -404,6 +404,9 @@ mod tests {
     use super::*;
     use compact_str::CompactString;
 
+    fn check_is_send<S: Send>(_: S) {}
+    fn check_is_sync<S: Sync>(_: S) {}
+
     #[test]
     fn test_tokenizer_options() {
         let options = TokenizerOptions::with_capacity(1000);
@@ -433,9 +436,6 @@ mod tests {
         let _ = TokenizerOptions::with_capacity(1000).with_pattern(r"(");
     }
 
-    fn check_is_send<S: Send>(_: S) {}
-    fn check_is_sync<S: Sync>(_: S) {}
-
     #[test]
     #[cfg(feature = "rayon")]
     fn test_train_tokenizer_parallel() {
@@ -448,17 +448,18 @@ mod tests {
     }
 
     fn test_train_tokenizer(parallel: bool) {
+        type T = u16;
+        type C = u32;
+        type K = CompactString;
+
+        let options = TokenizerOptions::with_capacity(1000).with_parallel(parallel);
+
         let samples = vec![
             "hello world",
             "hello san francisco",
             "it's not the heat, it's the salt",
         ];
 
-        type T = u16;
-        type C = u32;
-        type K = CompactString;
-
-        let options = TokenizerOptions::with_capacity(1000).with_parallel(parallel);
         let tokenizer: Tokenizer<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
         check_is_send(&tokenizer);
