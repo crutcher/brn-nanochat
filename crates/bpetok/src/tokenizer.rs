@@ -1,29 +1,17 @@
 //! # Tokenizer Structures
 
 use crate::decoder::TokenDecoder;
+use crate::pair_index::{PairIndex, PairIndexOptions};
+use crate::validators::U8_SIZE;
+use crate::word_count::{WordCounter, WordCounterOptions};
 use crate::{
-    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions,
-    StringChunkType, TokenType, Word, WordCounter, WordCounterOptions,
+    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, Pair, StringChunkType, TokenType, Word,
+    validators,
 };
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
-
-/// The size of the u8 space.
-pub const U8_SIZE: usize = 256;
-
-fn expect_vocab_size(vocab_size: usize) -> usize {
-    assert!(
-        vocab_size >= U8_SIZE,
-        "vocab_size ({vocab_size}) must be >= 256 (the size of the u8 space)"
-    );
-    vocab_size
-}
-
-fn expect_regex<S: AsRef<str>>(pattern: S) -> Regex {
-    let pattern = pattern.as_ref();
-    Regex::new(pattern).unwrap_or_else(|_| panic!("regex pattern compilation failed: {}", pattern))
-}
+use std::cmp::Ordering;
 
 /// A builder for [`Tokenizer`]s.
 #[derive(Debug)]
@@ -46,7 +34,7 @@ impl TokenizerOptions {
     pub fn with_capacity(vocab_size: usize) -> Self {
         Self {
             pattern: DEFAULT_PATTERN.to_string(),
-            vocab_size: expect_vocab_size(vocab_size),
+            vocab_size: validators::expect_vocab_size(vocab_size),
             parallel: DEFAULT_PARALLEL,
         }
     }
@@ -62,7 +50,7 @@ impl TokenizerOptions {
         vocab_size: usize,
     ) -> Self {
         Self {
-            vocab_size: expect_vocab_size(vocab_size),
+            vocab_size: validators::expect_vocab_size(vocab_size),
             ..self
         }
     }
@@ -73,7 +61,7 @@ impl TokenizerOptions {
         pattern: impl Into<String>,
     ) -> Self {
         let pattern = pattern.into();
-        expect_regex(&pattern);
+        validators::expect_regex(&pattern);
 
         Self { pattern, ..self }
     }
@@ -83,7 +71,18 @@ impl TokenizerOptions {
         self,
         parallel: bool,
     ) -> Self {
-        Self { parallel, ..self }
+        Self {
+            parallel: validators::expect_parallel(parallel),
+            ..self
+        }
+    }
+
+    /// Validates the options.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        validators::try_vocab_size(self.vocab_size)?;
+        validators::try_regex(&self.pattern)?;
+        validators::try_parallel(self.parallel)?;
+        Ok(())
     }
 
     /// Trains a [`Tokenizer`] over a sample iterator.
@@ -138,13 +137,13 @@ impl TokenizerOptions {
         T: TokenType,
         C: CountType,
     {
-        expect_vocab_size(self.vocab_size);
+        validators::expect_vocab_size(self.vocab_size);
 
         let num_merges = self.vocab_size - U8_SIZE;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
 
         // Prefer to fail before we do all the work below.
-        let compiled_pattern = expect_regex(&self.pattern);
+        let compiled_pattern = validators::expect_regex(&self.pattern);
 
         let mut merges: AHashMap<Pair<T>, T> = AHashMap::with_capacity(num_merges);
 
@@ -267,6 +266,55 @@ impl TokenizerOptions {
             parallel: self.parallel,
             compiled_pattern,
         }
+    }
+}
+
+/// Info about a [`Pair`] that could be merged.
+#[derive(Debug, Eq)]
+struct MergeJob<T: TokenType, C: CountType> {
+    /// The number of instances of this pair in the corpus.
+    pub count: C,
+
+    /// The pair to merge.
+    pub pair: Pair<T>,
+
+    /// Word indices that may contain this pair.
+    pub word_indices: AHashSet<usize>,
+}
+
+impl<T: TokenType, C: CountType> MergeJob<T, C> {
+    /// The job key.
+    ///
+    /// Max-heap by count; tie-break to ascending pair order (deterministic)
+    pub fn heap_key(&self) -> (C, Pair<T>) {
+        (self.count, self.pair)
+    }
+}
+
+impl<T: TokenType, C: CountType> PartialEq for MergeJob<T, C> {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
+        self.heap_key() == other.heap_key()
+    }
+}
+
+impl<T: TokenType, C: CountType> PartialOrd for MergeJob<T, C> {
+    fn partial_cmp(
+        &self,
+        other: &Self,
+    ) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
+    fn cmp(
+        &self,
+        other: &Self,
+    ) -> Ordering {
+        self.heap_key().cmp(&other.heap_key())
     }
 }
 
@@ -402,6 +450,7 @@ impl<T: TokenType> Tokenizer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use compact_str::CompactString;
 
     fn check_is_send<S: Send>(_: S) {}
@@ -478,5 +527,45 @@ mod tests {
         for sample in samples {
             assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample)
         }
+    }
+
+    #[test]
+    fn test_merge_job_heap_key() {
+        let job1 = MergeJob {
+            pair: (1, 2),
+            count: 2,
+            word_indices: AHashSet::new(),
+        };
+
+        let job2 = MergeJob {
+            pair: (2, 1),
+            count: 1,
+            word_indices: AHashSet::new(),
+        };
+        let job3 = MergeJob {
+            pair: (2, 2),
+            count: 1,
+            word_indices: AHashSet::new(),
+        };
+
+        assert_eq!(&job1, &job1);
+        assert_ne!(&job1, &job2);
+
+        assert_eq!(job1.heap_key(), (2, (1, 2)));
+        assert_eq!(job2.heap_key(), (1, (2, 1)));
+
+        assert_eq!(job1.heap_key().cmp(&job1.heap_key()), Ordering::Equal);
+        assert_eq!(
+            job1.heap_key().partial_cmp(&job1.heap_key()),
+            Some(Ordering::Equal)
+        );
+
+        assert_eq!(job2.heap_key().cmp(&job2.heap_key()), Ordering::Equal);
+
+        assert_eq!(job1.heap_key().cmp(&job2.heap_key()), Ordering::Greater);
+        assert_eq!(job2.heap_key().cmp(&job1.heap_key()), Ordering::Less);
+
+        assert_eq!(job3.heap_key().cmp(&job2.heap_key()), Ordering::Greater);
+        assert_eq!(job2.heap_key().cmp(&job3.heap_key()), Ordering::Less);
     }
 }

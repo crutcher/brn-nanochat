@@ -1,3 +1,4 @@
+//! # Common Types and Traits
 use core::hash::Hash;
 use num_traits::{FromPrimitive, Num, PrimInt};
 use std::fmt::{Debug, Display};

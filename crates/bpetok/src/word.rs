@@ -1,7 +1,7 @@
 //! # Word Structures
 
 use crate::Pair;
-use crate::token_types::TokenType;
+use crate::types::TokenType;
 use core::hash::Hash;
 
 /// A word in a BPE-based tokenizer.

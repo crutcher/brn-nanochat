@@ -1,3 +1,4 @@
+//! # BPE Token Decoder
 use crate::{Pair, TokenType};
 use ahash::AHashMap;
 
@@ -16,7 +17,7 @@ impl<T: TokenType> TokenDecoder<T> {
     /// Build a [`TokenDecoder`] from this [`Tokenizer`].
     pub fn from_merges(merges: &AHashMap<Pair<T>, T>) -> TokenDecoder<T> {
         let mut expansions = AHashMap::with_capacity(merges.len());
-        for b in 0..crate::tokenizer::U8_SIZE {
+        for b in 0..crate::validators::U8_SIZE {
             let token = T::from_u8(b as u8).unwrap();
             expansions.insert(token, vec![b as u8]);
         }

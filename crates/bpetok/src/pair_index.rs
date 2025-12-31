@@ -1,5 +1,5 @@
 //! Pair Count / Word Indexing
-use crate::token_types::TokenType;
+use crate::types::TokenType;
 use crate::{CountType, Pair, Word};
 use ahash::{AHashMap, AHashSet};
 
