@@ -75,6 +75,9 @@ mod tests {
             word_indices: AHashSet::new(),
         };
 
+        assert_eq!(&job1, &job1);
+        assert_ne!(&job1, &job2);
+
         assert_eq!(job1.heap_key(), (2, (1, 2)));
         assert_eq!(job2.heap_key(), (1, (2, 1)));
 
