@@ -108,33 +108,25 @@ fn main() -> anyhow::Result<()> {
         println!("decoder.size_estimate: {:#?}", decoder.size_estimate());
 
         if args.time_encode_decode {
-            // Duplication: see above.
-            let samples = shards.clone().into_iter().flat_map(move |shard| {
-                cache_ref
-                    .read_cached_batches(shard)
-                    .expect("failed to read batch")
-                    .flat_map(|batch| {
-                        batch
-                            .iter()
-                            .flat_map(|sample| {
-                                let text = sample
-                                    .column(0)
-                                    .as_any()
-                                    .downcast_ref::<StringArray>()
-                                    .unwrap();
-                                text.iter()
-                                    .map(|s| s.unwrap().to_string())
-                                    .collect::<Vec<_>>()
-                            })
-                            .collect::<Vec<_>>()
-                    })
-            });
+            // TODO: `indicatif` for optional progress bar for users waiting on this.
 
             println!("timing encode/decode:");
             let mut sample_sizes = Vec::new();
             let mut encode_durations = Vec::new();
             let mut decode_durations = Vec::new();
-            for sample in samples {
+
+            // Read the first batch of the first shard for timing.
+            let batch = cache.read_cached_batches(shards[0])?.next().unwrap()?;
+            let column = batch
+                .column_by_name("text")
+                .expect("failed to find 'text' column in batch")
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+
+            for sample in column.iter() {
+                let sample = sample.unwrap().to_string();
+
                 sample_sizes.push(sample.len());
 
                 let t0 = std::time::Instant::now();

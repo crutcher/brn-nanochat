@@ -80,3 +80,63 @@ DATASET_DOWNLOAD_PID=$!
 python -m scripts.tok_train --max_chars=2000000000
 ```
 
+# benchmarks
+
+Same as above:
+
+```terminaloutput
+# Build the `pull` binary; and pre-download the first 8 shards of the dataset.
+$ cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8
+$ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode
+    Finished `release` profile [optimized] target(s) in 0.32s
+     Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode`
+Args {
+    shards: [
+        Slice {
+            start: 0,
+            end: Some(
+                8,
+            ),
+            step: 1,
+        },
+    ],
+    dataset_dir: "/media/Data/nanochat/dataset",
+    train_tokenizer: true,
+    vocab_size: 65536,
+    time_encode_decode: true,
+}
+DatasetCacheConfig {
+    cache_dir: "/media/Data/nanochat/dataset",
+    source: DatasetSource {
+        base_url: "https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle/resolve/main",
+        max_shard: 1822,
+        index_pad_width: 5,
+        shard_template: "shard_{index}.parquet",
+    },
+}
+training tokenizer: [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+]
+tokenizer training_duration: 75.048450335s
+tokenizer.vocab_size: 65536
+tokenizer.size_estimate: 917613
+training decoder
+decoder training_duration: 11.668489ms
+decoder.size_estimate: 752521
+timing encode/decode:
+encode/decode sample count: 1024
+avg sample size: 4108
+tokenizer.encode avg duration: 3.533863ms
+decoder.decode_to_string avg duration: 61.891µs
+
+real    1m19.617s
+user    79m15.967s
+sys     25m43.074s
+```
