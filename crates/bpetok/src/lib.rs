@@ -1,6 +1,7 @@
 //! # BPE Tokenizer
 #![warn(missing_docs, unused)]
 
+mod decoder;
 mod merge_job;
 mod pair_index;
 mod token_types;
@@ -8,6 +9,7 @@ mod tokenizer;
 mod word;
 mod word_count;
 
+pub use decoder::*;
 pub use merge_job::*;
 pub use pair_index::*;
 pub use token_types::*;

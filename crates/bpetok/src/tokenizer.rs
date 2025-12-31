@@ -1,5 +1,6 @@
 //! # Tokenizer Structures
 
+use crate::decoder::TokenDecoder;
 use crate::{
     CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeJob, Pair, PairIndex, PairIndexOptions,
     StringChunkType, TokenType, Word, WordCounter, WordCounterOptions,
@@ -7,10 +8,9 @@ use crate::{
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use fancy_regex::Regex;
-use std::collections::HashMap;
 
 /// The size of the u8 space.
-const U8_SIZE: usize = 256;
+pub const U8_SIZE: usize = 256;
 
 fn expect_vocab_size(vocab_size: usize) -> usize {
     assert!(
@@ -146,7 +146,7 @@ impl TokenizerOptions {
         // Prefer to fail before we do all the work below.
         let compiled_pattern = expect_regex(&self.pattern);
 
-        let mut merges: HashMap<Pair<T>, T> = HashMap::new();
+        let mut merges: AHashMap<Pair<T>, T> = AHashMap::with_capacity(num_merges);
 
         log::info!("Building pair index...");
         let PairIndex {
@@ -273,7 +273,7 @@ impl TokenizerOptions {
 #[derive(Debug)]
 pub struct Tokenizer<T: TokenType> {
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
-    pub merges: HashMap<Pair<T>, T>,
+    pub merges: AHashMap<Pair<T>, T>,
 
     /// The regex pattern used for text splitting.
     pub pattern: String,
@@ -333,6 +333,11 @@ impl<T: TokenType> Tokenizer<T> {
 
         all_ids
     }
+
+    /// Build a [`TokenDecoder`] from this [`Tokenizer`].
+    pub fn to_decoder(&self) -> TokenDecoder<T> {
+        TokenDecoder::from_merges(&self.merges)
+    }
 }
 
 #[cfg(test)]
@@ -369,9 +374,16 @@ mod tests {
         let _ = TokenizerOptions::with_capacity(1000).with_pattern(r"(");
     }
 
+    fn check_is_send<S: Send>(_: S) {}
+    fn check_is_sync<S: Sync>(_: S) {}
+
     #[test]
     fn test_train_tokenizer() {
-        let samples = vec!["hello world"];
+        let samples = vec![
+            "hello world",
+            "hello san francisco",
+            "it's not the heat, it's the salt",
+        ];
 
         type T = usize;
         type C = u32;
@@ -379,11 +391,16 @@ mod tests {
 
         let options = TokenizerOptions::with_capacity(1000);
         let tokenizer: Tokenizer<T> =
-            options.train_from_sample_iterator::<T, K, C, _>(samples.into_iter());
+            options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+        check_is_send(&tokenizer);
+        check_is_sync(&tokenizer);
 
-        assert_eq!(tokenizer.vocab_size(), 265);
+        let decoder = tokenizer.to_decoder();
+        check_is_send(&decoder);
+        check_is_sync(&decoder);
 
-        assert_eq!(tokenizer.encode("hello"), vec![263]);
-        assert_eq!(tokenizer.encode("hello world"), vec![263, 264]);
+        for sample in samples {
+            assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample)
+        }
     }
 }
