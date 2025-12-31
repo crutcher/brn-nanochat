@@ -79,3 +79,19 @@ impl<T: TokenType> TokenDecoder<T> {
         String::from_utf8(self.decode_to_bytes(tokens)).unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decoder() {
+        let merges = AHashMap::from([
+            (('h' as usize, 'e' as usize), 300),
+            (('l' as usize, 'l' as usize), 301),
+        ]);
+        let decoder = TokenDecoder::from_merges(&merges);
+
+        assert_eq!(decoder.decode_to_string(&[300, 301, 'o' as usize]), "hello");
+    }
+}
