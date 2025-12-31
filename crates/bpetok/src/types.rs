@@ -1,13 +1,13 @@
 //! # Common Types and Traits
 use core::hash::Hash;
-use num_traits::{FromPrimitive, Num, PrimInt};
+use num_traits::{FromPrimitive, Num};
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, SubAssign};
 
 /// A type that can be used as a token in a BPE-based tokenizer.
-pub trait TokenType: Debug + Clone + Copy + Hash + Send + Sync + FromPrimitive + PrimInt {}
+pub trait TokenType: Debug + Clone + Copy + Hash + Send + Sync + FromPrimitive + Ord {}
 
-impl<T> TokenType for T where T: Debug + Clone + Copy + Hash + Send + Sync + FromPrimitive + PrimInt {}
+impl<T> TokenType for T where T: Debug + Clone + Copy + Hash + Send + Sync + FromPrimitive + Ord {}
 
 /// A pair of tokens.
 pub type Pair<T> = (T, T);
