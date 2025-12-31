@@ -260,10 +260,27 @@ impl DatasetCache {
         shard: usize,
         download: bool,
     ) -> anyhow::Result<ParquetRecordBatchReader> {
-        let path = self.get_shard(shard, download)?;
+        if download {
+            let _ = self.load_shard(shard)?;
+        }
+        self.read_cached_batches(shard)
+    }
+
+    /// Read a (pre-cached) shard as a parquet reader.
+    ///
+    /// # Arguments
+    /// * `shard` - The shard index.
+    ///
+    /// # Returns
+    ///
+    /// An `Iterator<Item=Result<RecordBatch, ArrowError>>` reader.
+    pub fn read_cached_batches(
+        &self,
+        shard: usize,
+    ) -> anyhow::Result<ParquetRecordBatchReader> {
+        let path = self.format_shard_path(shard);
         let file = File::open(path)?;
         let reader = ParquetRecordBatchReaderBuilder::try_new(file)?.build()?;
-
         Ok(reader)
     }
 }

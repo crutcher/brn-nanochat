@@ -14,6 +14,12 @@ impl<T: TokenType> TokenDecoder<T> {
         Self { dictionary }
     }
 
+    /// Estimates the memory usage of this decoder.
+    pub fn size_estimate(&self) -> usize {
+        self.dictionary.capacity() * std::mem::size_of::<T>()
+            + self.dictionary.values().map(|v| v.len()).sum::<usize>()
+    }
+
     /// Build a [`TokenDecoder`] from this [`Tokenizer`].
     pub fn from_merges(merges: &AHashMap<Pair<T>, T>) -> TokenDecoder<T> {
         let mut expansions = AHashMap::with_capacity(merges.len());
@@ -26,6 +32,8 @@ impl<T: TokenType> TokenDecoder<T> {
         for &token in merges.values() {
             Self::materialize_token(&mut expansions, &token2pair, token);
         }
+
+        expansions.shrink_to_fit();
 
         TokenDecoder::new(expansions)
     }
@@ -60,14 +68,21 @@ impl<T: TokenType> TokenDecoder<T> {
     ) -> Vec<u8> {
         let tokens = tokens.as_ref();
 
-        let total_size = tokens
+        let mut total_size = 0;
+        let chunks: Vec<&[u8]> = tokens
             .iter()
-            .map(|t| self.dictionary.get(t).unwrap().len())
-            .sum::<usize>();
+            .map(|t| {
+                let slice = self.dictionary.get(t).unwrap().as_slice();
+                total_size += slice.len();
+                slice
+            })
+            .collect();
+
         let mut buf = Vec::with_capacity(total_size);
-        for token in tokens {
-            buf.extend_from_slice(self.dictionary.get(token).unwrap());
-        }
+        chunks
+            .into_iter()
+            .for_each(|chunk| buf.extend_from_slice(chunk));
+
         buf
     }
 

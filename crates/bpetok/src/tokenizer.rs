@@ -258,6 +258,8 @@ impl TokenizerOptions {
             }
         }
 
+        merges.shrink_to_fit();
+
         log::info!("Finished training: {} merges completed", merges_done);
 
         Tokenizer {
@@ -338,6 +340,11 @@ impl<T: TokenType> Tokenizer<T> {
     /// Vocab Size.
     pub fn vocab_size(&self) -> usize {
         U8_SIZE + self.merges.len()
+    }
+
+    /// Memory usage estimate in bytes.
+    pub fn size_estimate(&self) -> usize {
+        self.merges.capacity() * std::mem::size_of::<Pair<T>>() + self.pattern.len()
     }
 
     /// Encode a chunk of text into token IDs.
