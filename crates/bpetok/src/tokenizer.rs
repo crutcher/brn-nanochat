@@ -384,14 +384,13 @@ impl<T: TokenType> Tokenizer<T> {
     ) -> Vec<T> {
         let text = text.as_ref();
 
-        let mut all_tokens: Vec<T> = Vec::new();
-        for m in self.compiled_pattern.find_iter(text) {
-            let chunk = m.expect("regex match failed").as_str();
-
-            all_tokens.extend(self.encode_chunk(chunk));
-        }
-
-        all_tokens
+        self.compiled_pattern
+            .find_iter(text)
+            .flat_map(|m| {
+                let chunk = m.expect("regex match failed").as_str();
+                self.encode_chunk(chunk)
+            })
+            .collect()
     }
 
     /// Build a [`TokenDecoder`] from this [`Tokenizer`].
