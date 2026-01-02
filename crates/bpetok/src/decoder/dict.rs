@@ -2,41 +2,41 @@
 
 use crate::{Pair, TokenDecoder, TokenType};
 use ahash::AHashMap;
-use std::collections::{HashMap, hash_map};
+use std::collections::hash_map;
 
 /// A decoder for [`Tokenizer`] decoder with a materialized dictionary.
 pub struct DictionaryDecoder<T: TokenType> {
     /// Token to bytes mapping.
-    pub dictionary: HashMap<T, Vec<u8>>,
+    pub dictionary: AHashMap<T, Vec<u8>>,
 }
 
 impl<T: TokenType> DictionaryDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(dictionary: HashMap<T, Vec<u8>>) -> Self {
+    pub fn new(mut dictionary: AHashMap<T, Vec<u8>>) -> Self {
+        dictionary.shrink_to_fit();
+
         Self { dictionary }
     }
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
     pub fn from_merge_map(merges: &AHashMap<Pair<T>, T>) -> DictionaryDecoder<T> {
-        let mut expansions = HashMap::with_capacity(merges.len());
+        let mut dictionary = AHashMap::with_capacity(merges.len());
         for b in 0..crate::validators::U8_SIZE {
             let token = T::from_u8(b as u8).unwrap();
-            expansions.insert(token, vec![b as u8]);
+            dictionary.insert(token, vec![b as u8]);
         }
 
-        let token_to_pair = HashMap::from_iter(merges.iter().map(|(&pair, &token)| (token, pair)));
+        let token_to_pair = AHashMap::from_iter(merges.iter().map(|(&pair, &token)| (token, pair)));
         for &token in merges.values() {
-            Self::materialize_token(&mut expansions, &token_to_pair, token);
+            Self::materialize_token(&mut dictionary, &token_to_pair, token);
         }
 
-        expansions.shrink_to_fit();
-
-        DictionaryDecoder::new(expansions)
+        DictionaryDecoder::new(dictionary)
     }
 
     fn materialize_token<'a>(
-        expansions: &'a mut HashMap<T, Vec<u8>>,
-        token_2_pair: &HashMap<T, Pair<T>>,
+        expansions: &'a mut AHashMap<T, Vec<u8>>,
+        token_2_pair: &AHashMap<T, Pair<T>>,
         token: T,
     ) -> &'a Vec<u8> {
         if expansions.contains_key(&token) {

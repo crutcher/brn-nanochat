@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn test_word_merge_pair_cb() {
         let mut word: Word<u32> = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
-        let mut deltas = Vec::new();
+        let mut deltas = vec![];
 
         word.merge_pair_cb((1, 2), 1, &mut |p, d| {
             deltas.push((p, d));

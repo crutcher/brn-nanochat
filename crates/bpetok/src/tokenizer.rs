@@ -214,7 +214,7 @@ impl TokenizerOptions {
             merges.insert(job.pair, new_token);
 
             // Merge this pair in all words where it occurs
-            let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> = AHashMap::new();
+            let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
             for &word_idx in &job.word_indices {
                 // Apply merge to this word.
                 words[word_idx].merge_pair_cb(job.pair, new_token, &mut |pair, delta| {
@@ -565,18 +565,18 @@ mod tests {
         let job1: MergeJob<T, C> = MergeJob {
             pair: (1, 2),
             count: 2,
-            word_indices: AHashSet::new(),
+            word_indices: Default::default(),
         };
 
         let job2 = MergeJob {
             pair: (2, 1),
             count: 1,
-            word_indices: AHashSet::new(),
+            word_indices: Default::default(),
         };
         let job3 = MergeJob {
             pair: (2, 2),
             count: 1,
-            word_indices: AHashSet::new(),
+            word_indices: Default::default(),
         };
 
         assert_eq!(&job1, &job1);

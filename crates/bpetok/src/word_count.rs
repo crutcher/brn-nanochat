@@ -204,13 +204,10 @@ where
         let updates: AHashMap<K, C> = samples
             .par_bridge()
             .map(|sample| word_counts_from_text(&regex, sample.as_ref()).unwrap())
-            .reduce(
-                || AHashMap::new(),
-                |mut a, b| {
-                    update_word_counts(&mut a, b);
-                    a
-                },
-            );
+            .reduce(Default::default, |mut a, b| {
+                update_word_counts(&mut a, b);
+                a
+            });
 
         self.update_from_word_counts(updates)
     }

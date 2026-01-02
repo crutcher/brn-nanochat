@@ -3,14 +3,14 @@
 
 use crate::{Pair, TokenDecoder, TokenType, is_byte_token};
 use ahash::AHashMap;
-use std::collections::{HashMap, hash_map};
+use std::collections::hash_map;
 use std::ops::Range;
 
 /// Represents a materialized sequence of tokens and their byte slices.
 pub struct MaterializationMap<T: TokenType> {
     root: T,
     buf: Vec<u8>,
-    slices: HashMap<T, Range<usize>>,
+    slices: AHashMap<T, Range<usize>>,
 }
 
 impl<T: TokenType> MaterializationMap<T> {
@@ -30,7 +30,7 @@ impl<T: TokenType> MaterializationMap<T> {
 
         let mut mmap = Self {
             root: token,
-            buf: Vec::new(),
+            buf: Default::default(),
             slices: Default::default(),
         };
 
@@ -93,7 +93,7 @@ impl<T: TokenType> MaterializationMap<T> {
     }
 
     /// Returns the slice map.
-    pub fn slices(&self) -> &HashMap<T, Range<usize>> {
+    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
         &self.slices
     }
 
@@ -121,16 +121,19 @@ impl<T: TokenType> MaterializationMap<T> {
 /// A token decoder.
 #[derive(Clone)]
 pub struct CorpusDecoder<T: TokenType> {
-    slices: HashMap<T, Range<usize>>,
+    slices: AHashMap<T, Range<usize>>,
     corpus: Vec<u8>,
 }
 
 impl<T: TokenType> CorpusDecoder<T> {
     /// Creates a new corpus decoder.
     pub fn new(
-        slices: HashMap<T, Range<usize>>,
-        corpus: Vec<u8>,
+        mut slices: AHashMap<T, Range<usize>>,
+        mut corpus: Vec<u8>,
     ) -> Self {
+        slices.shrink_to_fit();
+        corpus.shrink_to_fit();
+
         Self { slices, corpus }
     }
 
@@ -167,7 +170,7 @@ impl<T: TokenType> CorpusDecoder<T> {
             mmaps.push(mmap);
         }
 
-        let mut slices: HashMap<T, Range<usize>> = HashMap::with_capacity(merges.len());
+        let mut slices: AHashMap<T, Range<usize>> = AHashMap::with_capacity(merges.len());
         let mut corpus: Vec<u8> = Vec::with_capacity(total_size);
 
         for mmap in mmaps {
@@ -185,9 +188,6 @@ impl<T: TokenType> CorpusDecoder<T> {
             }
         }
 
-        slices.shrink_to_fit();
-        corpus.shrink_to_fit();
-
         Self::new(slices, corpus)
     }
 
@@ -197,7 +197,7 @@ impl<T: TokenType> CorpusDecoder<T> {
     }
 
     /// Gets the slice map.
-    pub fn slices(&self) -> &HashMap<T, Range<usize>> {
+    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
         &self.slices
     }
 }

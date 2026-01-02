@@ -134,8 +134,8 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
             .par_iter()
             .enumerate()
             .map(|(word_index, word)| {
-                let mut local_pc: AHashMap<Pair<T>, C> = AHashMap::new();
-                let mut local_wtu: AHashMap<Pair<T>, AHashSet<usize>> = AHashMap::new();
+                let mut local_pc: AHashMap<Pair<T>, C> = Default::default();
+                let mut local_wtu: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
                 Self::observe_word(
                     &mut local_pc,
                     &mut local_wtu,
@@ -145,18 +145,15 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
                 );
                 (local_pc, local_wtu)
             })
-            .reduce(
-                || (AHashMap::new(), AHashMap::new()),
-                |(mut acc_pc, mut acc_wtu), (pc, wtu)| {
-                    for (k, v) in pc {
-                        *acc_pc.entry(k).or_default() += v;
-                    }
-                    for (k, s) in wtu {
-                        acc_wtu.entry(k).or_default().extend(s);
-                    }
-                    (acc_pc, acc_wtu)
-                },
-            );
+            .reduce(Default::default, |(mut acc_pc, mut acc_wtu), (pc, wtu)| {
+                for (k, v) in pc {
+                    *acc_pc.entry(k).or_default() += v;
+                }
+                for (k, s) in wtu {
+                    acc_wtu.entry(k).or_default().extend(s);
+                }
+                (acc_pc, acc_wtu)
+            });
 
         Self {
             pair_counts,
