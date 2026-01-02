@@ -1,12 +1,11 @@
 //! # Tokenizer Structures
 
-use crate::decoder::TokenDecoder;
 use crate::pair_index::{PairIndex, PairIndexOptions};
 use crate::validators::U8_SIZE;
 use crate::word_count::{WordCounter, WordCounterOptions};
 use crate::{
-    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, Pair, StringChunkType, TokenType, Word,
-    validators,
+    CorpusDecoder, CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, DictionaryDecoder, Pair,
+    StringChunkType, TokenDecoder, TokenType, Word, validators,
 };
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
@@ -449,15 +448,25 @@ impl<T: TokenType> Tokenizer<T> {
     }
 
     /// Build a [`TokenDecoder`] from this [`Tokenizer`].
-    pub fn to_decoder(&self) -> TokenDecoder<T> {
-        TokenDecoder::from_merges(&self.merges)
+    pub fn to_decoder(&self) -> impl TokenDecoder<T> {
+        self.to_dictionary_decoder()
+    }
+
+    /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
+    pub fn to_dictionary_decoder(&self) -> DictionaryDecoder<T> {
+        DictionaryDecoder::from_merge_map(&self.merges)
+    }
+
+    /// Build a [`CorpusDecoder`] from this [`Tokenizer`].
+    pub fn to_corpus_decoder(&self) -> CorpusDecoder<T> {
+        CorpusDecoder::from_merge_map(&self.merges)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
+    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, TokenDecoder};
     use compact_str::CompactString;
 
     fn check_is_send<S: Send>(_: S) {}
@@ -526,19 +535,32 @@ mod tests {
         assert_eq!(tokenizer.vocab_size(), 293);
 
         let decoder = tokenizer.to_decoder();
+        let dict_decoder = tokenizer.to_dictionary_decoder();
+        let corpus_decoder = tokenizer.to_corpus_decoder();
 
         // compile time checks.
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample)
+            assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample);
+            assert_eq!(
+                dict_decoder.decode_to_string(tokenizer.encode(sample)),
+                sample
+            );
+            assert_eq!(
+                corpus_decoder.decode_to_string(tokenizer.encode(sample)),
+                sample
+            );
         }
     }
 
     #[test]
     fn test_merge_job_heap_key() {
-        let job1 = MergeJob {
+        type T = u32;
+        type C = u32;
+
+        let job1: MergeJob<T, C> = MergeJob {
             pair: (1, 2),
             count: 2,
             word_indices: AHashSet::new(),

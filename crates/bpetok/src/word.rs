@@ -149,38 +149,38 @@ mod tests {
 
     #[test]
     fn test_word_constructor() {
-        let word = Word::from_tokens(vec![1, 2, 3]);
+        let word: Word<u32> = Word::from_tokens(vec![1, 2, 3]);
         assert_eq!(word.tokens(), &[1, 2, 3]);
         assert_eq!(word.len(), 3);
     }
 
     #[test]
     fn test_word_from() {
-        let word: Word<i32> = vec![1, 2, 3].into();
+        let word: Word<u32> = vec![1, 2, 3].into();
         assert_eq!(word.tokens(), &[1, 2, 3]);
 
-        let word: Word<i32> = [1, 2, 3].into();
+        let word: Word<u32> = [1, 2, 3].into();
         assert_eq!(word.tokens(), &[1, 2, 3]);
 
-        let word: Word<i32> = (&[1, 2, 3]).into();
+        let word: Word<u32> = (&[1, 2, 3]).into();
         assert_eq!(word.tokens(), &[1, 2, 3]);
     }
 
     #[test]
     fn test_word_from_str() {
-        let word: Word<i32> = Word::from_string("hello");
+        let word: Word<u32> = Word::from_string("hello");
         assert_eq!(word.tokens(), &[104, 101, 108, 108, 111]);
     }
 
     #[test]
     fn test_word_pairs() {
-        let word = Word::from_tokens(vec![1, 2, 3]);
+        let word: Word<u32> = Word::from_tokens(vec![1, 2, 3]);
         assert_eq!(word.pairs().collect::<Vec<_>>(), vec![(1, 2), (2, 3)]);
     }
 
     #[test]
     fn test_word_merge_pair() {
-        let mut word = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
+        let mut word: Word<u32> = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
 
         let deltas = word.merge_pair((1, 2), 1);
         assert_eq!(word.tokens(), &[1, 3, 1, 2, 1]);
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_word_merge_pair_cb() {
-        let mut word = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
+        let mut word: Word<u32> = Word::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
         let mut deltas = Vec::new();
 
         word.merge_pair_cb((1, 2), 1, &mut |p, d| {
