@@ -87,9 +87,11 @@ Same as above:
 ```terminaloutput
 # Build the `pull` binary; and pre-download the first 8 shards of the dataset.
 $ cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8
-$ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=100000 --time-encode-decode
-    Finished `release` profile [optimized] target(s) in 0.28s
-     Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=100000 --time-encode-decode`
+$ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode
+   Compiling bpetok v0.0.1 (/home/crutcher/git/brn-nanochat/crates/bpetok)
+   Compiling pull v0.0.0 (/home/crutcher/git/brn-nanochat/crates/pull)
+    Finished `release` profile [optimized] target(s) in 1.61s
+     Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode`
 Args {
     shards: [
         Slice {
@@ -102,7 +104,7 @@ Args {
     ],
     dataset_dir: "/media/Data/nanochat/dataset",
     train_tokenizer: true,
-    vocab_size: 100000,
+    vocab_size: 65536,
     time_encode_decode: true,
 }
 DatasetCacheConfig {
@@ -114,39 +116,36 @@ DatasetCacheConfig {
         shard_template: "shard_{index}.parquet",
     },
 }
-training tokenizer: [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-]
-tokenizer training_duration: 73.586055232s
-tokenizer.vocab_size: 100000
-tokenizer.size_estimate: 917613
-training DictionaryDecoder:
-- training_duration: 14.425339ms
-- size_estimate: (
-    2400000,
-    484967,
-)
-training CorpusDecoder:
-- training_duration: 44.110899ms
-- size_estimate: (
-    2393856,
-    416577,
-)
-timing encode/decode:
-encode/decode sample count: 1024
-avg sample size: 4108
-tokenizer.encode avg duration: 4.417494ms
-DictionaryDecoder decode_to_string avg duration: 25.942µs
-CorpusDecoder decode_to_string avg duration: 32.437µs
 
-real    1m18.994s
-user    81m5.604s
-sys     26m30.199s
+Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
+- training_duration: 72.612455275s
+- vocab_size: 65536
+- size_estimate: 917613
+
+Training DictionaryDecoder:
+- training_duration: 9.944697ms
+- size_estimate: (
+    1572864,
+    293769,
+)
+
+Training CorpusDecoder:
+- training_duration: 24.811911ms
+- size_estimate: (
+    1566720,
+    253994,
+)
+
+Timing Encode:
+- sample count: 1024
+- avg sample size: 4108
+- encode avg duration: 4.391576ms
+
+DictionaryDecoder decode_to_string avg duration: 28.463µs
+
+CorpusDecoder decode_to_string avg duration: 23.298µs
+
+real    1m19.331s
+user    80m31.884s
+sys     25m26.822s
 ```

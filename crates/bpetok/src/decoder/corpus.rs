@@ -202,7 +202,7 @@ impl<T: TokenType> CorpusDecoder<T> {
     }
 }
 
-impl<'a, T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
+impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
     fn decode_to_bytes<S: AsRef<[T]>>(
         &self,
         tokens: S,

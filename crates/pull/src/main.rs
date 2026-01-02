@@ -64,7 +64,8 @@ fn main() -> anyhow::Result<()> {
 
         let options = TokenizerOptions::with_capacity(args.vocab_size);
 
-        println!("training tokenizer: {:#?}", shards);
+        println!();
+        println!("Training Tokenizer on shards: {:?}", shards);
         let t0 = std::time::Instant::now();
 
         let cache_ref = &cache;
@@ -95,11 +96,12 @@ fn main() -> anyhow::Result<()> {
         let tokenizer: Tokenizer<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
         let t1 = std::time::Instant::now();
         let training_duration = t1.duration_since(t0);
-        println!("tokenizer training_duration: {:#?}", training_duration);
-        println!("tokenizer.vocab_size: {:#?}", tokenizer.vocab_size());
-        println!("tokenizer.size_estimate: {:#?}", tokenizer.size_estimate());
+        println!("- training_duration: {:#?}", training_duration);
+        println!("- vocab_size: {:#?}", tokenizer.vocab_size());
+        println!("- size_estimate: {:#?}", tokenizer.size_estimate());
 
-        println!("training DictionaryDecoder:");
+        println!();
+        println!("Training DictionaryDecoder:");
         let t0 = std::time::Instant::now();
         let dict_decoder = tokenizer.to_dictionary_decoder();
         let t1 = std::time::Instant::now();
@@ -107,7 +109,8 @@ fn main() -> anyhow::Result<()> {
         println!("- training_duration: {:#?}", training_duration);
         println!("- size_estimate: {:#?}", dict_decoder.size_estimate());
 
-        println!("training CorpusDecoder:");
+        println!();
+        println!("Training CorpusDecoder:");
         let t0 = std::time::Instant::now();
         let corpus_decoder = tokenizer.to_corpus_decoder();
         let t1 = std::time::Instant::now();
@@ -117,10 +120,6 @@ fn main() -> anyhow::Result<()> {
 
         if args.time_encode_decode {
             // TODO: `indicatif` for optional progress bar for users waiting on this.
-
-            println!("timing encode/decode:");
-            let mut sample_sizes = Vec::new();
-            let mut encode_durations = Vec::new();
 
             // Read the first batch of the first shard for timing.
             let batch = cache.read_cached_batches(shards[0])?.next().unwrap()?;
@@ -132,10 +131,13 @@ fn main() -> anyhow::Result<()> {
                 .unwrap();
 
             let mut token_groups: Vec<Vec<T>> = Vec::new();
+            let mut sample_sizes = Vec::new();
+            let mut encode_durations = Vec::new();
 
+            println!();
+            println!("Timing Encode:");
             for sample in column.iter() {
                 let sample = sample.unwrap().to_string();
-
                 sample_sizes.push(sample.len());
 
                 let t0 = std::time::Instant::now();
@@ -145,9 +147,9 @@ fn main() -> anyhow::Result<()> {
                 encode_durations.push(duration);
             }
             let count = encode_durations.len();
-            println!("encode/decode sample count: {}", count);
+            println!("- sample count: {}", count);
             let avg_sample_size = sample_sizes.iter().sum::<usize>() / count;
-            println!("avg sample size: {}", avg_sample_size);
+            println!("- avg sample size: {}", avg_sample_size);
 
             let encode_avg = Duration::from_nanos(
                 encode_durations
@@ -155,7 +157,7 @@ fn main() -> anyhow::Result<()> {
                     .map(|d| d.as_nanos() as u64 / count as u64)
                     .sum::<u64>(),
             );
-            println!("tokenizer.encode avg duration: {:#?}", encode_avg);
+            println!("- encode avg duration: {:#?}", encode_avg);
 
             // Batch the tokens separately to try and get some cache-locality.
             let mut decode_durations = Vec::new();
@@ -172,6 +174,7 @@ fn main() -> anyhow::Result<()> {
                     .map(|d| d.as_nanos() as u64 / count as u64)
                     .sum::<u64>(),
             );
+            println!();
             println!(
                 "DictionaryDecoder decode_to_string avg duration: {:#?}",
                 decode_avg
@@ -192,6 +195,7 @@ fn main() -> anyhow::Result<()> {
                     .map(|d| d.as_nanos() as u64 / count as u64)
                     .sum::<u64>(),
             );
+            println!();
             println!(
                 "CorpusDecoder decode_to_string avg duration: {:#?}",
                 decode_avg
