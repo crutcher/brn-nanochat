@@ -1,11 +1,13 @@
 //! # Tokenizer Structures
 
+use crate::decoder::corpus::CorpusDecoder;
+use crate::decoder::dict::DictionaryDecoder;
 use crate::pair_index::{PairIndex, PairIndexOptions};
 use crate::validators::U8_SIZE;
 use crate::word_count::{WordCounter, WordCounterOptions};
 use crate::{
-    CorpusDecoder, CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, DictionaryDecoder, Pair,
-    StringChunkType, TokenDecoder, TokenType, Word, validators,
+    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, Pair, StringChunkType, TokenDecoder, TokenType,
+    Word, validators,
 };
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;

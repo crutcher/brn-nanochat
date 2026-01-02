@@ -1,124 +1,16 @@
-//! # BPE Token Decoder
+//! # Corpus Decoder
+//! Experimental.
 
-use crate::{Pair, TokenType, is_byte_token};
+use crate::{Pair, TokenDecoder, TokenType, is_byte_token};
 use ahash::AHashMap;
 use std::collections::{HashMap, hash_map};
 use std::ops::Range;
-
-/// Trait for token decoders.
-pub trait TokenDecoder<T: TokenType> {
-    /// Decodes tokens into bytes.
-    fn decode_to_bytes<S: AsRef<[T]>>(
-        &self,
-        tokens: S,
-    ) -> Vec<u8>;
-
-    /// Decodes tokens into a string.
-    fn decode_to_string<S: AsRef<[T]>>(
-        &self,
-        tokens: S,
-    ) -> String {
-        let tokens = tokens.as_ref();
-        String::from_utf8(self.decode_to_bytes(tokens)).unwrap()
-    }
-
-    /// Estimates the memory usage of this decoder.
-    fn size_estimate(&self) -> (usize, usize);
-}
-
-/// A decoder for [`Tokenizer`] decoder with a materialized dictionary.
-pub struct DictionaryDecoder<T: TokenType> {
-    /// Token to bytes mapping.
-    pub dictionary: AHashMap<T, Vec<u8>>,
-}
-
-impl<T: TokenType> DictionaryDecoder<T> {
-    /// Creates a new Decoder.
-    pub fn new(dictionary: AHashMap<T, Vec<u8>>) -> Self {
-        Self { dictionary }
-    }
-
-    /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    pub fn from_merge_map(merges: &AHashMap<Pair<T>, T>) -> DictionaryDecoder<T> {
-        let mut expansions = AHashMap::with_capacity(merges.len());
-        for b in 0..crate::validators::U8_SIZE {
-            let token = T::from_u8(b as u8).unwrap();
-            expansions.insert(token, vec![b as u8]);
-        }
-
-        let token2pair = AHashMap::from_iter(merges.iter().map(|(&pair, &token)| (token, pair)));
-        for &token in merges.values() {
-            Self::materialize_token(&mut expansions, &token2pair, token);
-        }
-
-        expansions.shrink_to_fit();
-
-        DictionaryDecoder::new(expansions)
-    }
-
-    fn materialize_token<'a>(
-        expansions: &'a mut AHashMap<T, Vec<u8>>,
-        token2pair: &AHashMap<T, Pair<T>>,
-        token: T,
-    ) -> &'a Vec<u8> {
-        if expansions.contains_key(&token) {
-            return expansions.get(&token).unwrap();
-        }
-
-        let (a, b) = token2pair.get(&token).unwrap().to_owned();
-
-        Self::materialize_token(expansions, token2pair, a);
-        Self::materialize_token(expansions, token2pair, b);
-        let abuf = expansions.get(&a).unwrap();
-        let bbuf = expansions.get(&b).unwrap();
-        let mut buf = Vec::with_capacity(abuf.len() + bbuf.len());
-        buf.extend_from_slice(abuf);
-        buf.extend_from_slice(bbuf);
-
-        expansions.insert(token, buf);
-        expansions.get(&token).unwrap()
-    }
-}
-
-impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
-    /// Estimates the memory usage of this decoder.
-    fn size_estimate(&self) -> (usize, usize) {
-        (
-            size_of::<hash_map::Entry<T, Vec<u8>>>() * self.dictionary.len(),
-            self.dictionary.values().map(|v| v.len()).sum::<usize>(),
-        )
-    }
-
-    fn decode_to_bytes<S: AsRef<[T]>>(
-        &self,
-        tokens: S,
-    ) -> Vec<u8> {
-        let tokens = tokens.as_ref();
-
-        let mut total_size = 0;
-        let chunks: Vec<&[u8]> = tokens
-            .iter()
-            .map(|t| {
-                let slice = self.dictionary.get(t).unwrap().as_slice();
-                total_size += slice.len();
-                slice
-            })
-            .collect();
-
-        let mut buf = Vec::with_capacity(total_size);
-        chunks
-            .into_iter()
-            .for_each(|chunk| buf.extend_from_slice(chunk));
-
-        buf
-    }
-}
 
 /// Represents a materialized sequence of tokens and their byte slices.
 pub struct MaterializationMap<T: TokenType> {
     root: T,
     buf: Vec<u8>,
-    slices: AHashMap<T, Range<usize>>,
+    slices: HashMap<T, Range<usize>>,
 }
 
 impl<T: TokenType> MaterializationMap<T> {
@@ -201,7 +93,7 @@ impl<T: TokenType> MaterializationMap<T> {
     }
 
     /// Returns the slice map.
-    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
+    pub fn slices(&self) -> &HashMap<T, Range<usize>> {
         &self.slices
     }
 
@@ -234,6 +126,14 @@ pub struct CorpusDecoder<T: TokenType> {
 }
 
 impl<T: TokenType> CorpusDecoder<T> {
+    /// Creates a new corpus decoder.
+    pub fn new(
+        slices: HashMap<T, Range<usize>>,
+        corpus: Vec<u8>,
+    ) -> Self {
+        Self { slices, corpus }
+    }
+
     /// Creates a new corpus decoder.
     pub fn from_merge_map(merges: &AHashMap<Pair<T>, T>) -> Self {
         let token_to_pair: AHashMap<T, Pair<T>> =
@@ -288,7 +188,7 @@ impl<T: TokenType> CorpusDecoder<T> {
         slices.shrink_to_fit();
         corpus.shrink_to_fit();
 
-        Self { slices, corpus }
+        Self::new(slices, corpus)
     }
 
     /// Gets the corpus buffer.
@@ -302,45 +202,32 @@ impl<T: TokenType> CorpusDecoder<T> {
     }
 }
 
-impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
-    fn size_estimate(&self) -> (usize, usize) {
-        (
-            size_of::<hash_map::Entry<T, Range<usize>>>() * self.slices.len(),
-            self.corpus.len(),
-        )
-    }
-
+impl<'a, T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
     fn decode_to_bytes<S: AsRef<[T]>>(
         &self,
         tokens: S,
     ) -> Vec<u8> {
         let tokens = tokens.as_ref();
 
-        let mut total_size = 0;
-        let slices: Vec<Option<Range<usize>>> = tokens
-            .iter()
-            .map(|&t| {
-                if is_byte_token(t) {
-                    total_size += 1;
-                    return None;
-                }
-                let slice = self.slices.get(&t).expect("Token not found in slice map");
-
-                total_size += slice.end - slice.start;
-
-                Some(slice.clone())
-            })
-            .collect();
-
-        let mut buf = Vec::with_capacity(total_size);
-        for (token, slice) in tokens.iter().zip(slices.into_iter()) {
-            match slice {
-                Some(slice) => buf.extend_from_slice(&self.corpus[slice]),
-                None => buf.push(token.to_u8().unwrap()),
+        let mut buf = Vec::with_capacity(tokens.len() * 2);
+        for t in tokens {
+            if let Some(b) = t.to_u8() {
+                buf.push(b);
+            } else {
+                let range = self.slices.get(t).expect("Token not found in slice map");
+                let slice = &self.corpus[range.clone()];
+                buf.extend_from_slice(slice);
             }
         }
 
         buf
+    }
+
+    fn size_estimate(&self) -> (usize, usize) {
+        (
+            size_of::<hash_map::Entry<T, Range<usize>>>() * self.slices.len(),
+            self.corpus.len(),
+        )
     }
 }
 
@@ -349,21 +236,8 @@ mod tests {
     use super::*;
     use crate::{Tokenizer, TokenizerOptions};
     use compact_str::CompactString;
-
     #[test]
-    fn test_decoder() {
-        let merges = AHashMap::from([
-            (('h' as usize, 'e' as usize), 300),
-            (('l' as usize, 'l' as usize), 301),
-        ]);
-        let decoder = DictionaryDecoder::from_merge_map(&merges);
-
-        assert_eq!(decoder.decode_to_string(&[300, 301, 'o' as usize]), "hello");
-    }
-
-    #[test]
-    #[allow(unused)]
-    fn scratch() {
+    fn test_corpus_decoder() {
         type T = u16;
         type C = u32;
         type K = CompactString;
@@ -379,6 +253,12 @@ mod tests {
         let tokenizer: Tokenizer<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let cd = CorpusDecoder::from_merge_map(&tokenizer.merges);
+        let decoder = CorpusDecoder::from_merge_map(&tokenizer.merges);
+
+        for sample in samples {
+            let tokens = tokenizer.encode(sample);
+            let decoded = decoder.decode_to_string(&tokens);
+            assert_eq!(decoded, sample);
+        }
     }
 }
