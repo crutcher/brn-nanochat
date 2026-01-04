@@ -85,5 +85,62 @@ python -m scripts.tok_train --max_chars=2000000000
 Same as above:
 
 ```terminaloutput
+$ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode
+   Compiling bpetok v0.0.1 (/home/crutcher/git/brn-nanochat/crates/bpetok)
+   Compiling pull v0.0.0 (/home/crutcher/git/brn-nanochat/crates/pull)
+    Finished `release` profile [optimized] target(s) in 1.80s
+     Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode`
+Args {
+    shards: [
+        Slice {
+            start: 0,
+            end: Some(
+                8,
+            ),
+            step: 1,
+        },
+    ],
+    dataset_dir: "/media/Data/nanochat/dataset",
+    train_tokenizer: true,
+    vocab_size: 65536,
+    time_encode_decode: true,
+}
+DatasetCacheConfig {
+    cache_dir: "/media/Data/nanochat/dataset",
+    source: DatasetSource {
+        base_url: "https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle/resolve/main",
+        max_shard: 1822,
+        index_pad_width: 5,
+        shard_template: "shard_{index}.parquet",
+    },
+}
 
+Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
+- training_duration: 75.246018982s
+- vocab_size: 65536
+- size_estimate: 917613
+
+Timing Samples:
+- count: 8192
+- avg size: 4712
+
+Timing Encode:
+- avg (serial): 482.796µs
+- avg (rayon): 1.808474ms
+
+Timing Decode: GraphDecoder
+- decoder est bytes: 1566720
+- avg: 53.715µs
+
+Timing Decode: DictionaryDecoder
+- decoder est bytes: 1860233
+- avg: 19.177µs
+
+Timing Decode: CorpusDecoder
+- decoder est bytes: 1820714
+- avg: 19.056µs
+
+real    1m37.214s
+user    89m24.339s
+sys     27m57.492s
 ```
