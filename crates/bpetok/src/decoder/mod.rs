@@ -1,4 +1,27 @@
 //! # BPE Token Decoder
+//!
+//! The currently recommended decoder is [`CorpusDecoder`].
+//!
+//! ```terminaloutput
+//! Timing Samples:
+//! - count: 8192
+//! - avg size: 4712
+//!
+//! Timing Encode:
+//! - avg: 1.737349ms
+//!
+//! Timing Decode: GraphDecoder
+//! - decoder est bytes: 1566720
+//! - avg: 52.626µs
+//!
+//! Timing Decode: DictionaryDecoder
+//! - decoder est bytes: 1860233
+//! - avg: 17.907µs
+//!
+//! Timing Decode: CorpusDecoder
+//! - decoder est bytes: 1820714
+//! - avg: 17.698µs
+//! ```
 
 use crate::TokenType;
 pub mod corpus;
