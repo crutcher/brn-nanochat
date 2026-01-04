@@ -1,5 +1,6 @@
 //! # Dictionary Decoder
 
+use crate::data::TokenizerData;
 use crate::graph::GraphDecoder;
 use crate::{MergeMap, TokenDecoder, TokenType};
 use ahash::AHashMap;
@@ -29,6 +30,12 @@ impl<T: TokenType> DictionaryDecoder<T> {
             dictionary.insert(token, decoder.decode_to_bytes([token]));
         }
         Self::new(dictionary)
+    }
+
+    /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
+    #[tracing::instrument(skip(data))]
+    pub fn from_data(data: &TokenizerData<T>) -> DictionaryDecoder<T> {
+        Self::from_merge_map(&data.merge_map)
     }
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
@@ -74,8 +81,10 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Tokenizer;
+    use crate::builder::TokenizerBuilder;
+    use crate::data::TokenizerData;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::{Tokenizer, TokenizerOptions};
     use compact_str::CompactString;
 
     #[test]
@@ -84,7 +93,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerOptions::with_capacity(1000);
+        let options = TokenizerBuilder::with_capacity(1000);
 
         let samples = vec![
             "hello world",
@@ -92,10 +101,12 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let tokenizer: Tokenizer<T> =
+        let data: TokenizerData<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let decoder = DictionaryDecoder::from_merge_map(&tokenizer.merge_map);
+        let tokenizer = Tokenizer::new(data.clone());
+
+        let decoder = DictionaryDecoder::from_data(&data);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

@@ -1,6 +1,8 @@
 //! # BPE Tokenizer
 #![warn(missing_docs, unused)]
 
+pub mod builder;
+mod data;
 pub mod decoder;
 pub mod pair_index;
 pub mod tokenizer;
@@ -9,6 +11,8 @@ pub mod validators;
 pub mod word;
 pub mod word_count;
 
+pub use builder::*;
+pub use data::*;
 pub use decoder::*;
 pub use tokenizer::*;
 pub use types::*;

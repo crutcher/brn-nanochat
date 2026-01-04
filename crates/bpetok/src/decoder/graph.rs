@@ -1,5 +1,6 @@
 //! # Graph Decoder
 
+use crate::data::TokenizerData;
 use crate::{ExpansionMap, MergeMap, TokenDecoder, TokenType};
 use ahash::AHashMap;
 use std::collections::hash_map;
@@ -19,6 +20,12 @@ impl<T: TokenType> GraphDecoder<T> {
     pub fn new(mut graph: ExpansionMap<T>) -> Self {
         graph.shrink_to_fit();
         Self { graph }
+    }
+
+    /// Build a [`GraphDecoder`] from this [`TokenizerData`].
+    #[tracing::instrument(skip(data))]
+    pub fn from_data(data: &TokenizerData<T>) -> Self {
+        Self::from_merge_map(&data.merge_map)
     }
 
     /// Build a [`GraphDecoder`] from this [`Tokenizer`].
@@ -62,8 +69,9 @@ impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Tokenizer;
+    use crate::builder::TokenizerBuilder;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::{Tokenizer, TokenizerOptions};
     use compact_str::CompactString;
 
     #[test]
@@ -72,7 +80,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerOptions::with_capacity(1000);
+        let options = TokenizerBuilder::with_capacity(1000);
 
         let samples = vec![
             "hello world",
@@ -80,10 +88,10 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let tokenizer: Tokenizer<T> =
-            options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+        let data = options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+        let tokenizer = Tokenizer::new(data.clone());
 
-        let decoder = GraphDecoder::from_merge_map(&tokenizer.merge_map);
+        let decoder = GraphDecoder::from_data(&data);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

@@ -1,8 +1,9 @@
 use arrow::array::StringArray;
+use bpetok::builder::TokenizerBuilder;
 use bpetok::corpus::CorpusDecoder;
 use bpetok::dict::DictionaryDecoder;
 use bpetok::graph::GraphDecoder;
-use bpetok::{TokenDecoder, TokenType, Tokenizer, TokenizerOptions};
+use bpetok::{TokenDecoder, TokenType, Tokenizer, TokenizerData};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -65,7 +66,7 @@ fn main() -> anyhow::Result<()> {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerOptions::with_capacity(args.vocab_size);
+        let options = TokenizerBuilder::with_capacity(args.vocab_size);
 
         println!();
         println!("Training Tokenizer on shards: {:?}", shards);
@@ -96,10 +97,12 @@ fn main() -> anyhow::Result<()> {
                 })
         });
 
-        let tokenizer: Tokenizer<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
+        let data: TokenizerData<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
+        let tokenizer = Tokenizer::new(data.clone());
+
         let training_duration = std::time::Instant::now().duration_since(t0);
         println!("- training_duration: {:#?}", training_duration);
-        println!("- vocab_size: {:#?}", tokenizer.vocab_size());
+        println!("- vocab_size: {:#?}", tokenizer.max_token());
         println!("- size_estimate: {:#?}", tokenizer.size_estimate());
 
         if args.time_encode_decode {
@@ -157,7 +160,7 @@ fn main() -> anyhow::Result<()> {
             }
 
             println!();
-            let graph_decoder = GraphDecoder::from_merge_map(&tokenizer.merge_map);
+            let graph_decoder = GraphDecoder::from_data(&data);
             time_decoder("GraphDecoder", &graph_decoder, &token_groups);
 
             println!();
@@ -165,7 +168,7 @@ fn main() -> anyhow::Result<()> {
             time_decoder("DictionaryDecoder", &dict_decoder, &token_groups);
 
             println!();
-            let corpus_decoder = CorpusDecoder::from_merge_map(&tokenizer.merge_map);
+            let corpus_decoder = CorpusDecoder::from_data(&data);
             time_decoder("CorpusDecoder", &corpus_decoder, &token_groups);
         }
     }

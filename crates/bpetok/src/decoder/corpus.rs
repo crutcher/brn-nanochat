@@ -1,6 +1,7 @@
 //! # Corpus Decoder
 //! Experimental.
 
+use crate::data::TokenizerData;
 use crate::{ExpansionMap, MergeMap, TokenDecoder, TokenType, is_byte_token};
 use ahash::AHashMap;
 use std::collections::hash_map;
@@ -124,6 +125,12 @@ impl<T: TokenType> CorpusDecoder<T> {
     }
 
     /// Creates a new corpus decoder.
+    #[tracing::instrument(skip(data))]
+    pub fn from_data(data: &TokenizerData<T>) -> Self {
+        Self::from_merge_map(&data.merge_map)
+    }
+
+    /// Creates a new corpus decoder.
     #[tracing::instrument(skip(merge_map))]
     pub fn from_merge_map(merge_map: &MergeMap<T>) -> Self {
         let expansion_map: ExpansionMap<T> = merge_map
@@ -217,8 +224,9 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Tokenizer;
+    use crate::builder::TokenizerBuilder;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::{Tokenizer, TokenizerOptions};
     use compact_str::CompactString;
 
     #[test]
@@ -227,7 +235,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerOptions::with_capacity(1000);
+        let options = TokenizerBuilder::with_capacity(1000);
 
         let samples = vec![
             "hello world",
@@ -235,10 +243,11 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let tokenizer: Tokenizer<T> =
-            options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+        let data = options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let decoder = CorpusDecoder::from_merge_map(&tokenizer.merge_map);
+        let tokenizer = Tokenizer::new(data.clone());
+
+        let decoder = CorpusDecoder::from_data(&data);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
