@@ -1,6 +1,6 @@
 //! # Tokenizer Data
 
-use crate::{MergeMap, Pair, TokenType};
+use crate::types::{MergeMap, Pair, TokenType};
 
 /// Core data describing a BPE Tokenizer.
 #[derive(Debug, Clone)]

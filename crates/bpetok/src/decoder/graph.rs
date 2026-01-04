@@ -1,7 +1,8 @@
 //! # Graph Decoder
 
 use crate::data::TokenizerData;
-use crate::{ExpansionMap, MergeMap, TokenDecoder, TokenType};
+use crate::decoder::TokenDecoder;
+use crate::types::{ExpansionMap, MergeMap, TokenType};
 use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
@@ -69,8 +70,8 @@ impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TokenEncoder;
     use crate::builder::TokenizerBuilder;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
     use compact_str::CompactString;

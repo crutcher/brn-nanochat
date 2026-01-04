@@ -1,7 +1,9 @@
 //! # Tokenizer Structures
 
-use crate::TokenType;
 pub mod chunkpair;
+
+use crate::types::TokenType;
+pub use chunkpair::*;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType> {

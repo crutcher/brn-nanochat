@@ -23,7 +23,8 @@
 //! - avg: 17.698µs
 //! ```
 
-use crate::TokenType;
+use crate::types::TokenType;
+
 pub mod corpus;
 pub mod dict;
 pub mod graph;

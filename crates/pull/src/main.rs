@@ -1,10 +1,12 @@
 use arrow::array::StringArray;
 use bpetok::builder::TokenizerBuilder;
-use bpetok::corpus::CorpusDecoder;
-use bpetok::dict::DictionaryDecoder;
-use bpetok::graph::GraphDecoder;
-use bpetok::tokenizer::chunkpair::ChunkPairScanTokenizer;
-use bpetok::{TokenDecoder, TokenType, TokenizerData};
+use bpetok::data::TokenizerData;
+use bpetok::decoder::TokenDecoder;
+use bpetok::decoder::corpus::CorpusDecoder;
+use bpetok::decoder::dict::DictionaryDecoder;
+use bpetok::decoder::graph::GraphDecoder;
+use bpetok::tokenizer::ChunkPairScanTokenizer;
+use bpetok::types::TokenType;
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;

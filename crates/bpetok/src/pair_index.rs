@@ -1,6 +1,7 @@
 //! Pair Count / Word Indexing
-use crate::types::TokenType;
-use crate::{CountType, Pair, Word};
+
+use crate::types::{CountType, Pair, TokenType};
+use crate::word::Word;
 use ahash::{AHashMap, AHashSet};
 
 /// Options for building a [`PairIndex`].
@@ -167,6 +168,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::word::Word;
 
     #[test]
     fn test_pair_index_serial() {

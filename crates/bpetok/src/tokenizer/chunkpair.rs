@@ -1,8 +1,11 @@
 //! # Chunk Pair Scan Tokenizer
 
-use crate::corpus::CorpusDecoder;
+use crate::data::TokenizerData;
+use crate::decoder::TokenDecoder;
+use crate::decoder::corpus::CorpusDecoder;
+use crate::tokenizer::TokenEncoder;
+use crate::types::{Pair, TokenType};
 use crate::validators::expect_regex;
-use crate::{Pair, TokenDecoder, TokenEncoder, TokenType, TokenizerData};
 use fancy_regex::Regex;
 
 /// A Byte Pair Encoding / Decoding Tokenizer.
@@ -148,8 +151,10 @@ impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
 #[cfg(test)]
 mod tests {
     use crate::builder::TokenizerBuilder;
+    use crate::decoder::TokenDecoder;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
-    use crate::{TokenDecoder, TokenEncoder, types};
+    use crate::types;
     use compact_str::CompactString;
 
     #[test]

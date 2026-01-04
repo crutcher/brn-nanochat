@@ -2,12 +2,11 @@
 
 use crate::data::TokenizerData;
 use crate::pair_index::{PairIndex, PairIndexOptions};
+use crate::types::{CountType, MergeMap, Pair, StringChunkType, TokenType};
 use crate::validators::U8_SIZE;
+use crate::word::Word;
 use crate::word_count::{WordCounter, WordCounterOptions};
-use crate::{
-    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeMap, Pair, StringChunkType, TokenType, Word,
-    validators,
-};
+use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, validators};
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use std::cmp::Ordering;
@@ -321,8 +320,10 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decoder::TokenDecoder;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
-    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, TokenDecoder, TokenEncoder, types};
+    use crate::types;
     use compact_str::CompactString;
 
     #[test]

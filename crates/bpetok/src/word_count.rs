@@ -1,6 +1,7 @@
 //! # Text Splitting
 
-use crate::{CountType, StringChunkType, TokenType, Word};
+use crate::types::{CountType, StringChunkType, TokenType};
+use crate::word::Word;
 use ahash::AHashMap;
 use std::fmt::Debug;
 
@@ -245,6 +246,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{CountType, StringChunkType};
+    use crate::word::Word;
     use compact_str::CompactString;
 
     const PATTERN: &str = r"\w+";

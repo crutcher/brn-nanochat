@@ -1,8 +1,9 @@
 //! # Dictionary Decoder
 
 use crate::data::TokenizerData;
-use crate::graph::GraphDecoder;
-use crate::{MergeMap, TokenDecoder, TokenType};
+use crate::decoder::TokenDecoder;
+use crate::decoder::graph::GraphDecoder;
+use crate::types::{MergeMap, TokenType};
 use ahash::AHashMap;
 use std::collections::hash_map;
 
@@ -81,9 +82,9 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TokenEncoder;
     use crate::builder::TokenizerBuilder;
     use crate::data::TokenizerData;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
     use compact_str::CompactString;

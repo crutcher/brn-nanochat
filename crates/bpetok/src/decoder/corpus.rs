@@ -2,7 +2,8 @@
 //! Experimental.
 
 use crate::data::TokenizerData;
-use crate::{ExpansionMap, MergeMap, TokenDecoder, TokenType, is_byte_token};
+use crate::decoder::TokenDecoder;
+use crate::types::{ExpansionMap, MergeMap, TokenType, is_byte_token};
 use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
@@ -224,8 +225,8 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TokenEncoder;
     use crate::builder::TokenizerBuilder;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
     use compact_str::CompactString;
