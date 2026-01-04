@@ -321,7 +321,8 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, TokenDecoder, Tokenizer, types};
+    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
+    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, TokenDecoder, TokenEncoder, types};
     use compact_str::CompactString;
 
     #[test]
@@ -380,7 +381,7 @@ mod tests {
         let data: TokenizerData<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let tokenizer = Tokenizer::new(data);
+        let tokenizer = ChunkPairScanTokenizer::new(data);
 
         // compile time checks.
         types::check_is_send(&tokenizer);

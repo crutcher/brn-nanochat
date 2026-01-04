@@ -18,8 +18,13 @@ impl<T: TokenType> TokenizerData<T> {
         self.merge_map.capacity() * std::mem::size_of::<Pair<T>>() + self.pattern.len()
     }
 
+    /// Returns an iterator over the non-byte tokens in this map.
+    pub fn pair_tokens(&self) -> impl Iterator<Item = T> {
+        self.merge_map.values().copied()
+    }
+
     /// Gets the highest ranked token.
     pub fn max_token(&self) -> T {
-        self.merge_map.values().max().unwrap().to_owned()
+        self.pair_tokens().max().unwrap()
     }
 }

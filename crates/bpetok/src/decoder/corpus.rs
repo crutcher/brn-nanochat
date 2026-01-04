@@ -224,8 +224,9 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Tokenizer;
+    use crate::TokenEncoder;
     use crate::builder::TokenizerBuilder;
+    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
     use compact_str::CompactString;
 
@@ -245,7 +246,7 @@ mod tests {
 
         let data = options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let tokenizer = Tokenizer::new(data.clone());
+        let tokenizer = ChunkPairScanTokenizer::new(data.clone());
 
         let decoder = CorpusDecoder::from_data(&data);
         check_is_send(&decoder);

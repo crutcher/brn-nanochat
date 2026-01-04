@@ -3,7 +3,8 @@ use bpetok::builder::TokenizerBuilder;
 use bpetok::corpus::CorpusDecoder;
 use bpetok::dict::DictionaryDecoder;
 use bpetok::graph::GraphDecoder;
-use bpetok::{TokenDecoder, TokenType, Tokenizer, TokenizerData};
+use bpetok::tokenizer::chunkpair::ChunkPairScanTokenizer;
+use bpetok::{TokenDecoder, TokenType, TokenizerData};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -98,7 +99,7 @@ fn main() -> anyhow::Result<()> {
         });
 
         let data: TokenizerData<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
-        let tokenizer = Tokenizer::new(data.clone());
+        let tokenizer = ChunkPairScanTokenizer::new(data.clone());
 
         let training_duration = std::time::Instant::now().duration_since(t0);
         println!("- training_duration: {:#?}", training_duration);

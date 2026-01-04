@@ -81,9 +81,10 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Tokenizer;
+    use crate::TokenEncoder;
     use crate::builder::TokenizerBuilder;
     use crate::data::TokenizerData;
+    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
     use compact_str::CompactString;
 
@@ -104,7 +105,7 @@ mod tests {
         let data: TokenizerData<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let tokenizer = Tokenizer::new(data.clone());
+        let tokenizer = ChunkPairScanTokenizer::new(data.clone());
 
         let decoder = DictionaryDecoder::from_data(&data);
         check_is_send(&decoder);
