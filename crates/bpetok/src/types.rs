@@ -87,3 +87,11 @@ mod tests {
         assert!(!is_byte_token(256_u32));
     }
 }
+
+/// Check if a type is `Send`.
+#[cfg(test)]
+pub(crate) fn check_is_send<S: Send>(_: S) {}
+
+#[cfg(test)]
+/// Check if a type is `Sync`.
+pub(crate) fn check_is_sync<S: Sync>(_: S) {}

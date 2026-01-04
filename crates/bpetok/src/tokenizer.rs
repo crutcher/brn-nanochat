@@ -1,7 +1,6 @@
 //! # Tokenizer Structures
 
 use crate::decoder::corpus::CorpusDecoder;
-use crate::decoder::dict::DictionaryDecoder;
 use crate::pair_index::{PairIndex, PairIndexOptions};
 use crate::validators::U8_SIZE;
 use crate::word_count::{WordCounter, WordCounterOptions};
@@ -264,7 +263,7 @@ impl TokenizerOptions {
         log::info!("Finished training: {} merges completed", merges_done);
 
         Tokenizer {
-            merges,
+            merge_map: merges,
             pattern: self.pattern,
             parallel: self.parallel,
             compiled_pattern,
@@ -325,7 +324,7 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 #[derive(Debug)]
 pub struct Tokenizer<T: TokenType> {
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
-    pub merges: AHashMap<Pair<T>, T>,
+    pub merge_map: AHashMap<Pair<T>, T>,
 
     /// The regex pattern used for text splitting.
     pub pattern: String,
@@ -340,12 +339,12 @@ pub struct Tokenizer<T: TokenType> {
 impl<T: TokenType> Tokenizer<T> {
     /// Vocab Size.
     pub fn vocab_size(&self) -> usize {
-        U8_SIZE + self.merges.len()
+        U8_SIZE + self.merge_map.len()
     }
 
     /// Memory usage estimate in bytes.
     pub fn size_estimate(&self) -> usize {
-        self.merges.capacity() * std::mem::size_of::<Pair<T>>() + self.pattern.len()
+        self.merge_map.capacity() * std::mem::size_of::<Pair<T>>() + self.pattern.len()
     }
 
     /// Encode a chunk of text into token IDs.
@@ -363,7 +362,7 @@ impl<T: TokenType> Tokenizer<T> {
 
             for i in 0..chunk_tokens.len() - 1 {
                 let pair: Pair<T> = (chunk_tokens[i], chunk_tokens[i + 1]);
-                if let Some(&new_id) = self.merges.get(&pair)
+                if let Some(&new_id) = self.merge_map.get(&pair)
                     && (best_pair.is_none() || new_id < best_pair.unwrap().2)
                 {
                     best_pair = Some((i, pair, new_id));
@@ -451,28 +450,15 @@ impl<T: TokenType> Tokenizer<T> {
 
     /// Build a [`TokenDecoder`] from this [`Tokenizer`].
     pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        self.to_dictionary_decoder()
-    }
-
-    /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    pub fn to_dictionary_decoder(&self) -> DictionaryDecoder<T> {
-        DictionaryDecoder::from_merge_map(&self.merges)
-    }
-
-    /// Build a [`CorpusDecoder`] from this [`Tokenizer`].
-    pub fn to_corpus_decoder(&self) -> CorpusDecoder<T> {
-        CorpusDecoder::from_merge_map(&self.merges)
+        CorpusDecoder::from_merge_map(&self.merge_map)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, TokenDecoder};
+    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, TokenDecoder, types};
     use compact_str::CompactString;
-
-    fn check_is_send<S: Send>(_: S) {}
-    fn check_is_sync<S: Sync>(_: S) {}
 
     #[test]
     fn test_tokenizer_options() {
@@ -531,29 +517,19 @@ mod tests {
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
         // compile time checks.
-        check_is_send(&tokenizer);
-        check_is_sync(&tokenizer);
+        types::check_is_send(&tokenizer);
+        types::check_is_sync(&tokenizer);
 
         assert_eq!(tokenizer.vocab_size(), 293);
 
         let decoder = tokenizer.to_decoder();
-        let dict_decoder = tokenizer.to_dictionary_decoder();
-        let corpus_decoder = tokenizer.to_corpus_decoder();
 
         // compile time checks.
-        check_is_send(&decoder);
-        check_is_sync(&decoder);
+        types::check_is_send(&decoder);
+        types::check_is_sync(&decoder);
 
         for sample in samples {
             assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample);
-            assert_eq!(
-                dict_decoder.decode_to_string(tokenizer.encode(sample)),
-                sample
-            );
-            assert_eq!(
-                corpus_decoder.decode_to_string(tokenizer.encode(sample)),
-                sample
-            );
         }
     }
 

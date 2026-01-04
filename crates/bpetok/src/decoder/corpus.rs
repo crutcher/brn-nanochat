@@ -92,19 +92,14 @@ impl<T: TokenType> MaterializationMap<T> {
         &self.buf
     }
 
-    /// Returns the slice map.
-    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
-        &self.slices
-    }
-
-    /// Returns an iterator over the tokens in this map.
-    pub fn token_iter(&self) -> impl Iterator<Item = T> {
+    /// Returns an iterator over the non-byte tokens in this map.
+    pub fn tokens(&self) -> impl Iterator<Item = T> {
         self.slices.keys().copied()
     }
 
-    /// Returns a list of all tokens in this map.
-    pub fn tokens(&self) -> Vec<T> {
-        self.token_iter().collect()
+    /// Returns the slice map.
+    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
+        &self.slices
     }
 
     /// Returns the byte slice for the given token, if it exists.
@@ -164,7 +159,7 @@ impl<T: TokenType> CorpusDecoder<T> {
             });
             total_size += mmap.buf.len();
             let idx = mmaps.len();
-            mmap.token_iter().for_each(|t| {
+            mmap.tokens().for_each(|t| {
                 mmap_index.insert(t, idx);
             });
             mmaps.push(mmap);
@@ -203,6 +198,10 @@ impl<T: TokenType> CorpusDecoder<T> {
 }
 
 impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
+    fn pair_tokens(&self) -> impl Iterator<Item = T> {
+        self.slices.keys().copied()
+    }
+
     fn decode_to_bytes<S: AsRef<[T]>>(
         &self,
         tokens: S,
@@ -223,19 +222,18 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
         buf
     }
 
-    fn size_estimate(&self) -> (usize, usize) {
-        (
-            size_of::<hash_map::Entry<T, Range<usize>>>() * self.slices.len(),
-            self.corpus.len(),
-        )
+    fn size_estimate(&self) -> usize {
+        size_of::<hash_map::Entry<T, Range<usize>>>() * self.slices.len() + self.corpus.len()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{check_is_send, check_is_sync};
     use crate::{Tokenizer, TokenizerOptions};
     use compact_str::CompactString;
+
     #[test]
     fn test_corpus_decoder() {
         type T = u16;
@@ -253,7 +251,9 @@ mod tests {
         let tokenizer: Tokenizer<T> =
             options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
 
-        let decoder = CorpusDecoder::from_merge_map(&tokenizer.merges);
+        let decoder = CorpusDecoder::from_merge_map(&tokenizer.merge_map);
+        check_is_send(&decoder);
+        check_is_sync(&decoder);
 
         for sample in samples {
             let tokens = tokenizer.encode(sample);

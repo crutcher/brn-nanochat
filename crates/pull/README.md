@@ -86,11 +86,9 @@ Same as above:
 
 ```terminaloutput
 # Build the `pull` binary; and pre-download the first 8 shards of the dataset.
-$ cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8
 $ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode
-   Compiling bpetok v0.0.1 (/home/crutcher/git/brn-nanochat/crates/bpetok)
    Compiling pull v0.0.0 (/home/crutcher/git/brn-nanochat/crates/pull)
-    Finished `release` profile [optimized] target(s) in 1.61s
+    Finished `release` profile [optimized] target(s) in 1.43s
      Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode`
 Args {
     shards: [
@@ -118,34 +116,30 @@ DatasetCacheConfig {
 }
 
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
-- training_duration: 72.612455275s
+- training_duration: 73.228821465s
 - vocab_size: 65536
 - size_estimate: 917613
 
-Training DictionaryDecoder:
-- training_duration: 9.944697ms
-- size_estimate: (
-    1572864,
-    293769,
-)
-
-Training CorpusDecoder:
-- training_duration: 24.811911ms
-- size_estimate: (
-    1566720,
-    253994,
-)
+Timing Samples:
+- count: 8192
+- avg size: 4712
 
 Timing Encode:
-- sample count: 1024
-- avg sample size: 4108
-- encode avg duration: 4.391576ms
+- avg: 4.089958ms
 
-DictionaryDecoder decode_to_string avg duration: 28.463µs
+Timing Decode: GraphDecoder
+- decoder est bytes: 1566720
+- avg: 55.168µs
 
-CorpusDecoder decode_to_string avg duration: 23.298µs
+Timing Decode: DictionaryDecoder
+- decoder est bytes: 1860233
+- avg: 19.78µs
 
-real    1m19.331s
-user    80m31.884s
-sys     25m26.822s
+Timing Decode: CorpusDecoder
+- decoder est bytes: 1820714
+- avg: 18.369µs
+
+real    1m49.558s
+user    84m55.163s
+sys     28m42.857s
 ```

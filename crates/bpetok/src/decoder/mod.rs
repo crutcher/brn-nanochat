@@ -3,9 +3,18 @@
 use crate::TokenType;
 pub mod corpus;
 pub mod dict;
+pub mod graph;
 
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType> {
+    /// Returns an iterator over the non-byte tokens in this map.
+    fn pair_tokens(&self) -> impl Iterator<Item = T>;
+
+    /// Returns the maximum token id in this decoder.
+    fn max_token(&self) -> T {
+        self.pair_tokens().max().unwrap()
+    }
+
     /// Decodes tokens into bytes.
     fn decode_to_bytes<S: AsRef<[T]>>(
         &self,
@@ -24,5 +33,5 @@ pub trait TokenDecoder<T: TokenType> {
     /// Estimates the memory usage of this decoder.
     ///
     /// Returns a (metadata, buffers) pair.
-    fn size_estimate(&self) -> (usize, usize);
+    fn size_estimate(&self) -> usize;
 }

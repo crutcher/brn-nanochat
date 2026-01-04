@@ -1,5 +1,8 @@
 use arrow::array::StringArray;
-use bpetok::{TokenDecoder, Tokenizer, TokenizerOptions};
+use bpetok::corpus::CorpusDecoder;
+use bpetok::dict::DictionaryDecoder;
+use bpetok::graph::GraphDecoder;
+use bpetok::{TokenDecoder, TokenType, Tokenizer, TokenizerOptions};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -94,114 +97,87 @@ fn main() -> anyhow::Result<()> {
         });
 
         let tokenizer: Tokenizer<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
-        let t1 = std::time::Instant::now();
-        let training_duration = t1.duration_since(t0);
+        let training_duration = std::time::Instant::now().duration_since(t0);
         println!("- training_duration: {:#?}", training_duration);
         println!("- vocab_size: {:#?}", tokenizer.vocab_size());
         println!("- size_estimate: {:#?}", tokenizer.size_estimate());
 
-        println!();
-        println!("Training DictionaryDecoder:");
-        let t0 = std::time::Instant::now();
-        let dict_decoder = tokenizer.to_dictionary_decoder();
-        let t1 = std::time::Instant::now();
-        let training_duration = t1.duration_since(t0);
-        println!("- training_duration: {:#?}", training_duration);
-        println!("- size_estimate: {:#?}", dict_decoder.size_estimate());
-
-        println!();
-        println!("Training CorpusDecoder:");
-        let t0 = std::time::Instant::now();
-        let corpus_decoder = tokenizer.to_corpus_decoder();
-        let t1 = std::time::Instant::now();
-        let training_duration = t1.duration_since(t0);
-        println!("- training_duration: {:#?}", training_duration);
-        println!("- size_estimate: {:#?}", corpus_decoder.size_estimate());
-
         if args.time_encode_decode {
             // TODO: `indicatif` for optional progress bar for users waiting on this.
 
-            // Read the first batch of the first shard for timing.
-            let batch = cache.read_cached_batches(shards[0])?.next().unwrap()?;
-            let column = batch
-                .column_by_name("text")
-                .expect("failed to find 'text' column in batch")
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
+            let mut samples = Vec::new();
+            let num_batches = 8;
+            for batch in cache.read_cached_batches(shards[0])?.take(num_batches) {
+                let batch = batch?;
+                let column = batch
+                    .column_by_name("text")
+                    .expect("failed to find 'text' column in batch")
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap();
 
-            let mut token_groups: Vec<Vec<T>> = Vec::new();
-            let mut sample_sizes = Vec::new();
-            let mut encode_durations = Vec::new();
+                for val in column {
+                    let val = val.unwrap().to_string();
+                    samples.push(val);
+                }
+            }
+            println!();
+            println!("Timing Samples:");
+            let count = samples.len();
+            println!("- count: {}", count);
+            let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / count;
+            println!("- avg size: {avg_size}");
 
             println!();
             println!("Timing Encode:");
-            for sample in column.iter() {
-                let sample = sample.unwrap().to_string();
-                sample_sizes.push(sample.len());
-
+            let mut token_groups = Vec::with_capacity(count);
+            let times_ns = samples.iter().map(|sample| {
                 let t0 = std::time::Instant::now();
-                token_groups.push(tokenizer.encode::<&str>(&sample));
+                let tokens = tokenizer.encode::<&str>(sample);
                 let t1 = std::time::Instant::now();
-                let duration = t1.duration_since(t0);
-                encode_durations.push(duration);
-            }
-            let count = encode_durations.len();
-            println!("- sample count: {}", count);
-            let avg_sample_size = sample_sizes.iter().sum::<usize>() / count;
-            println!("- avg sample size: {}", avg_sample_size);
 
-            let encode_avg = Duration::from_nanos(
-                encode_durations
-                    .into_iter()
-                    .map(|d| d.as_nanos() as u64 / count as u64)
-                    .sum::<u64>(),
-            );
-            println!("- encode avg duration: {:#?}", encode_avg);
+                token_groups.push(tokens);
 
-            // Batch the tokens separately to try and get some cache-locality.
-            let mut decode_durations = Vec::new();
-            for tokens in &token_groups {
-                let t0 = std::time::Instant::now();
-                let _ = dict_decoder.decode_to_string(tokens);
-                let t1 = std::time::Instant::now();
-                let duration = t1.duration_since(t0);
-                decode_durations.push(duration);
-            }
-            let decode_avg = Duration::from_nanos(
-                decode_durations
-                    .into_iter()
-                    .map(|d| d.as_nanos() as u64 / count as u64)
-                    .sum::<u64>(),
-            );
+                t1.duration_since(t0).as_nanos() as u64
+            });
+            let avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
+            println!("- avg: {:#?}", avg);
+
             println!();
-            println!(
-                "DictionaryDecoder decode_to_string avg duration: {:#?}",
-                decode_avg
-            );
+            let graph_decoder = GraphDecoder::from_merge_map(&tokenizer.merge_map);
+            time_decoder("GraphDecoder", &graph_decoder, &token_groups);
 
-            // Batch the tokens separately to try and get some cache-locality.
-            let mut decode_durations = Vec::new();
-            for tokens in &token_groups {
-                let t0 = std::time::Instant::now();
-                let _ = corpus_decoder.decode_to_string(tokens);
-                let t1 = std::time::Instant::now();
-                let duration = t1.duration_since(t0);
-                decode_durations.push(duration);
-            }
-            let decode_avg = Duration::from_nanos(
-                decode_durations
-                    .into_iter()
-                    .map(|d| d.as_nanos() as u64 / count as u64)
-                    .sum::<u64>(),
-            );
             println!();
-            println!(
-                "CorpusDecoder decode_to_string avg duration: {:#?}",
-                decode_avg
-            );
+            let dict_decoder = DictionaryDecoder::from_tokenizer(&graph_decoder);
+            time_decoder("DictionaryDecoder", &dict_decoder, &token_groups);
+
+            println!();
+            let corpus_decoder = CorpusDecoder::from_merge_map(&tokenizer.merge_map);
+            time_decoder("CorpusDecoder", &corpus_decoder, &token_groups);
         }
     }
 
     Ok(())
+}
+
+fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
+    name: &str,
+    decoder: &D,
+    token_groups: &[Vec<T>],
+) {
+    let count = token_groups.len();
+    println!("Timing Decode: {name}");
+    println!("- decoder est bytes: {}", decoder.size_estimate());
+
+    let times_ns = token_groups.iter().map(|tokens| {
+        let t0 = std::time::Instant::now();
+        let _ = decoder.decode_to_string(tokens);
+        let t1 = std::time::Instant::now();
+        let delta = t1.duration_since(t0);
+
+        delta.as_nanos() as u64
+    });
+
+    let avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
+    println!("- avg: {avg:#?}");
 }
