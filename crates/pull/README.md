@@ -85,10 +85,10 @@ python -m scripts.tok_train --max_chars=2000000000
 Same as above:
 
 ```terminaloutput
-# Build the `pull` binary; and pre-download the first 8 shards of the dataset.
 $ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode
+   Compiling bpetok v0.0.1 (/home/crutcher/git/brn-nanochat/crates/bpetok)
    Compiling pull v0.0.0 (/home/crutcher/git/brn-nanochat/crates/pull)
-    Finished `release` profile [optimized] target(s) in 1.43s
+    Finished `release` profile [optimized] target(s) in 1.83s
      Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode`
 Args {
     shards: [
@@ -116,7 +116,7 @@ DatasetCacheConfig {
 }
 
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
-- training_duration: 73.228821465s
+- training_duration: 73.264899412s
 - vocab_size: 65536
 - size_estimate: 917613
 
@@ -125,21 +125,21 @@ Timing Samples:
 - avg size: 4712
 
 Timing Encode:
-- avg: 4.089958ms
+- avg: 1.737349ms
 
 Timing Decode: GraphDecoder
 - decoder est bytes: 1566720
-- avg: 55.168µs
+- avg: 52.626µs
 
 Timing Decode: DictionaryDecoder
 - decoder est bytes: 1860233
-- avg: 19.78µs
+- avg: 17.907µs
 
 Timing Decode: CorpusDecoder
 - decoder est bytes: 1820714
-- avg: 18.369µs
+- avg: 17.698µs
 
-real    1m49.558s
-user    84m55.163s
-sys     28m42.857s
+real    1m30.722s
+user    86m59.622s
+sys     26m41.571s
 ```

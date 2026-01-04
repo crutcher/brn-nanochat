@@ -56,13 +56,12 @@ impl TokenizerOptions {
     }
 
     /// Sets the regex pattern used for text splitting.
-    pub fn with_pattern(
+    pub fn with_pattern<P: AsRef<str>>(
         self,
-        pattern: impl Into<String>,
+        pattern: P,
     ) -> Self {
-        let pattern = pattern.into();
+        let pattern = pattern.as_ref().to_string();
         validators::expect_regex(&pattern);
-
         Self { pattern, ..self }
     }
 
@@ -348,10 +347,12 @@ impl<T: TokenType> Tokenizer<T> {
     }
 
     /// Encode a chunk of text into token IDs.
-    pub fn encode_chunk(
+    pub fn encode_chunk<S: AsRef<str>>(
         &self,
-        chunk: &str,
+        chunk: S,
     ) -> Vec<T> {
+        let chunk = chunk.as_ref();
+
         // Convert chunk to bytes then to tokens.
         let mut chunk_tokens: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();
 
@@ -398,6 +399,15 @@ impl<T: TokenType> Tokenizer<T> {
         }
     }
 
+    fn split_groups<'a>(
+        &'a self,
+        text: &'a str,
+    ) -> impl Iterator<Item = &'a str> + 'a {
+        self.compiled_pattern
+            .find_iter(text)
+            .map(|m| m.unwrap().as_str())
+    }
+
     /// Encode a string into token IDs in parallel.
     ///
     /// Uses parallel processing, ignoring the `parallel` flag.
@@ -407,27 +417,11 @@ impl<T: TokenType> Tokenizer<T> {
     ) -> Vec<T> {
         use rayon::prelude::*;
 
-        let text = text.as_ref();
-
-        let mut chunks = self
-            .compiled_pattern
-            .find_iter(text)
-            .enumerate()
-            .par_bridge()
-            .map(|(i, m)| {
-                let chunk = m.expect("regex match failed").as_str();
-                (i, self.encode_chunk(chunk))
-            })
-            .collect::<Vec<_>>();
-
-        chunks.sort_by_key(|(i, _)| *i);
-
-        let total_size = chunks.iter().map(|(_, c)| c.len()).sum::<usize>();
-        let mut all_tokens: Vec<T> = Vec::with_capacity(total_size);
-        for (_, c) in chunks {
-            all_tokens.extend(c);
-        }
-        all_tokens
+        self.split_groups(text.as_ref())
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .flat_map(|chunk| self.encode_chunk(chunk))
+            .collect()
     }
 
     /// Encode a string into token IDs serially.
@@ -437,14 +431,8 @@ impl<T: TokenType> Tokenizer<T> {
         &self,
         text: S,
     ) -> Vec<T> {
-        let text = text.as_ref();
-
-        self.compiled_pattern
-            .find_iter(text)
-            .flat_map(|m| {
-                let chunk = m.expect("regex match failed").as_str();
-                self.encode_chunk(chunk)
-            })
+        self.split_groups(text.as_ref())
+            .flat_map(|chunk| self.encode_chunk(chunk))
             .collect()
     }
 
