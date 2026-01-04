@@ -3,7 +3,7 @@ use crate::types::TokenType;
 use fancy_regex::Regex;
 
 /// The size of the u8 space.
-pub const U8_SIZE: usize = 256;
+pub const U8_SIZE: usize = u8::MAX as usize + 1;
 
 /// Validates and returns the vocabulary size, ensuring it's at least the size of the u8 space.
 pub fn try_vocab_size<T: TokenType>(vocab_size: usize) -> anyhow::Result<usize> {
