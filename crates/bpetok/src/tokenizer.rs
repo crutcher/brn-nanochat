@@ -393,11 +393,10 @@ impl<T: TokenType> Tokenizer<T> {
             #[cfg(not(feature = "rayon"))]
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
 
-            #[cfg(feature = "rayon")]
-            self.encode_rayon(text)
-        } else {
-            self.encode_serial(text)
+            // We just fall back to serial, because rayon is currently slower.
         }
+
+        self.encode_serial(text)
     }
 
     fn split_groups<'a>(
@@ -418,6 +417,8 @@ impl<T: TokenType> Tokenizer<T> {
         text: S,
     ) -> Vec<T> {
         use rayon::prelude::*;
+
+        // This is significantly worse?
 
         self.split_groups(text.as_ref())
             .collect::<Vec<_>>()

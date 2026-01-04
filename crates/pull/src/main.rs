@@ -131,17 +131,30 @@ fn main() -> anyhow::Result<()> {
             println!();
             println!("Timing Encode:");
             let mut token_groups = Vec::with_capacity(count);
-            let times_ns = samples.iter().map(|sample| {
-                let t0 = std::time::Instant::now();
-                let tokens = tokenizer.encode::<&str>(sample);
-                let t1 = std::time::Instant::now();
+            {
+                let times_ns = samples.iter().map(|sample| {
+                    let t0 = std::time::Instant::now();
+                    let tokens = tokenizer.encode_serial::<&str>(sample);
+                    let t1 = std::time::Instant::now();
 
-                token_groups.push(tokens);
+                    token_groups.push(tokens);
 
-                t1.duration_since(t0).as_nanos() as u64
-            });
-            let avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
-            println!("- avg: {:#?}", avg);
+                    t1.duration_since(t0).as_nanos() as u64
+                });
+                let avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
+                println!("- avg (serial): {:#?}", avg);
+            }
+            {
+                let times_ns = samples.iter().map(|sample| {
+                    let t0 = std::time::Instant::now();
+                    let _ = tokenizer.encode_rayon::<&str>(sample);
+                    let t1 = std::time::Instant::now();
+
+                    t1.duration_since(t0).as_nanos() as u64
+                });
+                let avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
+                println!("- avg (rayon): {:#?}", avg);
+            }
 
             println!();
             let graph_decoder = GraphDecoder::from_merge_map(&tokenizer.merge_map);
