@@ -411,6 +411,7 @@ impl<T: TokenType> Tokenizer<T> {
     /// Encode a string into token IDs in parallel.
     ///
     /// Uses parallel processing, ignoring the `parallel` flag.
+    #[cfg(feature = "rayon")]
     pub fn encode_rayon<S: AsRef<str>>(
         &self,
         text: S,
