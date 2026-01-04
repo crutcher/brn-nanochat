@@ -32,7 +32,7 @@ impl VocabTrainer {
     pub fn with_capacity(vocab_size: usize) -> Self {
         Self {
             pattern: DEFAULT_PATTERN.to_string(),
-            vocab_size: validators::expect_vocab_size(vocab_size),
+            vocab_size,
             parallel: DEFAULT_PARALLEL,
         }
     }
@@ -47,10 +47,7 @@ impl VocabTrainer {
         self,
         vocab_size: usize,
     ) -> Self {
-        Self {
-            vocab_size: validators::expect_vocab_size(vocab_size),
-            ..self
-        }
+        Self { vocab_size, ..self }
     }
 
     /// Sets the regex pattern used for text splitting.
@@ -76,7 +73,6 @@ impl VocabTrainer {
 
     /// Validates the options.
     pub fn validate(&self) -> anyhow::Result<()> {
-        validators::try_vocab_size(self.vocab_size)?;
         validators::try_regex(&self.pattern)?;
         validators::try_parallel(self.parallel)?;
         Ok(())
@@ -135,7 +131,7 @@ impl VocabTrainer {
         T: TokenType,
         C: CountType,
     {
-        validators::expect_vocab_size(self.vocab_size);
+        validators::expect_vocab_size::<T>(self.vocab_size);
 
         let num_merges = self.vocab_size - U8_SIZE;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
@@ -322,7 +318,6 @@ mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
-    use crate::validators::U8_SIZE;
     use crate::vocab::data::TokenVocabData;
     use crate::vocab::training::trainer::{MergeJob, VocabTrainer};
     use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, types};
@@ -344,12 +339,6 @@ mod tests {
         assert_eq!(options.vocab_size, 2000);
         assert_eq!(options.pattern, r"\S+");
         assert_eq!(options.parallel, true);
-    }
-
-    #[test]
-    #[should_panic(expected = "vocab_size (255) must be >= 256 (the size of the u8 space)")]
-    fn test_tokenizer_options_vocab_size_too_small() {
-        let _ = VocabTrainer::with_capacity(U8_SIZE - 1);
     }
 
     #[test]
