@@ -20,9 +20,6 @@ pub const GPT4_PATTERN: &str = r"'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+
 /// Default regex pattern for splitting text.
 pub const DEFAULT_PATTERN: &str = GPT4_PATTERN;
 
-/// Default number of reserved tokens
-pub const DEFAULT_NUM_RESERVED: usize = 256;
-
 /// The default value for [`PairIndexOptions::parallel`].
 #[cfg(feature = "rayon")]
 pub const DEFAULT_PARALLEL: bool = true;
