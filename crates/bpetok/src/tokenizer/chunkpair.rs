@@ -6,8 +6,36 @@ use crate::decoder::corpus::CorpusDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::{Pair, TokenType};
 use crate::validators::expect_regex;
+use crate::{DEFAULT_PARALLEL, validators};
 use fancy_regex::Regex;
 use std::sync::Arc;
+
+/// A builder for [`Tokenizer`]s.
+#[derive(Debug, Clone)]
+pub struct ChunkPairScanTokenizerOptions {
+    /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
+    pub parallel: bool,
+}
+
+impl ChunkPairScanTokenizerOptions {
+    /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
+    pub fn with_parallel(
+        self,
+        parallel: bool,
+    ) -> Self {
+        Self {
+            parallel: validators::expect_parallel(parallel),
+        }
+    }
+}
+
+impl Default for ChunkPairScanTokenizerOptions {
+    fn default() -> Self {
+        Self {
+            parallel: DEFAULT_PARALLEL,
+        }
+    }
+}
 
 /// A Byte Pair Encoding / Decoding Tokenizer.
 #[derive(Debug)]
@@ -15,8 +43,8 @@ pub struct ChunkPairScanTokenizer<T: TokenType> {
     /// Core data describing a BPE Tokenizer.
     pub data: Arc<TokenizerData<T>>,
 
-    /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
-    pub parallel: bool,
+    /// Tokenizer options.
+    pub options: ChunkPairScanTokenizerOptions,
 
     /// The compiled regex pattern.
     pub compiled_pattern: Regex,
@@ -24,15 +52,23 @@ pub struct ChunkPairScanTokenizer<T: TokenType> {
 
 impl<T: TokenType> ChunkPairScanTokenizer<T> {
     /// Construct a new Tokenizer.
-    pub fn new<D>(data: D) -> Self
+    pub fn new<D>(
+        data: D,
+        options: ChunkPairScanTokenizerOptions,
+    ) -> Self
     where
         D: Into<Arc<TokenizerData<T>>>,
     {
+        #[cfg(not(feature = "rayon"))]
+        if options.parallel {
+            panic!("Parallel processing requires the `rayon` feature to be enabled.");
+        }
+
         let data = data.into();
         let compiled_pattern = expect_regex(&data.pattern);
         Self {
             data,
-            parallel: false,
+            options,
             compiled_pattern,
         }
     }
@@ -146,7 +182,7 @@ impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
         &self,
         text: S,
     ) -> Vec<T> {
-        if self.parallel {
+        if self.options.parallel {
             #[cfg(not(feature = "rayon"))]
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
 
@@ -159,7 +195,7 @@ impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::builder::TokenizerBuilder;
+    use crate::builder::VocabTrainer;
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
@@ -182,7 +218,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerBuilder::with_capacity(1000).with_parallel(parallel);
+        let options = VocabTrainer::with_capacity(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
@@ -190,8 +226,8 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data = options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
-        let tokenizer = ChunkPairScanTokenizer::new(data);
+        let data = options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
+        let tokenizer = ChunkPairScanTokenizer::new(data, Default::default());
 
         // compile time checks.
         types::check_is_send(&tokenizer);

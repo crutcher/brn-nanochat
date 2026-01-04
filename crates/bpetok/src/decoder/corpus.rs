@@ -225,7 +225,7 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::TokenizerBuilder;
+    use crate::builder::VocabTrainer;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
@@ -237,7 +237,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerBuilder::with_capacity(1000);
+        let options = VocabTrainer::with_capacity(1000);
 
         let samples = vec![
             "hello world",
@@ -245,9 +245,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data = options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+        let data = options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
 
-        let tokenizer = ChunkPairScanTokenizer::new(data.clone());
+        let tokenizer = ChunkPairScanTokenizer::new(data.clone(), Default::default());
 
         let decoder = CorpusDecoder::from_data(&data);
         check_is_send(&decoder);

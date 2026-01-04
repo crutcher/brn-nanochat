@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 
 /// A builder for [`Tokenizer`]s.
 #[derive(Debug)]
-pub struct TokenizerBuilder {
+pub struct VocabTrainer {
     /// The regex pattern used for text splitting.
     pub pattern: String,
 
@@ -24,8 +24,8 @@ pub struct TokenizerBuilder {
     pub parallel: bool,
 }
 
-impl TokenizerBuilder {
-    /// Creates a new [`TokenizerBuilder`].
+impl VocabTrainer {
+    /// Creates a new [`VocabTrainer`].
     ///
     /// # Arguments
     /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
@@ -38,7 +38,7 @@ impl TokenizerBuilder {
     }
 }
 
-impl TokenizerBuilder {
+impl VocabTrainer {
     /// Sets the vocab size.
     ///
     /// # Arguments
@@ -83,7 +83,7 @@ impl TokenizerBuilder {
     }
 
     /// Trains a [`Tokenizer`] over a sample iterator.
-    pub fn train_from_sample_iterator<T, K, C, I>(
+    pub fn train_vocab_from_sample_iter<T, K, C, I>(
         self,
         samples: I,
     ) -> TokenizerData<T>
@@ -101,14 +101,14 @@ impl TokenizerBuilder {
                 .with_parallel(self.parallel),
         );
 
-        self.train_from_word_counts_map(word_counts)
+        self.train_vocab_from_word_count_map(word_counts)
     }
 
     /// Trains a [`Tokenizer`] over [`Word`]s.
     ///
     /// # Arguments
     /// * `word_counts` - a ``{word: count}`` map.
-    pub fn train_from_word_counts_map<T, C>(
+    pub fn train_vocab_from_word_count_map<T, C>(
         self,
         words: AHashMap<Word<T>, C>,
     ) -> TokenizerData<T>
@@ -117,16 +117,16 @@ impl TokenizerBuilder {
         C: CountType,
     {
         let (ws, cs): (Vec<Word<T>>, Vec<C>) = words.into_iter().unzip();
-        self.train_from_word_counts_table(ws, &cs)
+        self.train_vocab_from_word_count_table(ws, &cs)
     }
 
     /// Trains a [`Tokenizer`] over [`Word`]s.
     ///
     /// # Arguments
-    /// * `words` - the words.
+    /// * `words` - the words, takes ownership.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
     #[tracing::instrument(skip(self, words, word_counts))]
-    pub fn train_from_word_counts_table<T, C>(
+    pub fn train_vocab_from_word_count_table<T, C>(
         self,
         mut words: Vec<Word<T>>,
         word_counts: &[C],
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn test_tokenizer_options() {
-        let options = TokenizerBuilder::with_capacity(1000);
+        let options = VocabTrainer::with_capacity(1000);
         assert_eq!(options.vocab_size, 1000);
         assert_eq!(options.pattern, DEFAULT_PATTERN);
         assert_eq!(options.parallel, DEFAULT_PARALLEL);
@@ -346,13 +346,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "vocab_size (255) must be >= 256 (the size of the u8 space)")]
     fn test_tokenizer_options_vocab_size_too_small() {
-        let _ = TokenizerBuilder::with_capacity(U8_SIZE - 1);
+        let _ = VocabTrainer::with_capacity(U8_SIZE - 1);
     }
 
     #[test]
     #[should_panic(expected = "regex pattern compilation failed")]
     fn test_tokenizer_options_bad_pattern() {
-        let _ = TokenizerBuilder::with_capacity(1000).with_pattern(r"(");
+        let _ = VocabTrainer::with_capacity(1000).with_pattern(r"(");
     }
 
     #[test]
@@ -371,7 +371,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerBuilder::with_capacity(1000).with_parallel(parallel);
+        let options = VocabTrainer::with_capacity(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
@@ -380,9 +380,9 @@ mod tests {
         ];
 
         let data: TokenizerData<T> =
-            options.train_from_sample_iterator::<T, K, C, _>(samples.iter());
+            options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
 
-        let tokenizer = ChunkPairScanTokenizer::new(data);
+        let tokenizer = ChunkPairScanTokenizer::new(data, Default::default());
 
         // compile time checks.
         types::check_is_send(&tokenizer);

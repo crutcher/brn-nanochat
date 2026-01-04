@@ -1,5 +1,5 @@
 use arrow::array::StringArray;
-use bpetok::builder::TokenizerBuilder;
+use bpetok::builder::VocabTrainer;
 use bpetok::data::TokenizerData;
 use bpetok::decoder::TokenDecoder;
 use bpetok::decoder::corpus::CorpusDecoder;
@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         type C = u32;
         type K = CompactString;
 
-        let options = TokenizerBuilder::with_capacity(args.vocab_size);
+        let trainer = VocabTrainer::with_capacity(args.vocab_size);
 
         println!();
         println!("Training Tokenizer on shards: {:?}", shards);
@@ -100,8 +100,8 @@ fn main() -> anyhow::Result<()> {
                 })
         });
 
-        let data: TokenizerData<T> = options.train_from_sample_iterator::<T, K, C, _>(samples);
-        let tokenizer = ChunkPairScanTokenizer::new(data.clone());
+        let data: TokenizerData<T> = trainer.train_vocab_from_sample_iter::<T, K, C, _>(samples);
+        let tokenizer = ChunkPairScanTokenizer::new(data.clone(), Default::default());
 
         let training_duration = std::time::Instant::now().duration_since(t0);
         println!("- training_duration: {:#?}", training_duration);
