@@ -1,16 +1,16 @@
 //! # Chunk Pair Scan Tokenizer
 
-use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
-use crate::decoder::corpus::CorpusDecoder;
+use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::{Pair, TokenType};
 use crate::validators::expect_regex;
+use crate::vocab::data::TokenVocabData;
 use crate::{DEFAULT_PARALLEL, validators};
 use fancy_regex::Regex;
 use std::sync::Arc;
 
-/// A builder for [`Tokenizer`]s.
+/// A training for [`Tokenizer`]s.
 #[derive(Debug, Clone)]
 pub struct ChunkPairScanTokenizerOptions {
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
@@ -195,11 +195,11 @@ impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::builder::VocabTrainer;
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
+    use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
     use crate::types;
+    use crate::vocab::training::trainer::VocabTrainer;
     use compact_str::CompactString;
 
     #[test]

@@ -25,9 +25,9 @@
 
 use crate::types::TokenType;
 
-pub mod corpus;
-pub mod dict;
-pub mod graph;
+pub mod corpus_decoder;
+pub mod dictionary_decoder;
+pub mod expansion_decoder;
 
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType> {

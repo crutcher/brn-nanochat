@@ -1,9 +1,9 @@
 //! # Dictionary Decoder
 
-use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
-use crate::decoder::graph::GraphDecoder;
+use crate::decoder::expansion_decoder::ExpansionDecoder;
 use crate::types::{MergeMap, TokenType};
+use crate::vocab::data::TokenVocabData;
 use ahash::AHashMap;
 use std::collections::hash_map;
 
@@ -23,7 +23,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
         Self { dictionary }
     }
 
-    /// Build a [`DictionaryDecoder`] from a [`GraphDecoder`].
+    /// Build a [`DictionaryDecoder`] from a [`ExpansionDecoder`].
     #[tracing::instrument(skip(decoder))]
     pub fn from_tokenizer<D: TokenDecoder<T>>(decoder: &D) -> Self {
         let mut dictionary = AHashMap::with_capacity(decoder.max_token().to_usize().unwrap());
@@ -42,7 +42,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
     #[tracing::instrument(skip(merges))]
     pub fn from_merge_map(merges: &MergeMap<T>) -> DictionaryDecoder<T> {
-        let gd = GraphDecoder::from_merge_map(merges);
+        let gd = ExpansionDecoder::from_merge_map(merges);
         Self::from_tokenizer(&gd)
     }
 }
@@ -82,11 +82,11 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::VocabTrainer;
-    use crate::data::TokenVocabData;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
+    use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::data::TokenVocabData;
+    use crate::vocab::training::trainer::VocabTrainer;
     use compact_str::CompactString;
 
     #[test]

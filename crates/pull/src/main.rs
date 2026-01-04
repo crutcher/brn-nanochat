@@ -1,12 +1,12 @@
 use arrow::array::StringArray;
-use bpetok::builder::VocabTrainer;
-use bpetok::data::TokenVocabData;
 use bpetok::decoder::TokenDecoder;
-use bpetok::decoder::corpus::CorpusDecoder;
-use bpetok::decoder::dict::DictionaryDecoder;
-use bpetok::decoder::graph::GraphDecoder;
+use bpetok::decoder::corpus_decoder::CorpusDecoder;
+use bpetok::decoder::dictionary_decoder::DictionaryDecoder;
+use bpetok::decoder::expansion_decoder::ExpansionDecoder;
 use bpetok::tokenizer::ChunkPairScanTokenizer;
 use bpetok::types::TokenType;
+use bpetok::vocab::data::TokenVocabData;
+use bpetok::vocab::training::trainer::VocabTrainer;
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -163,11 +163,11 @@ fn main() -> anyhow::Result<()> {
             }
 
             println!();
-            let graph_decoder = GraphDecoder::from_data(&data);
-            time_decoder("GraphDecoder", &graph_decoder, &token_groups);
+            let expansion_decoder = ExpansionDecoder::from_data(&data);
+            time_decoder("ExpansionDecoder", &expansion_decoder, &token_groups);
 
             println!();
-            let dict_decoder = DictionaryDecoder::from_tokenizer(&graph_decoder);
+            let dict_decoder = DictionaryDecoder::from_tokenizer(&expansion_decoder);
             time_decoder("DictionaryDecoder", &dict_decoder, &token_groups);
 
             println!();

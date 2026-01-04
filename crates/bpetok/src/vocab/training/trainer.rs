@@ -1,17 +1,17 @@
-//! # Tokenizer Builder
+//! # Vocab Trainer
 
-use crate::data::TokenVocabData;
-use crate::pair_index::{PairIndex, PairIndexOptions};
 use crate::types::{CountType, MergeMap, Pair, StringChunkType, TokenType};
 use crate::validators::U8_SIZE;
-use crate::word::Word;
-use crate::word_count::{WordCounter, WordCounterOptions};
+use crate::vocab::data::TokenVocabData;
+use crate::vocab::training::pair_index::{PairIndex, PairIndexOptions};
+use crate::vocab::training::word::Word;
+use crate::vocab::training::word_count::{WordCounter, WordCounterOptions};
 use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, validators};
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use std::cmp::Ordering;
 
-/// A builder for [`Tokenizer`]s.
+/// A training for [`Tokenizer`]s.
 #[derive(Debug)]
 pub struct VocabTrainer {
     /// The regex pattern used for text splitting.
@@ -319,12 +319,15 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
-    use crate::types;
+    use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
+    use crate::validators::U8_SIZE;
+    use crate::vocab::data::TokenVocabData;
+    use crate::vocab::training::trainer::{MergeJob, VocabTrainer};
+    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, types};
     use compact_str::CompactString;
+    use std::cmp::Ordering;
 
     #[test]
     fn test_tokenizer_options() {

@@ -1,35 +1,35 @@
 //! # Graph Decoder
 
-use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
 use crate::types::{ExpansionMap, MergeMap, TokenType};
+use crate::vocab::data::TokenVocabData;
 use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
 
 /// A decoder for [`Tokenizer`] decoder with a production graph.
 #[derive(Clone)]
-pub struct GraphDecoder<T: TokenType> {
+pub struct ExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
     ///
     /// Does not include byte-tokens.
     pub graph: ExpansionMap<T>,
 }
 
-impl<T: TokenType> GraphDecoder<T> {
+impl<T: TokenType> ExpansionDecoder<T> {
     /// Creates a new Decoder.
     pub fn new(mut graph: ExpansionMap<T>) -> Self {
         graph.shrink_to_fit();
         Self { graph }
     }
 
-    /// Build a [`GraphDecoder`] from this [`TokenVocabData`].
+    /// Build a [`ExpansionDecoder`] from this [`TokenVocabData`].
     #[tracing::instrument(skip(data))]
     pub fn from_data(data: &TokenVocabData<T>) -> Self {
         Self::from_merge_map(&data.merge_map)
     }
 
-    /// Build a [`GraphDecoder`] from this [`Tokenizer`].
+    /// Build a [`ExpansionDecoder`] from this [`Tokenizer`].
     #[tracing::instrument(skip(merge_map))]
     pub fn from_merge_map(merge_map: &MergeMap<T>) -> Self {
         let expansion_map =
@@ -38,7 +38,7 @@ impl<T: TokenType> GraphDecoder<T> {
     }
 }
 
-impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
+impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
     fn pair_tokens(&self) -> impl Iterator<Item = T> {
         self.graph.keys().copied()
     }
@@ -70,10 +70,10 @@ impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::VocabTrainer;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
+    use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::training::trainer::VocabTrainer;
     use compact_str::CompactString;
 
     #[test]
@@ -93,7 +93,7 @@ mod tests {
         let data = options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
         let tokenizer = ChunkPairScanTokenizer::new(data.clone(), Default::default());
 
-        let decoder = GraphDecoder::from_data(&data);
+        let decoder = ExpansionDecoder::from_data(&data);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
