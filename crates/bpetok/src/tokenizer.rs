@@ -5,8 +5,8 @@ use crate::pair_index::{PairIndex, PairIndexOptions};
 use crate::validators::U8_SIZE;
 use crate::word_count::{WordCounter, WordCounterOptions};
 use crate::{
-    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, Pair, StringChunkType, TokenDecoder, TokenType,
-    Word, validators,
+    CountType, DEFAULT_PARALLEL, DEFAULT_PATTERN, MergeMap, Pair, StringChunkType, TokenDecoder,
+    TokenType, Word, validators,
 };
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
@@ -127,6 +127,7 @@ impl TokenizerOptions {
     /// # Arguments
     /// * `words` - the words.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    #[tracing::instrument(skip(self, words, word_counts))]
     pub fn train_from_word_counts_table<T, C>(
         self,
         mut words: Vec<Word<T>>,
@@ -144,7 +145,7 @@ impl TokenizerOptions {
         // Prefer to fail before we do all the work below.
         let compiled_pattern = validators::expect_regex(&self.pattern);
 
-        let mut merges: AHashMap<Pair<T>, T> = AHashMap::with_capacity(num_merges);
+        let mut merge_map: MergeMap<T> = AHashMap::with_capacity(num_merges);
 
         log::info!("Building pair index...");
         let PairIndex {
@@ -209,7 +210,7 @@ impl TokenizerOptions {
             next_token_index += 1;
 
             // Record merge
-            merges.insert(job.pair, new_token);
+            merge_map.insert(job.pair, new_token);
 
             // Merge this pair in all words where it occurs
             let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> =
@@ -258,12 +259,12 @@ impl TokenizerOptions {
             }
         }
 
-        merges.shrink_to_fit();
+        merge_map.shrink_to_fit();
 
         log::info!("Finished training: {} merges completed", merges_done);
 
         Tokenizer {
-            merge_map: merges,
+            merge_map,
             pattern: self.pattern,
             parallel: self.parallel,
             compiled_pattern,
@@ -324,7 +325,7 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 #[derive(Debug)]
 pub struct Tokenizer<T: TokenType> {
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
-    pub merge_map: AHashMap<Pair<T>, T>,
+    pub merge_map: MergeMap<T>,
 
     /// The regex pattern used for text splitting.
     pub pattern: String,
@@ -348,6 +349,7 @@ impl<T: TokenType> Tokenizer<T> {
     }
 
     /// Encode a chunk of text into token IDs.
+    #[tracing::instrument(skip(self, chunk))]
     pub fn encode_chunk<S: AsRef<str>>(
         &self,
         chunk: S,
@@ -385,6 +387,7 @@ impl<T: TokenType> Tokenizer<T> {
     }
 
     /// Encode a string into token IDs
+    #[tracing::instrument(skip(self, text))]
     pub fn encode<S: AsRef<str>>(
         &self,
         text: S,
@@ -399,6 +402,7 @@ impl<T: TokenType> Tokenizer<T> {
         self.encode_serial(text)
     }
 
+    #[tracing::instrument(skip(self, text))]
     fn split_groups<'a>(
         &'a self,
         text: &'a str,

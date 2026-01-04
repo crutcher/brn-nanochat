@@ -88,6 +88,12 @@ mod tests {
     }
 }
 
+/// [`Pair<T>`] to T map.
+pub type MergeMap<T> = ahash::AHashMap<Pair<T>, T>;
+
+/// T to [`Pair<T>`] map.
+pub type ExpansionMap<T> = ahash::AHashMap<T, Pair<T>>;
+
 /// Check if a type is `Send`.
 #[cfg(test)]
 pub(crate) fn check_is_send<S: Send>(_: S) {}

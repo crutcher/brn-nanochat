@@ -702,6 +702,7 @@ dependencies = [
  "num-traits",
  "rayon",
  "regex",
+ "tracing",
 ]
 
 [[package]]

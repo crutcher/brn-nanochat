@@ -1,6 +1,6 @@
 //! # Graph Decoder
 
-use crate::{Pair, TokenDecoder, TokenType};
+use crate::{ExpansionMap, MergeMap, TokenDecoder, TokenType};
 use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
@@ -11,20 +11,22 @@ pub struct GraphDecoder<T: TokenType> {
     /// Token to pair mapping.
     ///
     /// Does not include byte-tokens.
-    pub graph: AHashMap<T, Pair<T>>,
+    pub graph: ExpansionMap<T>,
 }
 
 impl<T: TokenType> GraphDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut graph: AHashMap<T, Pair<T>>) -> Self {
+    pub fn new(mut graph: ExpansionMap<T>) -> Self {
         graph.shrink_to_fit();
         Self { graph }
     }
 
     /// Build a [`GraphDecoder`] from this [`Tokenizer`].
-    pub fn from_merge_map(merges: &AHashMap<Pair<T>, T>) -> Self {
-        let token_to_pair = AHashMap::from_iter(merges.iter().map(|(&pair, &token)| (token, pair)));
-        Self::new(token_to_pair)
+    #[tracing::instrument(skip(merge_map))]
+    pub fn from_merge_map(merge_map: &MergeMap<T>) -> Self {
+        let expansion_map =
+            AHashMap::from_iter(merge_map.iter().map(|(&pair, &token)| (token, pair)));
+        Self::new(expansion_map)
     }
 }
 
@@ -33,6 +35,7 @@ impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
         self.graph.keys().copied()
     }
 
+    #[tracing::instrument(skip(self, buf, tokens))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,

@@ -1,7 +1,7 @@
 //! # Corpus Decoder
 //! Experimental.
 
-use crate::{Pair, TokenDecoder, TokenType, is_byte_token};
+use crate::{ExpansionMap, MergeMap, TokenDecoder, TokenType, is_byte_token};
 use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
@@ -15,9 +15,10 @@ struct MaterializationMap<T: TokenType> {
 
 impl<T: TokenType> MaterializationMap<T> {
     /// Creates a new materialization map for the given token.
+    #[tracing::instrument(skip(token, expansion_map, maybe_slice))]
     fn materialize<'a, F>(
         token: T,
-        token_to_pair: &AHashMap<T, Pair<T>>,
+        expansion_map: &ExpansionMap<T>,
         maybe_slice: &F,
     ) -> Self
     where
@@ -34,15 +35,16 @@ impl<T: TokenType> MaterializationMap<T> {
             slices: Default::default(),
         };
 
-        mmap.expand(token, token_to_pair, maybe_slice);
+        mmap.expand(token, expansion_map, maybe_slice);
 
         mmap
     }
 
+    #[tracing::instrument(skip(self, token, expansion_map, maybe_slice))]
     fn expand<'a, F>(
         &mut self,
         token: T,
-        token_to_pair: &AHashMap<T, Pair<T>>,
+        expansion_map: &ExpansionMap<T>,
         maybe_slice: &F,
     ) where
         F: Fn(T) -> Option<&'a [u8]>,
@@ -71,13 +73,13 @@ impl<T: TokenType> MaterializationMap<T> {
             return;
         }
 
-        let pair = token_to_pair
+        let pair = expansion_map
             .get(&token)
-            .expect("token not found in token_to_pair");
+            .expect("token not found in expansion_map");
         let (a, b) = pair.to_owned();
         let start = self.buf.len();
-        self.expand(a, token_to_pair, maybe_slice);
-        self.expand(b, token_to_pair, maybe_slice);
+        self.expand(a, expansion_map, maybe_slice);
+        self.expand(b, expansion_map, maybe_slice);
         let end = self.buf.len();
         self.slices.insert(token, start..end);
     }
@@ -122,11 +124,14 @@ impl<T: TokenType> CorpusDecoder<T> {
     }
 
     /// Creates a new corpus decoder.
-    pub fn from_merge_map(merges: &AHashMap<Pair<T>, T>) -> Self {
-        let token_to_pair: AHashMap<T, Pair<T>> =
-            merges.iter().map(|(&pair, &token)| (token, pair)).collect();
+    #[tracing::instrument(skip(merge_map))]
+    pub fn from_merge_map(merge_map: &MergeMap<T>) -> Self {
+        let expansion_map: ExpansionMap<T> = merge_map
+            .iter()
+            .map(|(&pair, &token)| (token, pair))
+            .collect();
 
-        let mut tokens = token_to_pair.keys().copied().collect::<Vec<_>>();
+        let mut tokens = expansion_map.keys().copied().collect::<Vec<_>>();
         tokens.sort();
         tokens.reverse();
 
@@ -139,7 +144,7 @@ impl<T: TokenType> CorpusDecoder<T> {
             if mmap_index.contains_key(&token) {
                 continue;
             }
-            let mmap = MaterializationMap::materialize(token, &token_to_pair, &|t| {
+            let mmap = MaterializationMap::materialize(token, &expansion_map, &|t| {
                 if let Some(&i) = mmap_index.get(&t) {
                     let mmap = &mmaps[i];
                     return mmap.try_get(t);
@@ -154,7 +159,7 @@ impl<T: TokenType> CorpusDecoder<T> {
             mmaps.push(mmap);
         }
 
-        let mut slices: AHashMap<T, Range<usize>> = AHashMap::with_capacity(merges.len());
+        let mut slices: AHashMap<T, Range<usize>> = AHashMap::with_capacity(merge_map.len());
         let mut corpus: Vec<u8> = Vec::with_capacity(total_size);
 
         for mmap in mmaps {
@@ -187,6 +192,7 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
         self.slices.keys().copied()
     }
 
+    #[tracing::instrument(skip(self, buf, tokens))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,

@@ -1,7 +1,7 @@
 //! # Dictionary Decoder
 
 use crate::graph::GraphDecoder;
-use crate::{Pair, TokenDecoder, TokenType};
+use crate::{MergeMap, TokenDecoder, TokenType};
 use ahash::AHashMap;
 use std::collections::hash_map;
 
@@ -22,6 +22,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 
     /// Build a [`DictionaryDecoder`] from a [`GraphDecoder`].
+    #[tracing::instrument(skip(decoder))]
     pub fn from_tokenizer<D: TokenDecoder<T>>(decoder: &D) -> Self {
         let mut dictionary = AHashMap::with_capacity(decoder.max_token().to_usize().unwrap());
         for token in decoder.pair_tokens() {
@@ -31,7 +32,8 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    pub fn from_merge_map(merges: &AHashMap<Pair<T>, T>) -> DictionaryDecoder<T> {
+    #[tracing::instrument(skip(merges))]
+    pub fn from_merge_map(merges: &MergeMap<T>) -> DictionaryDecoder<T> {
         let gd = GraphDecoder::from_merge_map(merges);
         Self::from_tokenizer(&gd)
     }
@@ -42,6 +44,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         self.dictionary.keys().copied()
     }
 
+    #[tracing::instrument(skip(self, buf, tokens))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,

@@ -15,7 +15,9 @@ rayon = ["dep:rayon"]
 
 [dependencies]
 anyhow = { workspace = true }
+
 log = { workspace = true }
+tracing = { workspace = true }
 
 rayon = { workspace = true, optional = true }
 
