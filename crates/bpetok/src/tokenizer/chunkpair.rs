@@ -7,12 +7,13 @@ use crate::tokenizer::TokenEncoder;
 use crate::types::{Pair, TokenType};
 use crate::validators::expect_regex;
 use fancy_regex::Regex;
+use std::sync::Arc;
 
 /// A Byte Pair Encoding / Decoding Tokenizer.
 #[derive(Debug)]
 pub struct ChunkPairScanTokenizer<T: TokenType> {
     /// Core data describing a BPE Tokenizer.
-    pub data: TokenizerData<T>,
+    pub data: Arc<TokenizerData<T>>,
 
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
@@ -23,7 +24,11 @@ pub struct ChunkPairScanTokenizer<T: TokenType> {
 
 impl<T: TokenType> ChunkPairScanTokenizer<T> {
     /// Construct a new Tokenizer.
-    pub fn new(data: TokenizerData<T>) -> Self {
+    pub fn new<D>(data: D) -> Self
+    where
+        D: Into<Arc<TokenizerData<T>>>,
+    {
+        let data = data.into();
         let compiled_pattern = expect_regex(&data.pattern);
         Self {
             data,
@@ -128,6 +133,10 @@ impl<T: TokenType> ChunkPairScanTokenizer<T> {
 }
 
 impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
+    fn data(&self) -> &Arc<TokenizerData<T>> {
+        &self.data
+    }
+
     fn pair_tokens(&self) -> impl Iterator<Item = T> {
         self.data.pair_tokens()
     }

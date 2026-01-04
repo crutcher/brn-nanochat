@@ -2,11 +2,16 @@
 
 pub mod chunkpair;
 
+use crate::data::TokenizerData;
 use crate::types::TokenType;
 pub use chunkpair::*;
+use std::sync::Arc;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType> {
+    /// Returns a reference to the core data describing this tokenizer.
+    fn data(&self) -> &Arc<TokenizerData<T>>;
+
     /// Returns an iterator over the non-byte tokens in this map.
     fn pair_tokens(&self) -> impl Iterator<Item = T>;
 
