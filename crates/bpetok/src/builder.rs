@@ -262,8 +262,8 @@ impl VocabTrainer {
         log::info!("Finished training: {} merges completed", merges_done);
 
         TokenVocabData {
-            merge_map,
             pattern: self.pattern,
+            merge_map,
         }
     }
 }

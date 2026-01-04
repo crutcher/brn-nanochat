@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
 pub struct TokenVocabData<T: TokenType> {
-    /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
-    pub merge_map: MergeMap<T>,
-
     /// The regex pattern used for text splitting.
     pub pattern: String,
+
+    /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
+    pub merge_map: MergeMap<T>,
 }
 
 impl<T: TokenType> TokenVocabData<T> {
