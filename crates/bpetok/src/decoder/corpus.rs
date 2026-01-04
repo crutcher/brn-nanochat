@@ -7,7 +7,7 @@ use std::collections::hash_map;
 use std::ops::Range;
 
 /// Represents a materialized sequence of tokens and their byte slices.
-pub struct MaterializationMap<T: TokenType> {
+struct MaterializationMap<T: TokenType> {
     root: T,
     buf: Vec<u8>,
     slices: AHashMap<T, Range<usize>>,
@@ -15,7 +15,7 @@ pub struct MaterializationMap<T: TokenType> {
 
 impl<T: TokenType> MaterializationMap<T> {
     /// Creates a new materialization map for the given token.
-    pub fn materialize<'a, F>(
+    fn materialize<'a, F>(
         token: T,
         token_to_pair: &AHashMap<T, Pair<T>>,
         maybe_slice: &F,
@@ -82,28 +82,13 @@ impl<T: TokenType> MaterializationMap<T> {
         self.slices.insert(token, start..end);
     }
 
-    /// Returns the root token of this map.
-    pub fn root(&self) -> T {
-        self.root
-    }
-
-    /// Returns the underlying buffer.
-    pub fn buf(&self) -> &[u8] {
-        &self.buf
-    }
-
     /// Returns an iterator over the non-byte tokens in this map.
-    pub fn tokens(&self) -> impl Iterator<Item = T> {
+    fn tokens(&self) -> impl Iterator<Item = T> {
         self.slices.keys().copied()
     }
 
-    /// Returns the slice map.
-    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
-        &self.slices
-    }
-
     /// Returns the byte slice for the given token, if it exists.
-    pub fn try_get(
+    fn try_get(
         &self,
         token: T,
     ) -> Option<&[u8]> {
@@ -118,9 +103,10 @@ impl<T: TokenType> MaterializationMap<T> {
 pub struct CorpusDecoder<T: TokenType> {
     /// Token to byte slice mapping.
     /// Does not include byte-tokens.
-    slices: AHashMap<T, Range<usize>>,
+    pub slices: AHashMap<T, Range<usize>>,
 
-    corpus: Vec<u8>,
+    /// The corpus buffer.
+    pub corpus: Vec<u8>,
 }
 
 impl<T: TokenType> CorpusDecoder<T> {
@@ -172,7 +158,7 @@ impl<T: TokenType> CorpusDecoder<T> {
         let mut corpus: Vec<u8> = Vec::with_capacity(total_size);
 
         for mmap in mmaps {
-            if slices.contains_key(&mmap.root()) {
+            if slices.contains_key(&mmap.root) {
                 continue;
             }
 
@@ -193,16 +179,6 @@ impl<T: TokenType> CorpusDecoder<T> {
         }
 
         Self::new(slices, corpus)
-    }
-
-    /// Gets the corpus buffer.
-    pub fn corpus(&self) -> &[u8] {
-        &self.corpus
-    }
-
-    /// Gets the slice map.
-    pub fn slices(&self) -> &AHashMap<T, Range<usize>> {
-        &self.slices
     }
 }
 
