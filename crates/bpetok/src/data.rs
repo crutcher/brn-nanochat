@@ -1,10 +1,12 @@
 //! # Tokenizer Data
 
 use crate::types::{MergeMap, Pair, TokenType};
+use serde::{Deserialize, Serialize};
 
 /// Core data describing a BPE Tokenizer.
-#[derive(Debug, Clone)]
-pub struct TokenizerData<T: TokenType> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
+pub struct TokenVocabData<T: TokenType> {
     /// Maps [`Pair<T>`] to [`T`], representing the byte pair encoding merges.
     pub merge_map: MergeMap<T>,
 
@@ -12,7 +14,7 @@ pub struct TokenizerData<T: TokenType> {
     pub pattern: String,
 }
 
-impl<T: TokenType> TokenizerData<T> {
+impl<T: TokenType> TokenVocabData<T> {
     /// Size estimate in bytes.
     pub fn size_estimate(&self) -> usize {
         self.merge_map.capacity() * std::mem::size_of::<Pair<T>>() + self.pattern.len()

@@ -38,6 +38,7 @@ dependencies = [
  "const-random",
  "getrandom 0.3.4",
  "once_cell",
+ "serde",
  "version_check",
  "zerocopy",
 ]
@@ -701,7 +702,7 @@ dependencies = [
  "log",
  "num-traits",
  "rayon",
- "regex",
+ "serde",
  "tracing",
 ]
 

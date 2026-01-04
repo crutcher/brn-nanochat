@@ -1,6 +1,6 @@
 //! # Graph Decoder
 
-use crate::data::TokenizerData;
+use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
 use crate::types::{ExpansionMap, MergeMap, TokenType};
 use ahash::AHashMap;
@@ -23,9 +23,9 @@ impl<T: TokenType> GraphDecoder<T> {
         Self { graph }
     }
 
-    /// Build a [`GraphDecoder`] from this [`TokenizerData`].
+    /// Build a [`GraphDecoder`] from this [`TokenVocabData`].
     #[tracing::instrument(skip(data))]
-    pub fn from_data(data: &TokenizerData<T>) -> Self {
+    pub fn from_data(data: &TokenVocabData<T>) -> Self {
         Self::from_merge_map(&data.merge_map)
     }
 

@@ -6,12 +6,36 @@ use std::ops::{AddAssign, SubAssign};
 
 /// A type that can be used as a token in a BPE-based tokenizer.
 pub trait TokenType:
-    Debug + Clone + Copy + Hash + Send + Sync + Unsigned + FromPrimitive + ToPrimitive + Ord
+    'static
+    + Debug
+    + Clone
+    + Copy
+    + Hash
+    + Send
+    + Sync
+    + Unsigned
+    + FromPrimitive
+    + ToPrimitive
+    + Ord
+    + serde::Serialize
+    + for<'de> serde::Deserialize<'de>
 {
 }
 
 impl<T> TokenType for T where
-    T: Debug + Clone + Copy + Hash + Send + Sync + Unsigned + FromPrimitive + ToPrimitive + Ord
+    T: 'static
+        + Debug
+        + Clone
+        + Copy
+        + Hash
+        + Send
+        + Sync
+        + Unsigned
+        + FromPrimitive
+        + ToPrimitive
+        + Ord
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>
 {
 }
 

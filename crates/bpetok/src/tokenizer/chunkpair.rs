@@ -1,6 +1,6 @@
 //! # Chunk Pair Scan Tokenizer
 
-use crate::data::TokenizerData;
+use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
 use crate::decoder::corpus::CorpusDecoder;
 use crate::tokenizer::TokenEncoder;
@@ -41,7 +41,7 @@ impl Default for ChunkPairScanTokenizerOptions {
 #[derive(Debug)]
 pub struct ChunkPairScanTokenizer<T: TokenType> {
     /// Core data describing a BPE Tokenizer.
-    pub data: Arc<TokenizerData<T>>,
+    pub data: Arc<TokenVocabData<T>>,
 
     /// Tokenizer options.
     pub options: ChunkPairScanTokenizerOptions,
@@ -57,7 +57,7 @@ impl<T: TokenType> ChunkPairScanTokenizer<T> {
         options: ChunkPairScanTokenizerOptions,
     ) -> Self
     where
-        D: Into<Arc<TokenizerData<T>>>,
+        D: Into<Arc<TokenVocabData<T>>>,
     {
         #[cfg(not(feature = "rayon"))]
         if options.parallel {
@@ -169,7 +169,7 @@ impl<T: TokenType> ChunkPairScanTokenizer<T> {
 }
 
 impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
-    fn data(&self) -> &Arc<TokenizerData<T>> {
+    fn data(&self) -> &Arc<TokenVocabData<T>> {
         &self.data
     }
 

@@ -1,6 +1,6 @@
 //! # Tokenizer Builder
 
-use crate::data::TokenizerData;
+use crate::data::TokenVocabData;
 use crate::pair_index::{PairIndex, PairIndexOptions};
 use crate::types::{CountType, MergeMap, Pair, StringChunkType, TokenType};
 use crate::validators::U8_SIZE;
@@ -86,7 +86,7 @@ impl VocabTrainer {
     pub fn train_vocab_from_sample_iter<T, K, C, I>(
         self,
         samples: I,
-    ) -> TokenizerData<T>
+    ) -> TokenVocabData<T>
     where
         T: TokenType,
         K: StringChunkType,
@@ -111,7 +111,7 @@ impl VocabTrainer {
     pub fn train_vocab_from_word_count_map<T, C>(
         self,
         words: AHashMap<Word<T>, C>,
-    ) -> TokenizerData<T>
+    ) -> TokenVocabData<T>
     where
         T: TokenType,
         C: CountType,
@@ -130,7 +130,7 @@ impl VocabTrainer {
         self,
         mut words: Vec<Word<T>>,
         word_counts: &[C],
-    ) -> TokenizerData<T>
+    ) -> TokenVocabData<T>
     where
         T: TokenType,
         C: CountType,
@@ -261,7 +261,7 @@ impl VocabTrainer {
 
         log::info!("Finished training: {} merges completed", merges_done);
 
-        TokenizerData {
+        TokenVocabData {
             merge_map,
             pattern: self.pattern,
         }
@@ -379,7 +379,7 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data: TokenizerData<T> =
+        let data: TokenVocabData<T> =
             options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
 
         let tokenizer = ChunkPairScanTokenizer::new(data, Default::default());

@@ -1,7 +1,7 @@
 //! # Corpus Decoder
 //! Experimental.
 
-use crate::data::TokenizerData;
+use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
 use crate::types::{ExpansionMap, MergeMap, TokenType, is_byte_token};
 use ahash::AHashMap;
@@ -127,7 +127,7 @@ impl<T: TokenType> CorpusDecoder<T> {
 
     /// Creates a new corpus decoder.
     #[tracing::instrument(skip(data))]
-    pub fn from_data(data: &TokenizerData<T>) -> Self {
+    pub fn from_data(data: &TokenVocabData<T>) -> Self {
         Self::from_merge_map(&data.merge_map)
     }
 

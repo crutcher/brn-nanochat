@@ -1,6 +1,6 @@
 //! # Dictionary Decoder
 
-use crate::data::TokenizerData;
+use crate::data::TokenVocabData;
 use crate::decoder::TokenDecoder;
 use crate::decoder::graph::GraphDecoder;
 use crate::types::{MergeMap, TokenType};
@@ -35,7 +35,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
     #[tracing::instrument(skip(data))]
-    pub fn from_data(data: &TokenizerData<T>) -> DictionaryDecoder<T> {
+    pub fn from_data(data: &TokenVocabData<T>) -> DictionaryDecoder<T> {
         Self::from_merge_map(&data.merge_map)
     }
 
@@ -83,7 +83,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 mod tests {
     use super::*;
     use crate::builder::VocabTrainer;
-    use crate::data::TokenizerData;
+    use crate::data::TokenVocabData;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::chunkpair::ChunkPairScanTokenizer;
     use crate::types::{check_is_send, check_is_sync};
@@ -103,7 +103,7 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data: TokenizerData<T> =
+        let data: TokenVocabData<T> =
             options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
 
         let tokenizer = ChunkPairScanTokenizer::new(data.clone(), Default::default());
