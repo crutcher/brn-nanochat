@@ -180,9 +180,15 @@ impl<T: TokenType> CorpusDecoder<T> {
             corpus.extend_from_slice(&mmap.buf);
 
             for (t, slice) in mmap.slices {
+                // Every slice is in the highest ranked token it is a child of.
                 slices
                     .entry(t)
                     .or_insert_with(|| slice.start + offset..slice.end + offset);
+
+                // Alternatively, we could override; and push them to the lowest ranked:
+                // slices.insert(t, slice.start + offset..slice.end + offset);
+
+                // Timing seems to not care.
             }
         }
 
