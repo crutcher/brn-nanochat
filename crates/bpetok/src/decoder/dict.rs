@@ -8,6 +8,8 @@ use std::collections::hash_map;
 /// A decoder for [`Tokenizer`] decoder with a materialized dictionary.
 pub struct DictionaryDecoder<T: TokenType> {
     /// Token to bytes mapping.
+    ///
+    /// Does not include byte-tokens.
     pub dictionary: AHashMap<T, Vec<u8>>,
 }
 
@@ -40,13 +42,11 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         self.dictionary.keys().copied()
     }
 
-    fn decode_to_bytes<S: AsRef<[T]>>(
+    fn decode_append(
         &self,
-        tokens: S,
-    ) -> Vec<u8> {
-        let tokens = tokens.as_ref();
-
-        let mut buf = Vec::with_capacity(tokens.len() * 2);
+        buf: &mut Vec<u8>,
+        tokens: &[T],
+    ) {
         for t in tokens {
             if let Some(b) = t.to_u8() {
                 buf.push(b);
@@ -59,8 +59,6 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
                 buf.extend_from_slice(slice);
             }
         }
-
-        buf
     }
 
     /// Estimates the memory usage of this decoder.

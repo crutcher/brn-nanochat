@@ -116,7 +116,10 @@ impl<T: TokenType> MaterializationMap<T> {
 /// A token decoder.
 #[derive(Clone)]
 pub struct CorpusDecoder<T: TokenType> {
+    /// Token to byte slice mapping.
+    /// Does not include byte-tokens.
     slices: AHashMap<T, Range<usize>>,
+
     corpus: Vec<u8>,
 }
 
@@ -202,13 +205,11 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
         self.slices.keys().copied()
     }
 
-    fn decode_to_bytes<S: AsRef<[T]>>(
+    fn decode_append(
         &self,
-        tokens: S,
-    ) -> Vec<u8> {
-        let tokens = tokens.as_ref();
-
-        let mut buf = Vec::with_capacity(tokens.len() * 2);
+        buf: &mut Vec<u8>,
+        tokens: &[T],
+    ) {
         for t in tokens {
             if let Some(b) = t.to_u8() {
                 buf.push(b);
@@ -218,8 +219,6 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
                 buf.extend_from_slice(slice);
             }
         }
-
-        buf
     }
 
     fn size_estimate(&self) -> usize {

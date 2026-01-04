@@ -15,11 +15,23 @@ pub trait TokenDecoder<T: TokenType> {
         self.pair_tokens().max().unwrap()
     }
 
+    /// Decode tokens into a byte vector.
+    fn decode_append(
+        &self,
+        buf: &mut Vec<u8>,
+        tokens: &[T],
+    );
+
     /// Decodes tokens into bytes.
     fn decode_to_bytes<S: AsRef<[T]>>(
         &self,
         tokens: S,
-    ) -> Vec<u8>;
+    ) -> Vec<u8> {
+        let tokens = tokens.as_ref();
+        let mut buf = Vec::with_capacity(tokens.len() * 2);
+        self.decode_append(&mut buf, tokens);
+        buf
+    }
 
     /// Decodes tokens into a string.
     fn decode_to_string<S: AsRef<[T]>>(

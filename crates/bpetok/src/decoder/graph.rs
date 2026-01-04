@@ -9,6 +9,8 @@ use std::ops::Range;
 #[derive(Clone)]
 pub struct GraphDecoder<T: TokenType> {
     /// Token to pair mapping.
+    ///
+    /// Does not include byte-tokens.
     pub graph: AHashMap<T, Pair<T>>,
 }
 
@@ -24,9 +26,14 @@ impl<T: TokenType> GraphDecoder<T> {
         let token_to_pair = AHashMap::from_iter(merges.iter().map(|(&pair, &token)| (token, pair)));
         Self::new(token_to_pair)
     }
+}
 
-    /// Append a list of tokens to the output buffer.
-    pub fn append_tokens(
+impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
+    fn pair_tokens(&self) -> impl Iterator<Item = T> {
+        self.graph.keys().copied()
+    }
+
+    fn decode_append(
         &self,
         buf: &mut Vec<u8>,
         tokens: &[T],
@@ -42,22 +49,6 @@ impl<T: TokenType> GraphDecoder<T> {
             stack.push(*b);
             stack.push(*a);
         }
-    }
-}
-
-impl<T: TokenType> TokenDecoder<T> for GraphDecoder<T> {
-    fn pair_tokens(&self) -> impl Iterator<Item = T> {
-        self.graph.keys().copied()
-    }
-
-    fn decode_to_bytes<S: AsRef<[T]>>(
-        &self,
-        tokens: S,
-    ) -> Vec<u8> {
-        let tokens = tokens.as_ref();
-        let mut buf = Vec::with_capacity(tokens.len() * 2);
-        self.append_tokens(&mut buf, tokens);
-        buf
     }
 
     fn size_estimate(&self) -> usize {
