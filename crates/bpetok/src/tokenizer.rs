@@ -212,7 +212,8 @@ impl TokenizerOptions {
             merges.insert(job.pair, new_token);
 
             // Merge this pair in all words where it occurs
-            let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
+            let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> =
+                AHashMap::with_capacity(16);
             for &word_idx in &job.word_indices {
                 // Apply merge to this word.
                 words[word_idx].merge_pair_cb(job.pair, new_token, &mut |pair, delta| {
