@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         type C = u32;
         type K = CompactString;
 
-        let trainer = VocabTrainer::with_capacity(args.vocab_size);
+        let trainer = VocabTrainer::new_with_vocab_size(args.vocab_size);
 
         println!();
         println!("Training Tokenizer on shards: {:?}", shards);

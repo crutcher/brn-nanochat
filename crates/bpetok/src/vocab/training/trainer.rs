@@ -29,7 +29,7 @@ impl VocabTrainer {
     ///
     /// # Arguments
     /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
-    pub fn with_capacity(vocab_size: usize) -> Self {
+    pub fn new_with_vocab_size(vocab_size: usize) -> Self {
         Self {
             pattern: DEFAULT_PATTERN.to_string(),
             vocab_size,
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_tokenizer_options() {
-        let options = VocabTrainer::with_capacity(1000);
+        let options = VocabTrainer::new_with_vocab_size(1000);
         assert_eq!(options.vocab_size, 1000);
         assert_eq!(options.pattern, DEFAULT_PATTERN);
         assert_eq!(options.parallel, DEFAULT_PARALLEL);
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "regex pattern compilation failed")]
     fn test_tokenizer_options_bad_pattern() {
-        let _ = VocabTrainer::with_capacity(1000).with_pattern(r"(");
+        let _ = VocabTrainer::new_with_vocab_size(1000).with_pattern(r"(");
     }
 
     #[test]
@@ -363,7 +363,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = VocabTrainer::with_capacity(1000).with_parallel(parallel);
+        let options = VocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",

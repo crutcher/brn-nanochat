@@ -218,7 +218,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = VocabTrainer::with_capacity(1000).with_parallel(parallel);
+        let options = VocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
