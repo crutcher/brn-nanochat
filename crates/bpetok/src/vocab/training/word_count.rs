@@ -5,6 +5,9 @@ use crate::vocab::training::word::Word;
 use ahash::AHashMap;
 use std::fmt::Debug;
 
+/// Expected average word length in characters.
+pub const EXPECTED_AVG_WORD_LEN: usize = 5;
+
 /// Split text into words and count occurrences using a regular expression.
 pub fn word_counts_from_text<S, K, C>(
     regex: &fancy_regex::Regex,
@@ -15,7 +18,8 @@ where
     K: StringChunkType,
     C: CountType,
 {
-    let mut m: AHashMap<K, C> = Default::default();
+    let text = text.as_ref();
+    let mut m = AHashMap::with_capacity(text.len() / (EXPECTED_AVG_WORD_LEN - 2));
     update_word_counts_from_text(&mut m, regex, text)?;
     Ok(m)
 }
@@ -135,7 +139,7 @@ where
             parallel,
             pattern,
             regex,
-            word_counts: Default::default(),
+            word_counts: AHashMap::with_capacity(100_000),
         }
     }
 
@@ -201,15 +205,19 @@ where
         use rayon::iter::ParallelBridge;
         use rayon::prelude::*;
 
-        let regex = self.regex.clone();
-
         let updates: AHashMap<K, C> = samples
             .par_bridge()
-            .map(|sample| word_counts_from_text(&regex, sample.as_ref()).unwrap())
-            .reduce(Default::default, |mut a, b| {
-                update_word_counts(&mut a, b);
-                a
-            });
+            .map_init(
+                || self.regex.clone(),
+                |regex, sample| word_counts_from_text(regex, &sample).unwrap(),
+            )
+            .reduce(
+                || AHashMap::with_capacity(self.word_counts.capacity()),
+                |mut a, b| {
+                    update_word_counts(&mut a, b);
+                    a
+                },
+            );
 
         self.update_from_word_counts(updates)
     }
