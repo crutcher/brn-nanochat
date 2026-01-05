@@ -240,4 +240,158 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_pair_index_unique_word_counts_table_serial() {
+        // Create words from token sequences
+        let words = vec![
+            Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8]), // "hello"
+            Word::from_tokens(['w' as u8, 'o' as u8, 'r' as u8, 'l' as u8, 'd' as u8]), // "world"
+            Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'p' as u8]),            // "help"
+        ];
+
+        // Frequency counts for each word
+        let word_counts = vec![1, 2, 3]; // hello×1, world×2, help×3
+
+        // Build the pair index (serial version)
+        let options = PairIndexOptions::default().with_parallel(false);
+        let index: PairIndex<u8, i32> =
+            PairIndex::index_unique_word_counts_table_serial(&words, &word_counts, options);
+
+        // Assert that the Hashmap is not empty
+        assert!(!index.pair_counts.is_empty());
+        // Assert the number of keys in the Map is 9 (each expected key listed below)
+        assert_eq!(index.pair_counts.len(), 9);
+
+        // Results: pair_counts shows weighted frequencies
+        // (h,e): 4  (from hello×1 + help×3)
+        assert!(index.pair_counts.contains_key(&(104, 101))); // ('h', 'e') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('h' as u8, 'e' as u8)) {
+            assert_eq!(*pair_count, 4 as i32);
+        }
+        // (e,l): 4  (from hello×1 + help×3)
+        assert!(index.pair_counts.contains_key(&(101, 108))); // ('e', 'l') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('e' as u8, 'l' as u8)) {
+            assert_eq!(*pair_count, 4 as i32);
+        }
+        // (l,l): 1  (from hello×1)
+        assert!(index.pair_counts.contains_key(&(108, 108))); // ('l', 'l') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('l' as u8, 'l' as u8)) {
+            assert_eq!(*pair_count, 1 as i32);
+        }
+        // (l,o): 1  (from hello×1)
+        assert!(index.pair_counts.contains_key(&(108, 111))); // ('l', 'o') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('l' as u8, 'o' as u8)) {
+            assert_eq!(*pair_count, 1 as i32);
+        }
+        // (w,o): 2  (from world×2)
+        assert!(index.pair_counts.contains_key(&(119, 111))); // ('w', 'o') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('w' as u8, 'o' as u8)) {
+            assert_eq!(*pair_count, 2 as i32);
+        }
+        // (o,r): 2  (from world×2)
+        assert!(index.pair_counts.contains_key(&(111, 114))); // ('o', 'r') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('o' as u8, 'r' as u8)) {
+            assert_eq!(*pair_count, 2 as i32);
+        }
+        // (r,l): 2  (from world×2)
+        assert!(index.pair_counts.contains_key(&(114, 108))); // ('r', 'l') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('r' as u8, 'l' as u8)) {
+            assert_eq!(*pair_count, 2 as i32);
+        }
+        // (l,d): 2  (from world×2)
+        assert!(index.pair_counts.contains_key(&(108, 100))); // ('l', 'd') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('l' as u8, 'd' as u8)) {
+            assert_eq!(*pair_count, 2 as i32);
+        }
+        // (l,p): 3  (from help×3)
+        assert!(index.pair_counts.contains_key(&(108, 112))); // ('l', 'p') -> utf-8
+        if let Some(pair_count) = index.pair_counts.get(&('l' as u8, 'p' as u8)) {
+            assert_eq!(*pair_count, 3 as i32);
+        }
+
+        // ---
+        // pair_to_word_index tests
+        // These tests verify that:
+        // - Each pair appears in the map with the correct key
+        // - The set of word indices for each pair matches exactly the words where those adjacent tokens appear
+        // - The indices are sorted for deterministic comparison
+        // - All 9 expected pairs are tested
+        // ---
+        // Assert that the Hashmap is not empty
+        assert!(!index.pair_to_word_index.is_empty());
+        // Assert the number of keys in the Map is 9
+        assert_eq!(index.pair_to_word_index.len(), 9);
+
+        // Results: pair_to_word_index shows which word indices contain each pair
+        // (h,e): [0, 2]  (appears in hello and help)
+        assert!(index.pair_to_word_index.contains_key(&(104, 101))); // ('h', 'e') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('h' as u8, 'e' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![0, 2]);
+        }
+        // (e,l): [0, 2]  (appears in hello and help)
+        assert!(index.pair_to_word_index.contains_key(&(101, 108))); // ('e', 'l') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('e' as u8, 'l' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![0, 2]);
+        }
+        // (l,l): [0]  (appears only in hello)
+        assert!(index.pair_to_word_index.contains_key(&(108, 108))); // ('l', 'l') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('l' as u8, 'l' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![0]);
+        }
+        // (l,o): [0]  (appears only in hello)
+        assert!(index.pair_to_word_index.contains_key(&(108, 111))); // ('l', 'o') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('l' as u8, 'o' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![0]);
+        }
+        // (w,o): [1]  (appears only in world)
+        assert!(index.pair_to_word_index.contains_key(&(119, 111))); // ('w', 'o') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('w' as u8, 'o' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![1]);
+        }
+        // (o,r): [1]  (appears only in world)
+        assert!(index.pair_to_word_index.contains_key(&(111, 114))); // ('o', 'r') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('o' as u8, 'r' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![1]);
+        }
+        // (r,l): [1]  (appears only in world)
+        assert!(index.pair_to_word_index.contains_key(&(114, 108))); // ('r', 'l') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('r' as u8, 'l' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![1]);
+        }
+        // (l,d): [1]  (appears only in world)
+        assert!(index.pair_to_word_index.contains_key(&(108, 100))); // ('l', 'd') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('l' as u8, 'd' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![1]);
+        }
+        // (l,p): [2]  (appears only in help)
+        assert!(index.pair_to_word_index.contains_key(&(108, 112))); // ('l', 'p') -> utf-8
+        if let Some(word_indices) = index.pair_to_word_index.get(&('l' as u8, 'p' as u8)) {
+            let mut indices: Vec<_> = word_indices.iter().cloned().collect();
+            indices.sort();
+            assert_eq!(indices, vec![2]);
+        }
+    }
+
+    // #[test]
+    // #[cfg(feature = "rayon")]
+    // fn test_pair_index_unique_word_counts_table_rayon() {
+    //     todo!()
+    // }
 }
