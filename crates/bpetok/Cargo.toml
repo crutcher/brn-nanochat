@@ -21,6 +21,7 @@ tracing = { workspace = true }
 
 rayon = { workspace = true, optional = true }
 
+base64 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 fancy-regex = { workspace = true }

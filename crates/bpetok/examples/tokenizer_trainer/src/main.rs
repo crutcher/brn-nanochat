@@ -37,6 +37,10 @@ pub struct Args {
     /// Encode/Decode Batch size.
     #[arg(long, default_value = "32")]
     pub batch_size: usize,
+
+    /// Optional Tiktoken save path.
+    #[arg(long)]
+    pub tiktoken_save_path: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -107,6 +111,11 @@ fn main() -> anyhow::Result<()> {
     println!("- training_duration: {:#?}", training_duration);
     println!("- vocab_size: {:#?}", tokenizer.max_token());
     println!("- size_estimate: {:#?}", tokenizer.size_estimate());
+
+    if let Some(path) = args.tiktoken_save_path {
+        tokenizer.save_tiktoken_vocab(&path)?;
+        println!("- tiktoken vocab: {path:?}");
+    }
 
     if args.time_encode_decode {
         // TODO: `indicatif` for optional progress bar for users waiting on this.

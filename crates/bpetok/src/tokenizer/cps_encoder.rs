@@ -9,8 +9,12 @@ use crate::validators::expect_regex;
 use crate::vocab::data::TokenVocabData;
 use crate::{DEFAULT_PARALLEL, validators};
 use ahash::AHashMap;
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use fancy_regex::Regex;
 use std::collections::hash_map;
+use std::io::BufWriter;
+use std::io::Write;
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -84,6 +88,33 @@ impl<T: TokenType> CPSEncoder<T> {
             compiled_pattern,
             chunk_map,
         }
+    }
+
+    /// Get the chunk map.
+    pub fn chunk_map(&self) -> &AHashMap<Vec<u8>, T> {
+        &self.chunk_map
+    }
+
+    /// Save the chunk map to a tiktoken vocab file.
+    pub fn save_tiktoken_vocab(
+        &self,
+        path: &str,
+    ) -> anyhow::Result<()> {
+        let mut vocab: Vec<_> = self.chunk_map().iter().collect();
+        vocab.sort_by_key(|(_, t)| **t);
+
+        let file = std::fs::File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        for (chunk, token) in vocab {
+            writeln!(
+                writer,
+                "{} {}",
+                BASE64_STANDARD.encode(chunk),
+                token.to_u64().unwrap()
+            )?;
+        }
+
+        Ok(())
     }
 
     /// Memory usage estimate in bytes.

@@ -696,6 +696,7 @@ version = "0.0.1"
 dependencies = [
  "ahash",
  "anyhow",
+ "base64",
  "compact_str 0.9.0",
  "dary_heap",
  "fancy-regex",
