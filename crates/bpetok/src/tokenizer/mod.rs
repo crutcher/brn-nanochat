@@ -25,4 +25,12 @@ pub trait TokenEncoder<T: TokenType> {
         &self,
         text: S,
     ) -> Vec<T>;
+
+    /// Encode a batch of text into tokens.
+    fn encode_batch(
+        &self,
+        batch: &[&str],
+    ) -> Vec<Vec<T>> {
+        batch.iter().map(|s| self.encode(s)).collect()
+    }
 }

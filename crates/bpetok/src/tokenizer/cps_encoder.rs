@@ -232,6 +232,28 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
 
         self.encode_serial(text)
     }
+
+    /// Encode a batch of text into tokens.
+    fn encode_batch(
+        &self,
+        batch: &[&str],
+    ) -> Vec<Vec<T>> {
+        if self.options.parallel {
+            #[cfg(not(feature = "rayon"))]
+            panic!("Parallel processing requires the `rayon` feature to be enabled.");
+
+            #[cfg(feature = "rayon")]
+            {
+                use rayon::prelude::*;
+                batch
+                    .par_iter()
+                    .map(|text| self.encode_serial(text))
+                    .collect()
+            }
+        } else {
+            batch.iter().map(|text| self.encode_serial(text)).collect()
+        }
+    }
 }
 
 #[cfg(test)]

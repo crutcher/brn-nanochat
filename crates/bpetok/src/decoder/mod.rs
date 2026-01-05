@@ -57,6 +57,14 @@ pub trait TokenDecoder<T: TokenType> {
         buf
     }
 
+    /// Decodes a batch of tokens into a vector of byte vectors.
+    fn decode_batch_to_bytes(
+        &self,
+        tokens: &[&[T]],
+    ) -> Vec<Vec<u8>> {
+        tokens.iter().map(|t| self.decode_to_bytes(t)).collect()
+    }
+
     /// Decodes tokens into a string.
     fn decode_to_string<S: AsRef<[T]>>(
         &self,
@@ -64,6 +72,14 @@ pub trait TokenDecoder<T: TokenType> {
     ) -> String {
         let tokens = tokens.as_ref();
         String::from_utf8(self.decode_to_bytes(tokens)).unwrap()
+    }
+
+    /// Decodes a batch of tokens into a vector of strings.
+    fn decode_batch_to_strings(
+        &self,
+        tokens: &[&[T]],
+    ) -> Vec<String> {
+        tokens.iter().map(|t| self.decode_to_string(t)).collect()
     }
 
     /// Estimates the memory usage of this decoder.
