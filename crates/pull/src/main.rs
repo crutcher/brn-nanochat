@@ -3,7 +3,7 @@ use bpetok::decoder::TokenDecoder;
 use bpetok::decoder::corpus_decoder::CorpusDecoder;
 use bpetok::decoder::dictionary_decoder::DictionaryDecoder;
 use bpetok::decoder::expansion_decoder::ExpansionDecoder;
-use bpetok::tokenizer::ChunkPairScanTokenizer;
+use bpetok::tokenizer::CPSEncoder;
 use bpetok::types::TokenType;
 use bpetok::vocab::data::TokenVocabData;
 use bpetok::vocab::training::trainer::VocabTrainer;
@@ -101,7 +101,7 @@ fn main() -> anyhow::Result<()> {
         });
 
         let data: TokenVocabData<T> = trainer.train_vocab_from_sample_iter::<T, K, C, _>(samples);
-        let tokenizer = ChunkPairScanTokenizer::new(data.clone(), Default::default());
+        let tokenizer = CPSEncoder::new(data.clone(), Default::default());
 
         let training_duration = std::time::Instant::now().duration_since(t0);
         println!("- training_duration: {:#?}", training_duration);

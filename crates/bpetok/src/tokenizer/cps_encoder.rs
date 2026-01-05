@@ -10,14 +10,14 @@ use crate::{DEFAULT_PARALLEL, validators};
 use fancy_regex::Regex;
 use std::sync::Arc;
 
-/// A training for [`Tokenizer`]s.
+/// Config options for the [`CPSEncoder`].
 #[derive(Debug, Clone)]
-pub struct ChunkPairScanTokenizerOptions {
+pub struct CPSEncoderOptions {
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
 }
 
-impl ChunkPairScanTokenizerOptions {
+impl CPSEncoderOptions {
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub fn with_parallel(
         self,
@@ -29,7 +29,7 @@ impl ChunkPairScanTokenizerOptions {
     }
 }
 
-impl Default for ChunkPairScanTokenizerOptions {
+impl Default for CPSEncoderOptions {
     fn default() -> Self {
         Self {
             parallel: DEFAULT_PARALLEL,
@@ -37,24 +37,24 @@ impl Default for ChunkPairScanTokenizerOptions {
     }
 }
 
-/// A Byte Pair Encoding / Decoding Tokenizer.
-#[derive(Debug)]
-pub struct ChunkPairScanTokenizer<T: TokenType> {
+/// A Chunk/Pair Scanning [`TokenEncoder`].
+#[derive(Clone)]
+pub struct CPSEncoder<T: TokenType> {
     /// Core data describing a BPE Tokenizer.
     pub data: Arc<TokenVocabData<T>>,
 
     /// Tokenizer options.
-    pub options: ChunkPairScanTokenizerOptions,
+    pub options: CPSEncoderOptions,
 
     /// The compiled regex pattern.
-    pub compiled_pattern: Regex,
+    compiled_pattern: Regex,
 }
 
-impl<T: TokenType> ChunkPairScanTokenizer<T> {
+impl<T: TokenType> CPSEncoder<T> {
     /// Construct a new Tokenizer.
     pub fn new<D>(
         data: D,
-        options: ChunkPairScanTokenizerOptions,
+        options: CPSEncoderOptions,
     ) -> Self
     where
         D: Into<Arc<TokenVocabData<T>>>,
@@ -162,13 +162,13 @@ impl<T: TokenType> ChunkPairScanTokenizer<T> {
             .collect()
     }
 
-    /// Build a [`TokenDecoder`] from this [`ChunkPairScanTokenizer`].
+    /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
     pub fn to_decoder(&self) -> impl TokenDecoder<T> {
         CorpusDecoder::from_data(&self.data)
     }
 }
 
-impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
+impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
     fn data(&self) -> &Arc<TokenVocabData<T>> {
         &self.data
     }
@@ -197,7 +197,7 @@ impl<T: TokenType> TokenEncoder<T> for ChunkPairScanTokenizer<T> {
 mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
+    use crate::tokenizer::cps_encoder::CPSEncoder;
     use crate::types;
     use crate::vocab::training::trainer::VocabTrainer;
     use compact_str::CompactString;
@@ -227,7 +227,7 @@ mod tests {
         ];
 
         let data = options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
-        let tokenizer = ChunkPairScanTokenizer::new(data, Default::default());
+        let tokenizer = CPSEncoder::new(data, Default::default());
 
         // compile time checks.
         types::check_is_send(&tokenizer);

@@ -1,10 +1,10 @@
 //! # Tokenizer Structures
 
-pub mod cps_tokenizer;
+pub mod cps_encoder;
 
 use crate::types::TokenType;
 use crate::vocab::data::TokenVocabData;
-pub use cps_tokenizer::*;
+pub use cps_encoder::*;
 use std::sync::Arc;
 
 /// A trait for token encoders.

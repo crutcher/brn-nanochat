@@ -83,7 +83,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 mod tests {
     use super::*;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::cps_tokenizer::ChunkPairScanTokenizer;
+    use crate::tokenizer::cps_encoder::CPSEncoder;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::data::TokenVocabData;
     use crate::vocab::training::trainer::VocabTrainer;
@@ -106,7 +106,7 @@ mod tests {
         let data: TokenVocabData<T> =
             options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
 
-        let tokenizer = ChunkPairScanTokenizer::new(data.clone(), Default::default());
+        let tokenizer = CPSEncoder::new(data.clone(), Default::default());
 
         let decoder = DictionaryDecoder::from_data(&data);
         check_is_send(&decoder);
