@@ -82,7 +82,6 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         #[cfg(feature = "rayon")]
         {
             use rayon::prelude::*;
-            let batch: Vec<&Vec<T>> = batch.iter().collect::<Vec<_>>();
 
             batch
                 .into_par_iter()
