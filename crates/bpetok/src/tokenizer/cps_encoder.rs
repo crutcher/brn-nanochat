@@ -111,13 +111,6 @@ impl<T: TokenType> CPSEncoder<T> {
         buf: &mut Vec<T>,
         chunk: &[u8],
     ) {
-        /*
-        if chunk.len() == 1 {
-            buf.push(T::from_u8(chunk[0]).unwrap());
-            return;
-        }
-         */
-
         if let Some(token) = self.vocab_map.get(chunk) {
             buf.push(*token);
             return;
