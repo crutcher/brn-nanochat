@@ -151,19 +151,38 @@ fn main() -> anyhow::Result<()> {
             });
             let avg_ns = times_ns.sum::<u64>() / count as u64;
             println!("- batch avg: {:#?}", Duration::from_nanos(avg_ns));
+            println!(
+                "- sample avg: {:#?}",
+                Duration::from_nanos(avg_ns / count as u64)
+            );
         }
 
         println!();
         let expansion_decoder = ExpansionDecoder::from_data(&data);
-        time_decoder("ExpansionDecoder", &expansion_decoder, &token_batches);
+        time_decoder(
+            "ExpansionDecoder",
+            &expansion_decoder,
+            &token_batches,
+            args.batch_size,
+        );
 
         println!();
         let dict_decoder = DictionaryDecoder::from_tokenizer(&expansion_decoder);
-        time_decoder("DictionaryDecoder", &dict_decoder, &token_batches);
+        time_decoder(
+            "DictionaryDecoder",
+            &dict_decoder,
+            &token_batches,
+            args.batch_size,
+        );
 
         println!();
         let corpus_decoder = CorpusDecoder::from_data(&data);
-        time_decoder("CorpusDecoder", &corpus_decoder, &token_batches);
+        time_decoder(
+            "CorpusDecoder",
+            &corpus_decoder,
+            &token_batches,
+            args.batch_size,
+        );
     }
 
     Ok(())
@@ -173,6 +192,7 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     name: &str,
     decoder: &D,
     token_batches: &[Vec<Vec<T>>],
+    batch_size: usize,
 ) {
     let count = token_batches.len();
     println!("Timing Decode: {name}");
@@ -189,4 +209,8 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
 
     let avg_ns = times_ns.sum::<u64>() / count as u64;
     println!("- batch avg: {:?}", Duration::from_nanos(avg_ns));
+    println!(
+        "- sample avg: {:?}",
+        Duration::from_nanos(avg_ns / batch_size as u64)
+    );
 }
