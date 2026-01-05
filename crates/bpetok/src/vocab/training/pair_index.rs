@@ -168,6 +168,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::MergeMap;
     use crate::vocab::training::word::Word;
 
     #[test]
@@ -182,10 +183,12 @@ mod tests {
     }
 
     fn test_pair_index(parallel: bool) {
+        type T = u8;
+
         let words = vec![
-            Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'l' as u8, 'o' as u8]),
-            Word::from_tokens(['w' as u8, 'o' as u8, 'r' as u8, 'l' as u8, 'd' as u8]),
-            Word::from_tokens(['h' as u8, 'e' as u8, 'l' as u8, 'p' as u8]),
+            Word::from_string("hello"),
+            Word::from_string("world"),
+            Word::from_string("help"),
         ];
 
         let word_counts = vec![1, 2, 3];
@@ -199,45 +202,40 @@ mod tests {
             pair_to_word_index,
         } = index;
 
-        let mut pair_counts: Vec<_> = pair_counts.into_iter().collect();
-        pair_counts.sort();
         assert_eq!(
             pair_counts,
-            vec![
-                (('e' as u8, 'l' as u8), 4),
-                (('h' as u8, 'e' as u8), 4),
-                (('l' as u8, 'd' as u8), 2),
-                (('l' as u8, 'l' as u8), 1),
-                (('l' as u8, 'o' as u8), 1),
-                (('l' as u8, 'p' as u8), 3),
-                (('o' as u8, 'r' as u8), 2),
-                (('r' as u8, 'l' as u8), 2),
-                (('w' as u8, 'o' as u8), 2),
+            [
+                (('e', 'l'), 4),
+                (('h', 'e'), 4),
+                (('l', 'd'), 2),
+                (('l', 'l'), 1),
+                (('l', 'o'), 1),
+                (('l', 'p'), 3),
+                (('o', 'r'), 2),
+                (('r', 'l'), 2),
+                (('w', 'o'), 2),
             ]
+            .into_iter()
+            .map(|((a, b), c)| ((a as u8, b as u8), c))
+            .collect::<MergeMap<T>>()
         );
 
-        let mut pair_to_word_index: Vec<_> = pair_to_word_index
-            .into_iter()
-            .map(|(p, wi)| {
-                let mut wi = wi.into_iter().collect::<Vec<_>>();
-                wi.sort();
-                (p, wi)
-            })
-            .collect();
-        pair_to_word_index.sort_by_key(|(p, _)| *p);
         assert_eq!(
             pair_to_word_index,
-            vec![
-                (('e' as u8, 'l' as u8), vec![0, 2]),
-                (('h' as u8, 'e' as u8), vec![0, 2]),
-                (('l' as u8, 'd' as u8), vec![1]),
-                (('l' as u8, 'l' as u8), vec![0]),
-                (('l' as u8, 'o' as u8), vec![0]),
-                (('l' as u8, 'p' as u8), vec![2]),
-                (('o' as u8, 'r' as u8), vec![1]),
-                (('r' as u8, 'l' as u8), vec![1]),
-                (('w' as u8, 'o' as u8), vec![1]),
+            [
+                (('e', 'l'), vec![0, 2]),
+                (('h', 'e'), vec![0, 2]),
+                (('l', 'd'), vec![1]),
+                (('l', 'l'), vec![0]),
+                (('l', 'o'), vec![0]),
+                (('l', 'p'), vec![2]),
+                (('o', 'r'), vec![1]),
+                (('r', 'l'), vec![1]),
+                (('w', 'o'), vec![1]),
             ]
+            .into_iter()
+            .map(|((a, b), s)| ((a as u8, b as u8), AHashSet::from_iter(s)))
+            .collect::<AHashMap<Pair<T>, AHashSet<usize>>>()
         );
     }
 }
