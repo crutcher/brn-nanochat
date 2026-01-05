@@ -155,30 +155,15 @@ fn main() -> anyhow::Result<()> {
 
         println!();
         let expansion_decoder = ExpansionDecoder::from_data(&data);
-        time_decoder(
-            "ExpansionDecoder",
-            &expansion_decoder,
-            &token_batches,
-            args.batch_size,
-        );
+        time_decoder("ExpansionDecoder", &expansion_decoder, &token_batches);
 
         println!();
         let dict_decoder = DictionaryDecoder::from_tokenizer(&expansion_decoder);
-        time_decoder(
-            "DictionaryDecoder",
-            &dict_decoder,
-            &token_batches,
-            args.batch_size,
-        );
+        time_decoder("DictionaryDecoder", &dict_decoder, &token_batches);
 
         println!();
         let corpus_decoder = CorpusDecoder::from_data(&data);
-        time_decoder(
-            "CorpusDecoder",
-            &corpus_decoder,
-            &token_batches,
-            args.batch_size,
-        );
+        time_decoder("CorpusDecoder", &corpus_decoder, &token_batches);
     }
 
     Ok(())
@@ -188,7 +173,6 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     name: &str,
     decoder: &D,
     token_batches: &[Vec<Vec<T>>],
-    batch_size: usize,
 ) {
     let count = token_batches.len();
     println!("Timing Decode: {name}");
