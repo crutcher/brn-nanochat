@@ -128,7 +128,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         println!();
-        println!("Timing Samples:");
+        println!("Samples Summary:");
         let count = samples.len();
         println!("- count: {}", count);
         let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / count;
@@ -137,7 +137,11 @@ fn main() -> anyhow::Result<()> {
         let sample_batches: Vec<&[String]> = samples.chunks(args.batch_size).collect::<Vec<_>>();
 
         println!();
-        println!("Timing Encode:");
+        println!("Timing Config:");
+        println!("- batch size: {}", args.batch_size);
+
+        println!();
+        println!("Timing CPSEncoder Encode:");
         let mut token_batches: Vec<Vec<Vec<T>>> = Vec::with_capacity(sample_batches.len());
         {
             let times_ns = sample_batches.iter().map(|batch| {
