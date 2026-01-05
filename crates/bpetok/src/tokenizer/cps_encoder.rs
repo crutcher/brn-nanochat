@@ -102,7 +102,7 @@ impl<T: TokenType> CPSEncoder<T> {
     }
 
     /// Append a chunk of text into token IDs.
-    #[tracing::instrument(skip(self, chunk))]
+    #[tracing::instrument(skip(self, buf, chunk))]
     pub fn append_encode_chunk(
         &self,
         buf: &mut Vec<T>,
@@ -117,6 +117,8 @@ impl<T: TokenType> CPSEncoder<T> {
             buf.push(*token);
             return;
         }
+
+        // TODO: use `buf` *as* chunk_tokens, to avoid the extra allocation.
 
         // Convert chunk to tokens.
         let mut chunk_tokens: Vec<T> = chunk.iter().map(|&b| T::from_u8(b).unwrap()).collect();

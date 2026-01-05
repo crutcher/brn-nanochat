@@ -85,7 +85,7 @@ Timing Samples:
 - avg size: 4712
 
 Timing Encode:
-- avg (serial): 426.958µs
+- avg (serial): 405.53µs
 - avg (rayon): 1.709301ms
 
 Timing Decode: ExpansionDecoder
