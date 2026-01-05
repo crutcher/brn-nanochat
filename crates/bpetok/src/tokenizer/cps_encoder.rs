@@ -86,11 +86,6 @@ impl<T: TokenType> CPSEncoder<T> {
         }
     }
 
-    /// Vocab Size.
-    pub fn max_token(&self) -> T {
-        self.data.max_token()
-    }
-
     /// Memory usage estimate in bytes.
     pub fn size_estimate(&self) -> usize {
         let data_size = self.data.size_estimate();
