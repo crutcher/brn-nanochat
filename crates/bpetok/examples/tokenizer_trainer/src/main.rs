@@ -158,6 +158,9 @@ fn main() -> anyhow::Result<()> {
         }
 
         println!();
+        println!("Note: batch parallelism is not implemented for decoders yet.");
+
+        println!();
         let expansion_decoder = ExpansionDecoder::from_data(&data);
         time_decoder(
             "ExpansionDecoder",
