@@ -8,101 +8,7 @@ use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
 
-/// Represents a materialized sequence of tokens and their byte slices.
-struct MaterializationMap<T: TokenType> {
-    root: T,
-    buf: Vec<u8>,
-    slices: AHashMap<T, Range<usize>>,
-}
-
-impl<T: TokenType> MaterializationMap<T> {
-    /// Creates a new materialization map for the given token.
-    #[tracing::instrument(skip(token, expansion_map, maybe_slice))]
-    fn materialize<'a, F>(
-        token: T,
-        expansion_map: &ExpansionMap<T>,
-        maybe_slice: &F,
-    ) -> Self
-    where
-        F: Fn(T) -> Option<&'a [u8]>,
-    {
-        assert!(
-            !is_byte_token(token),
-            "MaterializationMap should only be used for non-byte tokens"
-        );
-
-        let mut mmap = Self {
-            root: token,
-            buf: Default::default(),
-            slices: Default::default(),
-        };
-
-        mmap.expand(token, expansion_map, maybe_slice);
-
-        mmap
-    }
-
-    #[tracing::instrument(skip(self, token, expansion_map, maybe_slice))]
-    fn expand<'a, F>(
-        &mut self,
-        token: T,
-        expansion_map: &ExpansionMap<T>,
-        maybe_slice: &F,
-    ) where
-        F: Fn(T) -> Option<&'a [u8]>,
-    {
-        if is_byte_token(token) {
-            // byte tokens are not inserted into the slice map.
-            let b = token.to_u8().unwrap();
-            self.buf.push(b);
-            return;
-        }
-
-        if let Some(slice) = self.try_get(token) {
-            // The current buffer is def in the cache lines;
-            // so copy from self first.
-            let slice = slice.to_owned();
-
-            // we're already in the slices map, so don't update it.
-            self.buf.extend_from_slice(&slice);
-            return;
-        }
-        if let Some(slice) = maybe_slice(token) {
-            let start = self.buf.len();
-            self.slices.insert(token, start..start + slice.len());
-
-            self.buf.extend_from_slice(slice);
-            return;
-        }
-
-        let pair = expansion_map
-            .get(&token)
-            .expect("token not found in expansion_map");
-        let (a, b) = pair.to_owned();
-        let start = self.buf.len();
-        self.expand(a, expansion_map, maybe_slice);
-        self.expand(b, expansion_map, maybe_slice);
-        let end = self.buf.len();
-        self.slices.insert(token, start..end);
-    }
-
-    /// Returns an iterator over the non-byte tokens in this map.
-    fn tokens(&self) -> impl Iterator<Item = T> {
-        self.slices.keys().copied()
-    }
-
-    /// Returns the byte slice for the given token, if it exists.
-    fn try_get(
-        &self,
-        token: T,
-    ) -> Option<&[u8]> {
-        self.slices
-            .get(&token)
-            .map(|range| &self.buf[range.clone()])
-    }
-}
-
-/// A token decoder.
+/// A token dictionary [`TokenDecoder<T>`], with a shared corpus buffer.
 #[derive(Clone)]
 pub struct CorpusDecoder<T: TokenType> {
     /// Token to byte slice mapping.
@@ -222,6 +128,99 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
     }
 }
 
+/// Represents a materialized sequence of tokens and their byte slices.
+struct MaterializationMap<T: TokenType> {
+    root: T,
+    buf: Vec<u8>,
+    slices: AHashMap<T, Range<usize>>,
+}
+
+impl<T: TokenType> MaterializationMap<T> {
+    /// Creates a new materialization map for the given token.
+    #[tracing::instrument(skip(token, expansion_map, maybe_slice))]
+    fn materialize<'a, F>(
+        token: T,
+        expansion_map: &ExpansionMap<T>,
+        maybe_slice: &F,
+    ) -> Self
+    where
+        F: Fn(T) -> Option<&'a [u8]>,
+    {
+        assert!(
+            !is_byte_token(token),
+            "MaterializationMap should only be used for non-byte tokens"
+        );
+
+        let mut mmap = Self {
+            root: token,
+            buf: Default::default(),
+            slices: Default::default(),
+        };
+
+        mmap.expand(token, expansion_map, maybe_slice);
+
+        mmap
+    }
+
+    #[tracing::instrument(skip(self, token, expansion_map, maybe_slice))]
+    fn expand<'a, F>(
+        &mut self,
+        token: T,
+        expansion_map: &ExpansionMap<T>,
+        maybe_slice: &F,
+    ) where
+        F: Fn(T) -> Option<&'a [u8]>,
+    {
+        if is_byte_token(token) {
+            // byte tokens are not inserted into the slice map.
+            let b = token.to_u8().unwrap();
+            self.buf.push(b);
+            return;
+        }
+
+        if let Some(slice) = self.try_get(token) {
+            // The current buffer is def in the cache lines;
+            // so copy from self first.
+            let slice = slice.to_owned();
+
+            // we're already in the slices map, so don't update it.
+            self.buf.extend_from_slice(&slice);
+            return;
+        }
+        if let Some(slice) = maybe_slice(token) {
+            let start = self.buf.len();
+            self.slices.insert(token, start..start + slice.len());
+
+            self.buf.extend_from_slice(slice);
+            return;
+        }
+
+        let pair = expansion_map
+            .get(&token)
+            .expect("token not found in expansion_map");
+        let (a, b) = pair.to_owned();
+        let start = self.buf.len();
+        self.expand(a, expansion_map, maybe_slice);
+        self.expand(b, expansion_map, maybe_slice);
+        let end = self.buf.len();
+        self.slices.insert(token, start..end);
+    }
+
+    /// Returns an iterator over the non-byte tokens in this map.
+    fn tokens(&self) -> impl Iterator<Item = T> {
+        self.slices.keys().copied()
+    }
+
+    /// Returns the byte slice for the given token, if it exists.
+    fn try_get(
+        &self,
+        token: T,
+    ) -> Option<&[u8]> {
+        self.slices
+            .get(&token)
+            .map(|range| &self.buf[range.clone()])
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

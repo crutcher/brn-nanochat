@@ -7,7 +7,7 @@ use crate::vocab::data::TokenVocabData;
 use ahash::AHashMap;
 use std::collections::hash_map;
 
-/// A decoder for [`Tokenizer`] decoder with a materialized dictionary.
+/// A token dictionary [`TokenDecoder<T>`].
 pub struct DictionaryDecoder<T: TokenType> {
     /// Token to bytes mapping.
     ///

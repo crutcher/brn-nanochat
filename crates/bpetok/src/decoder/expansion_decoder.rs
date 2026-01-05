@@ -1,4 +1,4 @@
-//! # Graph Decoder
+//! # Expansion Decoder
 
 use crate::decoder::TokenDecoder;
 use crate::types::{ExpansionMap, MergeMap, TokenType};
@@ -7,20 +7,20 @@ use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
 
-/// A decoder for [`Tokenizer`] decoder with a production graph.
+/// An [`ExpansionMap`] [`TokenDecoder<T>`].
 #[derive(Clone)]
 pub struct ExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
     ///
     /// Does not include byte-tokens.
-    pub graph: ExpansionMap<T>,
+    pub expansion_map: ExpansionMap<T>,
 }
 
 impl<T: TokenType> ExpansionDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut graph: ExpansionMap<T>) -> Self {
-        graph.shrink_to_fit();
-        Self { graph }
+    pub fn new(mut expansion_map: ExpansionMap<T>) -> Self {
+        expansion_map.shrink_to_fit();
+        Self { expansion_map }
     }
 
     /// Build a [`ExpansionDecoder`] from this [`TokenVocabData`].
@@ -40,7 +40,7 @@ impl<T: TokenType> ExpansionDecoder<T> {
 
 impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
     fn pair_tokens(&self) -> impl Iterator<Item = T> {
-        self.graph.keys().copied()
+        self.expansion_map.keys().copied()
     }
 
     #[tracing::instrument(skip(self, buf, tokens))]
@@ -56,14 +56,17 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
                 buf.push(b);
                 continue;
             }
-            let (a, b) = self.graph.get(&t).expect("Token not found in slice map");
+            let (a, b) = self
+                .expansion_map
+                .get(&t)
+                .expect("Token not found in slice map");
             stack.push(*b);
             stack.push(*a);
         }
     }
 
     fn size_estimate(&self) -> usize {
-        size_of::<hash_map::Entry<T, Range<usize>>>() * self.graph.len()
+        size_of::<hash_map::Entry<T, Range<usize>>>() * self.expansion_map.len()
     }
 }
 
@@ -77,7 +80,7 @@ mod tests {
     use compact_str::CompactString;
 
     #[test]
-    fn test_graph_decoder() {
+    fn test_expansion_decoder() {
         type T = u16;
         type C = u32;
         type K = CompactString;
