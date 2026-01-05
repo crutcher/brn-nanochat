@@ -101,14 +101,17 @@ impl<T: TokenType> CPSEncoder<T> {
         &self,
         chunk: S,
     ) -> Vec<T> {
-        let chunk = chunk.as_ref();
+        let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
 
-        if let Some(t) = self.chunk_map.get(chunk.as_bytes()) {
+        if let Some(t) = self.chunk_map.get(chunk_bytes) {
             return vec![*t];
         }
 
-        // Convert chunk to bytes then to tokens.
-        let mut chunk_tokens: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();
+        // Convert chunk to tokens.
+        let mut chunk_tokens: Vec<T> = chunk_bytes
+            .iter()
+            .map(|&b| T::from_u8(b).unwrap())
+            .collect();
 
         // Apply merges iteratively
         while chunk_tokens.len() >= 2 {
