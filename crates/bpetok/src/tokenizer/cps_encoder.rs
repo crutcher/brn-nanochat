@@ -103,6 +103,10 @@ impl<T: TokenType> CPSEncoder<T> {
     ) -> Vec<T> {
         let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
 
+        if chunk_bytes.len() == 1 {
+            return vec![T::from_u8(chunk_bytes[0]).unwrap()];
+        }
+
         if let Some(t) = self.chunk_map.get(chunk_bytes) {
             return vec![*t];
         }
