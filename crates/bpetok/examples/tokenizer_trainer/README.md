@@ -76,7 +76,7 @@ DatasetCacheConfig {
 Loading Shards ...: [0, 1, 2, 3, 4, 5, 6, 7]
 
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
-- training_duration: 71.980114011s
+- training_duration: 73.573697478s
 - vocab_size: 65535
 - size_estimate: 917613
 
@@ -85,22 +85,22 @@ Timing Samples:
 - avg size: 4712
 
 Timing Encode:
-- avg (serial): 502.521µs
-- avg (rayon): 1.771724ms
+- avg (serial): 426.958µs
+- avg (rayon): 1.709301ms
 
 Timing Decode: ExpansionDecoder
 - decoder est bytes: 1566720
-- avg: 52.744µs
+- avg: 51.898µs
 
 Timing Decode: DictionaryDecoder
 - decoder est bytes: 1860233
-- avg: 19.589µs
+- avg: 18.14µs
 
 Timing Decode: CorpusDecoder
 - decoder est bytes: 1820714
-- avg: 18.167µs
+- avg: 18.069µs
 
-real    1m32.263s
-user    85m35.655s
-sys     26m15.540s
+real	1m34.296s
+user	86m53.705s
+sys	27m43.176s
 ```
