@@ -2,11 +2,13 @@
 
 use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
+use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::{Pair, TokenType};
 use crate::validators::expect_regex;
 use crate::vocab::data::TokenVocabData;
 use crate::{DEFAULT_PARALLEL, validators};
+use ahash::AHashMap;
 use fancy_regex::Regex;
 use std::sync::Arc;
 
@@ -48,6 +50,8 @@ pub struct CPSEncoder<T: TokenType> {
 
     /// The compiled regex pattern.
     compiled_pattern: Regex,
+
+    chunk_map: AHashMap<Vec<u8>, T>,
 }
 
 impl<T: TokenType> CPSEncoder<T> {
@@ -66,10 +70,18 @@ impl<T: TokenType> CPSEncoder<T> {
 
         let data = data.into();
         let compiled_pattern = expect_regex(&data.pattern);
+
+        let decoder = DictionaryDecoder::from_data(&data);
+        let chunk_map = decoder
+            .dictionary
+            .into_iter()
+            .map(|(k, v)| (v, k))
+            .collect();
         Self {
             data,
             options,
             compiled_pattern,
+            chunk_map,
         }
     }
 
@@ -90,6 +102,10 @@ impl<T: TokenType> CPSEncoder<T> {
         chunk: S,
     ) -> Vec<T> {
         let chunk = chunk.as_ref();
+
+        if let Some(t) = self.chunk_map.get(chunk.as_bytes()) {
+            return vec![*t];
+        }
 
         // Convert chunk to bytes then to tokens.
         let mut chunk_tokens: Vec<T> = chunk.bytes().map(|b| T::from_u8(b).unwrap()).collect();

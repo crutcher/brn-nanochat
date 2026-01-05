@@ -8,6 +8,7 @@ use ahash::AHashMap;
 use std::collections::hash_map;
 
 /// A token dictionary [`TokenDecoder<T>`].
+#[derive(Clone)]
 pub struct DictionaryDecoder<T: TokenType> {
     /// Token to bytes mapping.
     ///
