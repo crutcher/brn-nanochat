@@ -108,10 +108,12 @@ impl<T: TokenType> CPSEncoder<T> {
         buf: &mut Vec<T>,
         chunk: &[u8],
     ) {
+        /*
         if chunk.len() == 1 {
             buf.push(T::from_u8(chunk[0]).unwrap());
             return;
         }
+         */
 
         if let Some(token) = self.chunk_map.get(chunk) {
             buf.push(*token);
@@ -122,7 +124,7 @@ impl<T: TokenType> CPSEncoder<T> {
         let start = buf.len();
         chunk.iter().for_each(|&b| buf.push(T::from_u8(b).unwrap()));
 
-        while buf.len() >= start + 2 {
+        while (start + 2) < buf.len() {
             // Find the best pair to merge
             let mut best_pair: Option<(usize, Pair<T>, T)> = None;
 
