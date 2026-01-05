@@ -4,17 +4,13 @@ use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
-use crate::types::{Pair, TokenType};
+use crate::types::{Pair, TokenType, VocabMap};
 use crate::validators::expect_regex;
 use crate::vocab::data::TokenVocabData;
+use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
-use ahash::AHashMap;
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
 use fancy_regex::Regex;
 use std::collections::hash_map;
-use std::io::BufWriter;
-use std::io::Write;
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -56,7 +52,7 @@ pub struct CPSEncoder<T: TokenType> {
     /// The compiled regex pattern.
     compiled_pattern: Regex,
 
-    chunk_map: AHashMap<Vec<u8>, T>,
+    vocab_map: VocabMap<T>,
 }
 
 impl<T: TokenType> CPSEncoder<T> {
@@ -86,13 +82,8 @@ impl<T: TokenType> CPSEncoder<T> {
             data,
             options,
             compiled_pattern,
-            chunk_map,
+            vocab_map: chunk_map,
         }
-    }
-
-    /// Get the chunk map.
-    pub fn chunk_map(&self) -> &AHashMap<Vec<u8>, T> {
-        &self.chunk_map
     }
 
     /// Save the chunk map to a tiktoken vocab file.
@@ -100,29 +91,15 @@ impl<T: TokenType> CPSEncoder<T> {
         &self,
         path: &str,
     ) -> anyhow::Result<()> {
-        let mut vocab: Vec<_> = self.chunk_map().iter().collect();
-        vocab.sort_by_key(|(_, t)| **t);
-
-        let file = std::fs::File::create(path)?;
-        let mut writer = BufWriter::new(file);
-        for (chunk, token) in vocab {
-            writeln!(
-                writer,
-                "{} {}",
-                BASE64_STANDARD.encode(chunk),
-                token.to_u64().unwrap()
-            )?;
-        }
-
-        Ok(())
+        save_tiktoken_vocab(&self.vocab_map, path)
     }
 
     /// Memory usage estimate in bytes.
     pub fn size_estimate(&self) -> usize {
         let data_size = self.data.size_estimate();
 
-        let chunk_meta = size_of::<hash_map::Entry<Vec<u8>, T>>() * self.chunk_map.len();
-        let chunk_sum = self.chunk_map.keys().map(|b| b.len()).sum::<usize>();
+        let chunk_meta = size_of::<hash_map::Entry<Vec<u8>, T>>() * self.vocab_map.len();
+        let chunk_sum = self.vocab_map.keys().map(|b| b.len()).sum::<usize>();
 
         data_size + chunk_meta + chunk_sum
     }
@@ -141,7 +118,7 @@ impl<T: TokenType> CPSEncoder<T> {
         }
          */
 
-        if let Some(token) = self.chunk_map.get(chunk) {
+        if let Some(token) = self.vocab_map.get(chunk) {
             buf.push(*token);
             return;
         }
