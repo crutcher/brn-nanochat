@@ -9,8 +9,10 @@ use crate::validators::expect_regex;
 use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
+use ahash::AHashMap;
 use fancy_regex::Regex;
 use std::collections::hash_map;
+use std::ops::Range;
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -106,13 +108,26 @@ impl<T: TokenType> CPSEncoder<T> {
 
     /// Append a chunk of text into token IDs.
     #[tracing::instrument(skip(self, buf, chunk))]
-    pub fn append_encode_chunk(
+    pub fn append_encode_chunk<'a>(
         &self,
         buf: &mut Vec<T>,
-        chunk: &[u8],
+        chunk: &'a [u8],
+        cache: Option<&mut AHashMap<&'a [u8], Range<usize>>>,
     ) {
+        if chunk.len() == 1 {
+            buf.push(T::from_u8(chunk[0]).unwrap());
+            return;
+        }
+
         if let Some(token) = self.vocab_map.get(chunk) {
             buf.push(*token);
+            return;
+        }
+
+        if let Some(cache) = &cache
+            && let Some(r) = cache.get(chunk)
+        {
+            buf.extend_from_within(r.clone());
             return;
         }
 
@@ -142,6 +157,10 @@ impl<T: TokenType> CPSEncoder<T> {
                 break;
             }
         }
+
+        if let Some(cache) = cache {
+            cache.insert(chunk, start..buf.len());
+        }
     }
 
     /// Encode a chunk of text into token IDs.
@@ -152,7 +171,7 @@ impl<T: TokenType> CPSEncoder<T> {
     ) -> Vec<T> {
         let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
         let mut tokens = Vec::with_capacity(chunk_bytes.len());
-        self.append_encode_chunk(&mut tokens, chunk_bytes);
+        self.append_encode_chunk(&mut tokens, chunk_bytes, None);
         tokens
     }
 
@@ -175,8 +194,10 @@ impl<T: TokenType> CPSEncoder<T> {
     ) -> Vec<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
-        self.split_groups(text)
-            .for_each(|chunk| self.append_encode_chunk(&mut tokens, chunk.as_bytes()));
+        let mut cache = AHashMap::with_capacity(tokens.len());
+        for chunk in self.split_groups(text) {
+            self.append_encode_chunk(&mut tokens, chunk.as_bytes(), Some(&mut cache));
+        }
         tokens
     }
 
