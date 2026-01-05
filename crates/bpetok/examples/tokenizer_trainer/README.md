@@ -47,9 +47,10 @@ python -m scripts.tok_train --max_chars=2000000000
 - Note: my machine is a beast (64-core Threadripper; NVME data disk).
 
 ```terminaloutput
-$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode
-    Finished `release` profile [optimized] target(s) in 0.32s
-     Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode`
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 100
+   Compiling tokenizer_trainer v0.0.0 (/home/crutcher/git/brn-nanochat/crates/bpetok/examples/tokenizer_trainer)
+    Finished `release` profile [optimized] target(s) in 1.39s
+     Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 100`
 Args {
     shards: [
         Slice {
@@ -63,6 +64,7 @@ Args {
     dataset_dir: "/media/Data/nanochat/dataset",
     vocab_size: 65536,
     time_encode_decode: true,
+    batch_size: 100,
 }
 DatasetCacheConfig {
     cache_dir: "/media/Data/nanochat/dataset",
@@ -76,7 +78,7 @@ DatasetCacheConfig {
 Loading Shards ...: [0, 1, 2, 3, 4, 5, 6, 7]
 
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
-- training_duration: 73.573697478s
+- training_duration: 72.657323792s
 - vocab_size: 65535
 - size_estimate: 3822326
 
@@ -85,22 +87,27 @@ Timing Samples:
 - avg size: 4712
 
 Timing Encode:
-- avg (serial): 405.53µs
-- avg (rayon): 1.709301ms
+- batch avg: 277.786µs
+- sample avg: 33ns
+
+Note: batch parallelism is not implemented for decoders yet.
 
 Timing Decode: ExpansionDecoder
 - decoder est bytes: 1566720
-- avg: 51.898µs
+- batch avg: 5.466192ms
+- sample avg: 54.661µs
 
 Timing Decode: DictionaryDecoder
 - decoder est bytes: 1860233
-- avg: 18.14µs
+- batch avg: 1.851256ms
+- sample avg: 18.512µs
 
 Timing Decode: CorpusDecoder
 - decoder est bytes: 1820714
-- avg: 18.069µs
+- batch avg: 1.829392ms
+- sample avg: 18.293µs
 
-real	1m34.296s
-user	86m53.705s
-sys	27m43.176s
+real	1m17.720s
+user	76m48.118s
+sys	24m18.150s
 ```
