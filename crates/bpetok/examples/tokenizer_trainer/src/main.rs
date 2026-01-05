@@ -150,9 +150,11 @@ fn main() -> anyhow::Result<()> {
                 t1.duration_since(t0).as_nanos() as u64
             });
             let avg_ns = times_ns.sum::<u64>() / count as u64;
-            let batch_avg = Duration::from_nanos(avg_ns);
-            println!("- batch avg: {:#?}", batch_avg);
-            println!("- sample avg: {:#?}", avg_ns / count as u64);
+            println!("- batch avg: {:#?}", Duration::from_nanos(avg_ns));
+            println!(
+                "- sample avg: {:#?}",
+                Duration::from_nanos(avg_ns / count as u64)
+            );
         }
 
         println!();
@@ -206,8 +208,7 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     });
 
     let avg_ns = times_ns.sum::<u64>() / count as u64;
-    let avg = Duration::from_nanos(avg_ns);
-    println!("- batch avg: {avg:?}");
+    println!("- batch avg: {:?}", Duration::from_nanos(avg_ns));
     println!(
         "- sample avg: {:?}",
         Duration::from_nanos(avg_ns / batch_size as u64)
