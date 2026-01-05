@@ -95,8 +95,8 @@ Timing Config:
 - batch size: 256
 
 Timing CPSEncoder Encode:
-- batch avg: 182.233µs
-- sample avg: 22ns
+- batch avg: 191.163µs
+- sample avg: 746ns
 
 Timing Decode: ExpansionDecoder
 - decoder est bytes: 1566720
