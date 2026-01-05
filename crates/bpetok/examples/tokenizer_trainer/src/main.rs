@@ -166,7 +166,7 @@ fn main() -> anyhow::Result<()> {
             println!("- batch avg: {:#?}", Duration::from_nanos(avg_ns));
             println!(
                 "- sample avg: {:#?}",
-                Duration::from_nanos(avg_ns / count as u64)
+                Duration::from_nanos(avg_ns / args.batch_size as u64)
             );
         }
 
