@@ -1,4 +1,4 @@
-# Shard Pull Utility
+# Example Tokenizer Trainer
 
 Each shard is ~90MB parquet file.
 
@@ -20,50 +20,12 @@ _TL;DR_:
 
 This is a *partial example* of training a nanochat-equivalent tokenizer:
 
-```terminaloutput
-# Build the `pull` binary; and pre-download the first 8 shards of the dataset.
-$ cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8
-# Train the tokenizer on the first 8 shards of the dataset.
-$ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536
-    Finished `release` profile [optimized] target(s) in 0.32s
-     Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536`
-Args {
-    shards: [
-        Slice {
-            start: 0,
-            end: Some(
-                8,
-            ),
-            step: 1,
-        },
-    ],
-    dataset_dir: "/media/Data/nanochat/dataset",
-    train_tokenizer: true,
-    vocab_size: 65536,
-}
-DatasetCacheConfig {
-    cache_dir: "/media/Data/nanochat/dataset",
-    source: DatasetSource {
-        base_url: "https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle/resolve/main",
-        max_shard: 1822,
-        index_pad_width: 5,
-        shard_template: "shard_{index}.parquet",
-    },
-}
-vocab_size: 65536
-
-real    1m14.608s
-user    75m21.630s
-sys     24m21.012s
-```
-
-- Note: my machine is a beast (64 core Threadripper; NVME data disk).
 - we don't support export / load of the tokenizer yet; so this is all in-memory for nothing.
 - the nanochat choice of 2**16 vocab size *seems* cool; but it ignores:
     - nighter the `rustbpe` nor `tiktoken` tokenizers support tuning the `Token` width for a smaller vocab size.
     - the token=>embedding table also doesn't tune for smaller vocab sizes.
 
-See: [nanochat/speedrun.sh](https://github.com/karpathy/nanochat/blob/master/speedrun.sh#L58C1-L69C51)
+See: [original nanochat/speedrun.sh](https://github.com/karpathy/nanochat/blob/master/speedrun.sh#L58C1-L69C51)
 
 ```bash
 # Download the first ~2B characters of pretraining dataset
@@ -80,16 +42,14 @@ DATASET_DOWNLOAD_PID=$!
 python -m scripts.tok_train --max_chars=2000000000
 ```
 
-# benchmarks
+# training and timing
 
-Same as above:
+- Note: my machine is a beast (64-core Threadripper; NVME data disk).
 
 ```terminaloutput
-$ time cargo run --release -p pull -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode
-   Compiling bpetok v0.0.1 (/home/crutcher/git/brn-nanochat/crates/bpetok)
-   Compiling pull v0.0.0 (/home/crutcher/git/brn-nanochat/crates/pull)
-    Finished `release` profile [optimized] target(s) in 1.80s
-     Running `target/release/pull --dataset-dir /media/Data/nanochat/dataset --shards ..8 --train-tokenizer --vocab-size=65536 --time-encode-decode`
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode
+    Finished `release` profile [optimized] target(s) in 0.32s
+     Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode`
 Args {
     shards: [
         Slice {
@@ -101,7 +61,6 @@ Args {
         },
     ],
     dataset_dir: "/media/Data/nanochat/dataset",
-    train_tokenizer: true,
     vocab_size: 65536,
     time_encode_decode: true,
 }
@@ -114,10 +73,11 @@ DatasetCacheConfig {
         shard_template: "shard_{index}.parquet",
     },
 }
+Loading Shards ...: [0, 1, 2, 3, 4, 5, 6, 7]
 
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
-- training_duration: 75.246018982s
-- vocab_size: 65536
+- training_duration: 71.980114011s
+- vocab_size: 65535
 - size_estimate: 917613
 
 Timing Samples:
@@ -125,22 +85,22 @@ Timing Samples:
 - avg size: 4712
 
 Timing Encode:
-- avg (serial): 482.796µs
-- avg (rayon): 1.808474ms
+- avg (serial): 502.521µs
+- avg (rayon): 1.771724ms
 
-Timing Decode: GraphDecoder
+Timing Decode: ExpansionDecoder
 - decoder est bytes: 1566720
-- avg: 53.715µs
+- avg: 52.744µs
 
 Timing Decode: DictionaryDecoder
 - decoder est bytes: 1860233
-- avg: 19.177µs
+- avg: 19.589µs
 
 Timing Decode: CorpusDecoder
 - decoder est bytes: 1820714
-- avg: 19.056µs
+- avg: 18.167µs
 
-real    1m37.214s
-user    89m24.339s
-sys     27m57.492s
+real    1m32.263s
+user    85m35.655s
+sys     26m15.540s
 ```

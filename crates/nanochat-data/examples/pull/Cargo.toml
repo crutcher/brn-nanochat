@@ -1,5 +1,5 @@
 [package]
-name = "pull"
+name = "pull_shards"
 repository.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -11,12 +11,8 @@ workspace = true
 
 [dependencies]
 burn = { workspace = true, features = ["network"] }
-nanochat-data = { path = "../nanochat-data" }
-bpetok = { path = "../bpetok", features = ["rayon"] }
-compact_str = { workspace = true }
+nanochat-data = { path = "../.." }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 
-parquet = { workspace = true, features = ["arrow"] }
-arrow = { workspace = true }
