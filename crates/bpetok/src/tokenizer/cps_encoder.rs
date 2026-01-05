@@ -101,27 +101,25 @@ impl<T: TokenType> CPSEncoder<T> {
         data_size + chunk_meta + chunk_sum
     }
 
-    /// Encode a chunk of text into token IDs.
+    /// Append a chunk of text into token IDs.
     #[tracing::instrument(skip(self, chunk))]
-    pub fn encode_chunk<S: AsRef<str>>(
+    pub fn append_encode_chunk(
         &self,
-        chunk: S,
-    ) -> Vec<T> {
-        let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
-
-        if chunk_bytes.len() == 1 {
-            return vec![T::from_u8(chunk_bytes[0]).unwrap()];
+        buf: &mut Vec<T>,
+        chunk: &[u8],
+    ) {
+        if chunk.len() == 1 {
+            buf.push(T::from_u8(chunk[0]).unwrap());
+            return;
         }
 
-        if let Some(t) = self.chunk_map.get(chunk_bytes) {
-            return vec![*t];
+        if let Some(token) = self.chunk_map.get(chunk) {
+            buf.push(*token);
+            return;
         }
 
         // Convert chunk to tokens.
-        let mut chunk_tokens: Vec<T> = chunk_bytes
-            .iter()
-            .map(|&b| T::from_u8(b).unwrap())
-            .collect();
+        let mut chunk_tokens: Vec<T> = chunk.iter().map(|&b| T::from_u8(b).unwrap()).collect();
 
         // Apply merges iteratively
         while chunk_tokens.len() >= 2 {
@@ -146,8 +144,18 @@ impl<T: TokenType> CPSEncoder<T> {
                 break;
             }
         }
+    }
 
-        chunk_tokens
+    /// Encode a chunk of text into token IDs.
+    #[tracing::instrument(skip(self, chunk))]
+    pub fn encode_chunk<S: AsRef<str>>(
+        &self,
+        chunk: S,
+    ) -> Vec<T> {
+        let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
+        let mut tokens = Vec::with_capacity(chunk_bytes.len());
+        self.append_encode_chunk(&mut tokens, chunk_bytes);
+        tokens
     }
 
     #[tracing::instrument(skip(self, text))]
@@ -158,6 +166,20 @@ impl<T: TokenType> CPSEncoder<T> {
         self.compiled_pattern
             .find_iter(text)
             .map(|m| m.unwrap().as_str())
+    }
+
+    /// Encode a string into token IDs serially.
+    ///
+    /// Uses serial processing, ignoring the `parallel` flag.
+    pub fn encode_serial<S: AsRef<str>>(
+        &self,
+        text: S,
+    ) -> Vec<T> {
+        let text = text.as_ref();
+        let mut tokens = Vec::with_capacity(text.len());
+        self.split_groups(text)
+            .for_each(|chunk| self.append_encode_chunk(&mut tokens, chunk.as_bytes()));
+        tokens
     }
 
     /// Encode a string into token IDs in parallel.
@@ -175,18 +197,6 @@ impl<T: TokenType> CPSEncoder<T> {
         self.split_groups(text.as_ref())
             .collect::<Vec<_>>()
             .into_par_iter()
-            .flat_map(|chunk| self.encode_chunk(chunk))
-            .collect()
-    }
-
-    /// Encode a string into token IDs serially.
-    ///
-    /// Uses serial processing, ignoring the `parallel` flag.
-    pub fn encode_serial<S: AsRef<str>>(
-        &self,
-        text: S,
-    ) -> Vec<T> {
-        self.split_groups(text.as_ref())
             .flat_map(|chunk| self.encode_chunk(chunk))
             .collect()
     }
