@@ -47,10 +47,10 @@ python -m scripts.tok_train --max_chars=2000000000
 - Note: my machine is a beast (64-core Threadripper; NVME data disk).
 
 ```terminaloutput
-$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 100
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 256
    Compiling tokenizer_trainer v0.0.0 (/home/crutcher/git/brn-nanochat/crates/bpetok/examples/tokenizer_trainer)
-    Finished `release` profile [optimized] target(s) in 1.39s
-     Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 100`
+    Finished `release` profile [optimized] target(s) in 1.44s
+     Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 256`
 Args {
     shards: [
         Slice {
@@ -64,7 +64,7 @@ Args {
     dataset_dir: "/media/Data/nanochat/dataset",
     vocab_size: 65536,
     time_encode_decode: true,
-    batch_size: 100,
+    batch_size: 256,
 }
 DatasetCacheConfig {
     cache_dir: "/media/Data/nanochat/dataset",
@@ -78,36 +78,37 @@ DatasetCacheConfig {
 Loading Shards ...: [0, 1, 2, 3, 4, 5, 6, 7]
 
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
-- training_duration: 72.657323792s
+- training_duration: 71.739351579s
 - vocab_size: 65535
 - size_estimate: 3822326
 
-Timing Samples:
+Samples Summary:
 - count: 8192
 - avg size: 4712
 
-Timing Encode:
-- batch avg: 277.786µs
-- sample avg: 33ns
+Timing Config:
+- batch size: 256
 
-Note: batch parallelism is not implemented for decoders yet.
+Timing CPSEncoder Encode:
+- batch avg: 183.192µs
+- sample avg: 22ns
 
 Timing Decode: ExpansionDecoder
 - decoder est bytes: 1566720
-- batch avg: 5.466192ms
-- sample avg: 54.661µs
+- batch avg: 2.050247ms
+- sample avg: 8.008µs
 
 Timing Decode: DictionaryDecoder
 - decoder est bytes: 1860233
-- batch avg: 1.851256ms
-- sample avg: 18.512µs
+- batch avg: 1.291125ms
+- sample avg: 5.043µs
 
 Timing Decode: CorpusDecoder
 - decoder est bytes: 1820714
-- batch avg: 1.829392ms
-- sample avg: 18.293µs
+- batch avg: 1.28169ms
+- sample avg: 5.006µs
 
-real	1m17.720s
-user	76m48.118s
-sys	24m18.150s
+real	1m15.431s
+user	75m57.365s
+sys	23m56.722s
 ```
