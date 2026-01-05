@@ -12,9 +12,7 @@ use clap::Parser;
 use compact_str::CompactString;
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
-use std::ffi::os_str::len;
 use std::time::Duration;
-use itertools::Itertools;
 
 /// Example tokenizer trainer.
 #[derive(Parser, Debug)]
@@ -136,42 +134,53 @@ fn main() -> anyhow::Result<()> {
         let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / count;
         println!("- avg size: {avg_size}");
 
-        let sample_batches: Vec<Vec<String>> = samples.chunks(args.batch_size)
-            .into_iter()
-            .map(|chunk| {
-                chunk.co
-            })
-            .collect::<Vec<_>>();
+        let sample_batches: Vec<&[String]> = samples.chunks(args.batch_size).collect::<Vec<_>>();
 
         println!();
         println!("Timing Encode:");
-        let mut token_batches: Vec<Vec<T>> = Vec::with_capacity(sample_batches.len());
+        let mut token_batches: Vec<Vec<Vec<T>>> = Vec::with_capacity(sample_batches.len());
         {
             let times_ns = sample_batches.iter().map(|batch| {
                 let t0 = std::time::Instant::now();
-                let token_batch = tokenizer.encode_batch(batch);
+                let token_batch: Vec<Vec<T>> = tokenizer.encode_batch(batch);
                 let t1 = std::time::Instant::now();
 
                 token_batches.push(token_batch);
 
                 t1.duration_since(t0).as_nanos() as u64
             });
-            let batch_avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
+            let avg_ns = times_ns.sum::<u64>() / count as u64;
+            let batch_avg = Duration::from_nanos(avg_ns);
             println!("- batch avg: {:#?}", batch_avg);
-            println!("- sample avg: {:#?}", batch_avg / count as u64);
+            println!("- sample avg: {:#?}", avg_ns / count as u64);
         }
 
         println!();
         let expansion_decoder = ExpansionDecoder::from_data(&data);
-        time_decoder("ExpansionDecoder", &expansion_decoder, &token_batches, args.batch_size);
+        time_decoder(
+            "ExpansionDecoder",
+            &expansion_decoder,
+            &token_batches,
+            args.batch_size,
+        );
 
         println!();
         let dict_decoder = DictionaryDecoder::from_tokenizer(&expansion_decoder);
-        time_decoder("DictionaryDecoder", &dict_decoder, &token_batches, args.batch_size);
+        time_decoder(
+            "DictionaryDecoder",
+            &dict_decoder,
+            &token_batches,
+            args.batch_size,
+        );
 
         println!();
         let corpus_decoder = CorpusDecoder::from_data(&data);
-        time_decoder("CorpusDecoder", &corpus_decoder, &token_batches, args.batch_size);
+        time_decoder(
+            "CorpusDecoder",
+            &corpus_decoder,
+            &token_batches,
+            args.batch_size,
+        );
     }
 
     Ok(())
@@ -180,23 +189,27 @@ fn main() -> anyhow::Result<()> {
 fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     name: &str,
     decoder: &D,
-    token_batches: &[Vec<T>],
+    token_batches: &[Vec<Vec<T>>],
     batch_size: usize,
 ) {
     let count = token_batches.len();
     println!("Timing Decode: {name}");
     println!("- decoder est bytes: {}", decoder.size_estimate());
 
-    let times_ns = token_batches.iter().map(|tokens| {
+    let times_ns = token_batches.iter().map(|batch| {
         let t0 = std::time::Instant::now();
-        let _ = decoder.decode_batch_to_strings(tokens);
+        let _ = decoder.decode_batch_to_strings(batch);
         let t1 = std::time::Instant::now();
         let delta = t1.duration_since(t0);
 
         delta.as_nanos() as u64
     });
 
-    let avg = Duration::from_nanos(times_ns.sum::<u64>() / count as u64);
+    let avg_ns = times_ns.sum::<u64>() / count as u64;
+    let avg = Duration::from_nanos(avg_ns);
     println!("- batch avg: {avg:?}");
-    println!("- sample avg: {:?}", avg / count as u64);
+    println!(
+        "- sample avg: {:?}",
+        Duration::from_nanos(avg_ns / batch_size as u64)
+    );
 }

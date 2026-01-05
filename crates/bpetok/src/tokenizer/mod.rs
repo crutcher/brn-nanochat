@@ -29,7 +29,7 @@ pub trait TokenEncoder<T: TokenType> {
     /// Encode a batch of text into tokens.
     fn encode_batch(
         &self,
-        batch: &[&str],
+        batch: &[String],
     ) -> Vec<Vec<T>> {
         batch.iter().map(|s| self.encode(s)).collect()
     }

@@ -60,7 +60,7 @@ pub trait TokenDecoder<T: TokenType> {
     /// Decodes a batch of tokens into a vector of byte vectors.
     fn decode_batch_to_bytes(
         &self,
-        tokens: &[&[T]],
+        tokens: &[Vec<T>],
     ) -> Vec<Vec<u8>> {
         tokens.iter().map(|t| self.decode_to_bytes(t)).collect()
     }
@@ -77,7 +77,7 @@ pub trait TokenDecoder<T: TokenType> {
     /// Decodes a batch of tokens into a vector of strings.
     fn decode_batch_to_strings(
         &self,
-        tokens: &[&[T]],
+        tokens: &[Vec<T>],
     ) -> Vec<String> {
         tokens.iter().map(|t| self.decode_to_string(t)).collect()
     }

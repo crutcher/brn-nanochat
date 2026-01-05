@@ -236,7 +236,7 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
     /// Encode a batch of text into tokens.
     fn encode_batch(
         &self,
-        batch: &[&str],
+        batch: &[String],
     ) -> Vec<Vec<T>> {
         if self.options.parallel {
             #[cfg(not(feature = "rayon"))]
