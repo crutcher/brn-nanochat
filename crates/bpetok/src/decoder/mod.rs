@@ -30,7 +30,7 @@ pub mod dictionary_decoder;
 pub mod expansion_decoder;
 
 /// Trait for token decoders.
-pub trait TokenDecoder<T: TokenType> {
+pub trait TokenDecoder<T: TokenType>: Send + Sync {
     /// Returns an iterator over the non-byte tokens in this map.
     fn pair_tokens(&self) -> impl Iterator<Item = T>;
 
@@ -77,9 +77,21 @@ pub trait TokenDecoder<T: TokenType> {
     /// Decodes a batch of tokens into a vector of strings.
     fn decode_batch_to_strings(
         &self,
-        tokens: &[Vec<T>],
+        batch: &[Vec<T>],
     ) -> Vec<String> {
-        tokens.iter().map(|t| self.decode_to_string(t)).collect()
+        #[cfg(feature = "rayon")]
+        {
+            use rayon::prelude::*;
+            let batch: Vec<&Vec<T>> = batch.iter().collect::<Vec<_>>();
+
+            batch
+                .into_par_iter()
+                .map(|tokens| self.decode_to_string(tokens))
+                .collect()
+        }
+
+        #[cfg(not(feature = "rayon"))]
+        batch.iter().map(|t| self.decode_to_string(t)).collect()
     }
 
     /// Estimates the memory usage of this decoder.
