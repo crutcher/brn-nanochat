@@ -78,7 +78,7 @@ Loading Shards ...: [0, 1, 2, 3, 4, 5, 6, 7]
 Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
 - training_duration: 73.573697478s
 - vocab_size: 65535
-- size_estimate: 917613
+- size_estimate: 3822326
 
 Timing Samples:
 - count: 8192
