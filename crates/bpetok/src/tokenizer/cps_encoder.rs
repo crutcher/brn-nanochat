@@ -118,18 +118,16 @@ impl<T: TokenType> CPSEncoder<T> {
             return;
         }
 
-        // TODO: use `buf` *as* chunk_tokens, to avoid the extra allocation.
+        // Reuse the output buffer for the merges.
+        let start = buf.len();
+        chunk.iter().for_each(|&b| buf.push(T::from_u8(b).unwrap()));
 
-        // Convert chunk to tokens.
-        let mut chunk_tokens: Vec<T> = chunk.iter().map(|&b| T::from_u8(b).unwrap()).collect();
-
-        // Apply merges iteratively
-        while chunk_tokens.len() >= 2 {
+        while buf.len() >= start + 2 {
             // Find the best pair to merge
             let mut best_pair: Option<(usize, Pair<T>, T)> = None;
 
-            for i in 0..chunk_tokens.len() - 1 {
-                let pair: Pair<T> = (chunk_tokens[i], chunk_tokens[i + 1]);
+            for i in start..=buf.len() {
+                let pair: Pair<T> = (buf[i], buf[i + 1]);
                 if let Some(&new_id) = self.data.merge_map.get(&pair)
                     && (best_pair.is_none() || new_id < best_pair.unwrap().2)
                 {
@@ -139,8 +137,8 @@ impl<T: TokenType> CPSEncoder<T> {
 
             // If we found a pair to merge, apply it
             if let Some((idx, _pair, new_id)) = best_pair {
-                chunk_tokens[idx] = new_id;
-                chunk_tokens.remove(idx + 1);
+                buf[idx] = new_id;
+                buf.remove(idx + 1);
             } else {
                 // No more merges possible
                 break;
