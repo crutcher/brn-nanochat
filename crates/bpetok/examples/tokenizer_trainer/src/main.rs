@@ -165,6 +165,7 @@ fn main() -> anyhow::Result<()> {
         time_decoder(
             "ExpansionDecoder",
             &expansion_decoder,
+            &sample_batches,
             &token_batches,
             args.batch_size,
         );
@@ -174,6 +175,7 @@ fn main() -> anyhow::Result<()> {
         time_decoder(
             "DictionaryDecoder",
             &dict_decoder,
+            &sample_batches,
             &token_batches,
             args.batch_size,
         );
@@ -183,6 +185,7 @@ fn main() -> anyhow::Result<()> {
         time_decoder(
             "CorpusDecoder",
             &corpus_decoder,
+            &sample_batches,
             &token_batches,
             args.batch_size,
         );
@@ -194,6 +197,7 @@ fn main() -> anyhow::Result<()> {
 fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     name: &str,
     decoder: &D,
+    sample_batches: &[&[String]],
     token_batches: &[Vec<Vec<T>>],
     batch_size: usize,
 ) {
@@ -201,14 +205,19 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     println!("Timing Decode: {name}");
     println!("- decoder est bytes: {}", decoder.size_estimate());
 
-    let times_ns = token_batches.iter().map(|batch| {
-        let t0 = std::time::Instant::now();
-        let _ = decoder.decode_batch_to_strings(batch);
-        let t1 = std::time::Instant::now();
-        let delta = t1.duration_since(t0);
+    let times_ns = sample_batches
+        .iter()
+        .zip(token_batches.iter())
+        .map(|(sample, batch)| {
+            let t0 = std::time::Instant::now();
+            let decoded_sample = decoder.decode_batch_to_strings(batch);
+            let t1 = std::time::Instant::now();
+            let delta = t1.duration_since(t0);
 
-        delta.as_nanos() as u64
-    });
+            assert_eq!(sample, &decoded_sample);
+
+            delta.as_nanos() as u64
+        });
 
     let avg_ns = times_ns.sum::<u64>() / count as u64;
     println!("- batch avg: {:?}", Duration::from_nanos(avg_ns));
