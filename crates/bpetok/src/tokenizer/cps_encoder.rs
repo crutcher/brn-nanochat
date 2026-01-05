@@ -10,6 +10,7 @@ use crate::vocab::data::TokenVocabData;
 use crate::{DEFAULT_PARALLEL, validators};
 use ahash::AHashMap;
 use fancy_regex::Regex;
+use std::collections::hash_map;
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -92,7 +93,12 @@ impl<T: TokenType> CPSEncoder<T> {
 
     /// Memory usage estimate in bytes.
     pub fn size_estimate(&self) -> usize {
-        self.data.size_estimate()
+        let data_size = self.data.size_estimate();
+
+        let chunk_meta = size_of::<hash_map::Entry<Vec<u8>, T>>() * self.chunk_map.len();
+        let chunk_sum = self.chunk_map.keys().map(|b| b.len()).sum::<usize>();
+
+        data_size + chunk_meta + chunk_sum
     }
 
     /// Encode a chunk of text into token IDs.
