@@ -4,6 +4,12 @@ use crate::types::{CountType, Pair, TokenType};
 use crate::vocab::training::word::Word;
 use ahash::{AHashMap, AHashSet};
 
+/// A map from [`Pair`] to its occurrence count.
+pub type PairCountMap<T, C> = AHashMap<Pair<T>, C>;
+
+/// A map from [`Pair`] to indices over ``words``.
+pub type PairIndexMap<T> = AHashMap<Pair<T>, AHashSet<usize>>;
+
 /// Options for building a [`PairIndex`].
 #[derive(Debug, Clone, Copy)]
 pub struct PairIndexOptions {
@@ -37,10 +43,10 @@ pub struct PairIndex<T: TokenType, C: CountType> {
     /// A map from [`Pair`] to its occurrence count.
     ///
     /// ``sum(words[i].non_overlapping_count(pair) * word_counts[i]) for all i``
-    pub pair_counts: AHashMap<Pair<T>, C>,
+    pub pair_counts: PairCountMap<T, C>,
 
     /// A map from [`Pair`] to indices over ``words``.
-    pub pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>>,
+    pub pair_to_word_index: PairIndexMap<T>,
 }
 
 impl<T: TokenType, C: CountType> PairIndex<T, C> {
@@ -69,8 +75,8 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 
     #[tracing::instrument(skip(pair_counts, pair_to_word_index, index, w, word_count))]
     fn observe_word(
-        pair_counts: &mut AHashMap<Pair<T>, C>,
-        pair_to_word_index: &mut AHashMap<Pair<T>, AHashSet<usize>>,
+        pair_counts: &mut PairCountMap<T, C>,
+        pair_to_word_index: &mut PairIndexMap<T>,
         index: usize,
         w: &Word<T>,
         word_count: C,
@@ -97,8 +103,9 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
         word_counts: &[C],
         _options: PairIndexOptions,
     ) -> Self {
-        let mut pair_counts: AHashMap<Pair<T>, C> = Default::default();
-        let mut pair_to_word_index: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
+        let size_hint = words.len() / 100;
+        let mut pair_counts: PairCountMap<T, C> = PairCountMap::with_capacity(size_hint);
+        let mut pair_to_word_index: PairIndexMap<T> = PairIndexMap::with_capacity(size_hint);
 
         for (word_index, word) in words.iter().enumerate() {
             Self::observe_word(
@@ -137,8 +144,8 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
             .par_iter()
             .enumerate()
             .map(|(word_index, word)| {
-                let mut local_pc: AHashMap<Pair<T>, C> = Default::default();
-                let mut local_wtu: AHashMap<Pair<T>, AHashSet<usize>> = Default::default();
+                let mut local_pc: PairCountMap<T, C> = Default::default();
+                let mut local_wtu: PairIndexMap<T> = Default::default();
                 Self::observe_word(
                     &mut local_pc,
                     &mut local_wtu,
@@ -168,74 +175,96 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::MergeMap;
     use crate::vocab::training::word::Word;
 
     #[test]
-    fn test_pair_index_serial() {
-        test_pair_index(false);
+    fn test_pair_index_serial_token_u32_count_usize() {
+        test_pair_index::<u32, usize>(false);
     }
 
     #[test]
     #[cfg(feature = "rayon")]
-    fn test_pair_index_parallel() {
-        test_pair_index(true);
+    fn test_pair_index_rayon_token_u32_count_usize() {
+        test_pair_index::<u32, usize>(true);
     }
 
-    fn test_pair_index(parallel: bool) {
-        type T = u8;
+    #[test]
+    fn test_pair_index_serial_token_u16_count_i32() {
+        test_pair_index::<u16, i32>(false);
+    }
 
-        let words = vec![
+    #[test]
+    #[cfg(feature = "rayon")]
+    fn test_pair_index_rayon_token_u16_count_i32() {
+        test_pair_index::<u16, i32>(true);
+    }
+
+    fn test_pair_index<T: TokenType, C: CountType>(parallel: bool) {
+        let words: Vec<Word<T>> = vec![
             Word::from_string("hello"),
             Word::from_string("world"),
             Word::from_string("help"),
+            Word::from_string("☃"), // "☃" := [0xE2 0x98] 0x83
         ];
 
-        let word_counts = vec![1, 2, 3];
-
-        let options = PairIndexOptions::default().with_parallel(parallel);
-
-        let index = PairIndex::index_unique_word_counts_table(&words, &word_counts, options);
+        let word_counts: Vec<C> = [1, 2, 3, 4]
+            .into_iter()
+            .map(|c| C::from_u32(c).unwrap())
+            .collect();
 
         let PairIndex {
             pair_counts,
             pair_to_word_index,
-        } = index;
+        } = PairIndex::<T, C>::index_unique_word_counts_table(
+            &words,
+            &word_counts,
+            PairIndexOptions::default().with_parallel(parallel),
+        );
 
         assert_eq!(
             pair_counts,
             [
-                (('e', 'l'), 4),
-                (('h', 'e'), 4),
-                (('l', 'd'), 2),
-                (('l', 'l'), 1),
-                (('l', 'o'), 1),
-                (('l', 'p'), 3),
-                (('o', 'r'), 2),
-                (('r', 'l'), 2),
-                (('w', 'o'), 2),
+                (('e', 'l'), 4),                   // 1 h[el]lo
+                (('h', 'e'), 4),                   // 1 [he]llo, 3 [he]lp
+                (('l', 'p'), 3),                   // 3 hel[lp]
+                (('l', 'd'), 2),                   // 2 wor[ld]
+                (('o', 'r'), 2),                   // 2 w[or]ld
+                (('r', 'l'), 2),                   // 2 wo[rl]d
+                (('w', 'o'), 2),                   // 2 [wo]rld
+                (('l', 'l'), 1),                   // 1 he[ll]o
+                (('l', 'o'), 1),                   // 1 hel[lo]
+                ((0xE2 as char, 0x98 as char), 4), // "☃" := [0xE2 0x98] 0x83
+                ((0x98 as char, 0x83 as char), 4), // "☃" := 0xE2 [0x98 0x83]
             ]
             .into_iter()
-            .map(|((a, b), c)| ((a as u8, b as u8), c))
-            .collect::<MergeMap<T>>()
+            .map(|((a, b), c)| (
+                (T::from_u8(a as u8).unwrap(), T::from_u8(b as u8).unwrap()),
+                C::from_u32(c).unwrap()
+            ))
+            .collect::<PairCountMap<T, C>>()
         );
 
         assert_eq!(
             pair_to_word_index,
             [
-                (('e', 'l'), vec![0, 2]),
-                (('h', 'e'), vec![0, 2]),
-                (('l', 'd'), vec![1]),
-                (('l', 'l'), vec![0]),
-                (('l', 'o'), vec![0]),
-                (('l', 'p'), vec![2]),
-                (('o', 'r'), vec![1]),
-                (('r', 'l'), vec![1]),
-                (('w', 'o'), vec![1]),
+                (('e', 'l'), vec![0, 2]),                // "h[el]lo world h[el]p ☃"
+                (('h', 'e'), vec![0, 2]),                // "[he]llo world [he]lp ☃"
+                (('l', 'd'), vec![1]),                   // "hello wor[ld] help ☃"
+                (('l', 'l'), vec![0]),                   // "he[ll]o world help ☃"
+                (('l', 'o'), vec![0]),                   // "hel[lo] world help ☃"
+                (('l', 'p'), vec![2]),                   // "hello world he[lp] ☃"
+                (('o', 'r'), vec![1]),                   // "hello w[or]ld help ☃"
+                (('r', 'l'), vec![1]),                   // "hello wo[rl]d help ☃"
+                (('w', 'o'), vec![1]),                   // "hello [wo]rld help ☃"
+                ((0xE2 as char, 0x98 as char), vec![3]), // "hello world help [☃]"
+                ((0x98 as char, 0x83 as char), vec![3]), // "hello world help [☃]"
             ]
             .into_iter()
-            .map(|((a, b), s)| ((a as u8, b as u8), AHashSet::from_iter(s)))
-            .collect::<AHashMap<Pair<T>, AHashSet<usize>>>()
+            .map(|((a, b), s)| (
+                (T::from_u8(a as u8).unwrap(), T::from_u8(b as u8).unwrap()),
+                AHashSet::from_iter(s)
+            ))
+            .collect::<PairIndexMap<T>>()
         );
     }
 }
