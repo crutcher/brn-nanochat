@@ -3,6 +3,7 @@
 use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
+use crate::regex_pool::RegexPool;
 use crate::tokenizer::TokenEncoder;
 use crate::types::{Pair, TokenType, VocabMap};
 use crate::validators::expect_regex;
@@ -10,7 +11,6 @@ use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
 use ahash::AHashMap;
-use fancy_regex::Regex;
 use std::collections::hash_map;
 use std::ops::Range;
 use std::sync::Arc;
@@ -51,8 +51,7 @@ pub struct CPSEncoder<T: TokenType> {
     /// Tokenizer options.
     pub options: CPSEncoderOptions,
 
-    /// The compiled regex pattern.
-    compiled_pattern: Regex,
+    regex_pool: RegexPool,
 
     vocab_map: VocabMap<T>,
 }
@@ -72,7 +71,7 @@ impl<T: TokenType> CPSEncoder<T> {
         }
 
         let data = data.into();
-        let compiled_pattern = expect_regex(&data.pattern);
+        let regex_pool = RegexPool::new(expect_regex(&data.pattern));
 
         let decoder = DictionaryDecoder::from_data(&data);
         let chunk_map = decoder
@@ -83,7 +82,7 @@ impl<T: TokenType> CPSEncoder<T> {
         Self {
             data,
             options,
-            compiled_pattern,
+            regex_pool,
             vocab_map: chunk_map,
         }
     }
@@ -175,16 +174,6 @@ impl<T: TokenType> CPSEncoder<T> {
         tokens
     }
 
-    #[tracing::instrument(skip(self, text))]
-    fn split_groups<'a>(
-        &'a self,
-        text: &'a str,
-    ) -> impl Iterator<Item = &'a str> + 'a {
-        self.compiled_pattern
-            .find_iter(text)
-            .map(|m| m.unwrap().as_str())
-    }
-
     /// Encode a string into token IDs serially.
     ///
     /// Uses serial processing, ignoring the `parallel` flag.
@@ -195,7 +184,12 @@ impl<T: TokenType> CPSEncoder<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
         let mut cache = AHashMap::with_capacity(tokens.len());
-        for chunk in self.split_groups(text) {
+        for chunk in self
+            .regex_pool
+            .get()
+            .find_iter(text)
+            .map(|m| m.unwrap().as_str())
+        {
             self.append_encode_chunk(&mut tokens, chunk.as_bytes(), Some(&mut cache));
         }
         tokens
@@ -213,7 +207,11 @@ impl<T: TokenType> CPSEncoder<T> {
 
         // This is significantly worse?
 
-        self.split_groups(text.as_ref())
+        let text1 = text.as_ref();
+        self.regex_pool
+            .get()
+            .find_iter(text1)
+            .map(|m| m.unwrap().as_str())
             .collect::<Vec<_>>()
             .into_par_iter()
             .flat_map(|chunk| self.encode_chunk(chunk))
