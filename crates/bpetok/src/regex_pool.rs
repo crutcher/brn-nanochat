@@ -2,21 +2,33 @@
 
 use ahash::AHashMap;
 use fancy_regex::Regex;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, RwLock};
-use std::thread::ThreadId;
 
 /// Interior-Mutable Thread-Local Regex Pool
 #[derive(Clone)]
 pub struct RegexPool {
     regex: Regex,
-    pool: Arc<RwLock<AHashMap<ThreadId, Arc<Regex>>>>,
+
+    pool_size: usize,
+    pool: Arc<RwLock<AHashMap<usize, Arc<Regex>>>>,
+}
+
+fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
 }
 
 impl RegexPool {
     /// Create a new `RegexPool`
-    pub fn new(regex: Regex) -> Self {
+    pub fn new(
+        regex: Regex,
+        pool_size: usize,
+    ) -> Self {
         Self {
             regex,
+            pool_size,
             pool: Arc::new(RwLock::new(AHashMap::new())),
         }
     }
@@ -24,13 +36,15 @@ impl RegexPool {
     /// Get a Regex from the pool for the current thread.
     pub fn get(&self) -> Arc<Regex> {
         let thread_id = std::thread::current().id();
-        if let Some(regex) = self.pool.read().unwrap().get(&thread_id) {
+        let slot = calculate_hash(&thread_id) as usize / self.pool_size;
+
+        if let Some(regex) = self.pool.read().unwrap().get(&slot) {
             return regex.clone();
         }
 
         let mut write_lock = self.pool.write().unwrap();
         write_lock
-            .entry(thread_id)
+            .entry(slot)
             .or_insert(Arc::new(self.regex.clone()))
             .clone()
     }
@@ -43,7 +57,7 @@ mod tests {
     #[test]
     fn test_regex_pool() {
         let regex = Regex::new(r"foo").unwrap();
-        let pool = RegexPool::new(regex);
+        let pool = RegexPool::new(regex, 10);
 
         let r0 = pool.get();
         assert_eq!(r0.as_str(), r"foo");
