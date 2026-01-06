@@ -1,16 +1,18 @@
 //! # Text Splitting
 
+use crate::regex_pool::RegexPool;
 use crate::types::{CountType, StringChunkType, TokenType};
 use crate::vocab::training::word::Word;
 use ahash::AHashMap;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 /// Expected average word length in characters.
 pub const EXPECTED_AVG_WORD_LEN: usize = 5;
 
 /// Split text into words and count occurrences using a regular expression.
 pub fn word_counts_from_text<S, K, C>(
-    regex: &fancy_regex::Regex,
+    regex: &Arc<fancy_regex::Regex>,
     text: S,
 ) -> anyhow::Result<AHashMap<K, C>>
 where
@@ -27,7 +29,7 @@ where
 /// Update word counts in-place from text using a regular expression.
 pub fn update_word_counts_from_text<S, K, C>(
     word_counts: &mut AHashMap<K, C>,
-    regex: &fancy_regex::Regex,
+    regex: &Arc<fancy_regex::Regex>,
     text: S,
 ) -> anyhow::Result<()>
 where
@@ -99,7 +101,6 @@ impl WordCounterOptions {
 }
 
 /// Word counter structure.
-#[derive(Debug)]
 pub struct WordCounter<K, C>
 where
     K: StringChunkType,
@@ -114,6 +115,8 @@ where
     /// The compiled regex pattern.
     pub regex: fancy_regex::Regex,
 
+    regex_pool: RegexPool,
+
     /// The word counts.
     pub word_counts: AHashMap<K, C>,
 }
@@ -127,6 +130,7 @@ where
     pub fn new(options: WordCounterOptions) -> Self {
         let pattern = options.pattern;
         let regex = fancy_regex::Regex::new(&pattern).unwrap();
+        let regex_pool = RegexPool::new(regex.clone());
 
         let parallel = options.parallel;
 
@@ -139,6 +143,7 @@ where
             parallel,
             pattern,
             regex,
+            regex_pool,
             word_counts: AHashMap::with_capacity(100_000),
         }
     }
@@ -153,7 +158,7 @@ where
         &mut self,
         text: S,
     ) {
-        update_word_counts_from_text(&mut self.word_counts, &self.regex, text).unwrap();
+        update_word_counts_from_text(&mut self.word_counts, &self.regex_pool.get(), text).unwrap();
     }
 
     /// Update word counts inplace from a sample iterator.
@@ -207,10 +212,7 @@ where
 
         let updates: AHashMap<K, C> = samples
             .par_bridge()
-            .map_init(
-                || self.regex.clone(),
-                |regex, sample| word_counts_from_text(regex, &sample).unwrap(),
-            )
+            .map(|sample| word_counts_from_text(&self.regex_pool.get(), &sample).unwrap())
             .reduce(
                 || AHashMap::with_capacity(self.word_counts.capacity()),
                 |mut a, b| {
@@ -260,8 +262,8 @@ mod tests {
 
     const PATTERN: &str = r"\w+";
 
-    fn get_regex() -> fancy_regex::Regex {
-        fancy_regex::Regex::new(PATTERN).unwrap()
+    fn get_regex() -> Arc<fancy_regex::Regex> {
+        Arc::new(fancy_regex::Regex::new(PATTERN).unwrap())
     }
 
     #[test]
