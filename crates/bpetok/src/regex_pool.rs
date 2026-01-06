@@ -33,7 +33,7 @@ impl RegexPool {
         let mut write_lock = self.pool.write().unwrap();
         write_lock
             .entry(thread_id)
-            .or_insert(Arc::new(self.regex.clone()))
+            .or_insert_with(|| Arc::new(self.regex.clone()))
             .clone()
     }
 }
