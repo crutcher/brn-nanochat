@@ -71,7 +71,7 @@ impl<T: TokenType> CPSEncoder<T> {
         }
 
         let data = data.into();
-        let regex_pool = RegexPool::new(expect_regex(&data.pattern), 10);
+        let regex_pool = RegexPool::new(expect_regex(&data.pattern), 128);
 
         let decoder = DictionaryDecoder::from_data(&data);
         let chunk_map = decoder
