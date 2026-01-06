@@ -3,7 +3,6 @@
 use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
-use crate::regex_pool::RegexPool;
 use crate::tokenizer::TokenEncoder;
 use crate::types::{Pair, TokenType, VocabMap};
 use crate::validators::expect_regex;
@@ -11,6 +10,7 @@ use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
 use ahash::AHashMap;
+use fancy_regex::Regex;
 use std::collections::hash_map;
 use std::ops::Range;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ pub struct CPSEncoder<T: TokenType> {
     /// Tokenizer options.
     pub options: CPSEncoderOptions,
 
-    regex_pool: RegexPool,
+    regex: Regex,
 
     vocab_map: VocabMap<T>,
 }
@@ -71,7 +71,7 @@ impl<T: TokenType> CPSEncoder<T> {
         }
 
         let data = data.into();
-        let regex_pool = RegexPool::new(expect_regex(&data.pattern));
+        let regex = expect_regex(&data.pattern);
 
         let decoder = DictionaryDecoder::from_data(&data);
         let chunk_map = decoder
@@ -82,7 +82,7 @@ impl<T: TokenType> CPSEncoder<T> {
         Self {
             data,
             options,
-            regex_pool,
+            regex,
             vocab_map: chunk_map,
         }
     }
@@ -184,12 +184,7 @@ impl<T: TokenType> CPSEncoder<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
         let mut cache = AHashMap::with_capacity(tokens.len());
-        for chunk in self
-            .regex_pool
-            .get()
-            .find_iter(text)
-            .map(|m| m.unwrap().as_str())
-        {
+        for chunk in self.regex.find_iter(text).map(|m| m.unwrap().as_str()) {
             self.append_encode_chunk(&mut tokens, chunk.as_bytes(), Some(&mut cache));
         }
         tokens
@@ -208,8 +203,7 @@ impl<T: TokenType> CPSEncoder<T> {
         // This is significantly worse?
 
         let text1 = text.as_ref();
-        self.regex_pool
-            .get()
+        self.regex
             .find_iter(text1)
             .map(|m| m.unwrap().as_str())
             .collect::<Vec<_>>()

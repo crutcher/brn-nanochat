@@ -1,5 +1,4 @@
 //! # Thread Regex Pool
-#![allow(unused)]
 
 use ahash::AHashMap;
 use fancy_regex::Regex;
@@ -33,8 +32,6 @@ impl RegexPool {
 
     /// Get a Regex from the pool for the current thread.
     pub fn get(&self) -> Arc<Regex> {
-        self.regex.clone()
-        /*
         let thread_id = std::thread::current().id();
 
         let mut s = DefaultHasher::new();
@@ -51,8 +48,6 @@ impl RegexPool {
         let re = Arc::new((*self.regex).clone());
         writer.insert(slot, re.clone());
         re
-
-         */
     }
 }
 
