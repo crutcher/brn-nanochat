@@ -30,11 +30,10 @@ impl RegexPool {
             return regex.clone();
         }
 
-        let mut write_lock = self.pool.write().unwrap();
-        write_lock
-            .entry(thread_id)
-            .or_insert_with(|| Arc::new(self.regex.clone()))
-            .clone()
+        let mut writer = self.pool.write().unwrap();
+        let re = Arc::new(self.regex.clone());
+        writer.insert(thread_id, re.clone());
+        re
     }
 }
 
