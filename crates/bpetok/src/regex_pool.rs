@@ -36,7 +36,7 @@ impl RegexPool {
     /// Get a Regex from the pool for the current thread.
     pub fn get(&self) -> Arc<Regex> {
         let thread_id = std::thread::current().id();
-        let slot = calculate_hash(&thread_id) as usize / self.pool_size;
+        let slot = calculate_hash(&thread_id) as usize % self.pool_size;
 
         if let Some(regex) = self.pool.read().unwrap().get(&slot) {
             return regex.clone();
