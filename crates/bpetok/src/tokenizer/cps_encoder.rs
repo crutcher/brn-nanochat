@@ -137,20 +137,20 @@ impl<T: TokenType> CPSEncoder<T> {
         let stop = start + 2;
         while buf.len() >= stop {
             // Find the best pair to merge
-            let mut best_pair: Option<(usize, T)> = None;
+            let mut best_match: Option<(usize, T)> = None;
 
-            for i in start..buf.len() - 1 {
+            for idx in start..buf.len() - 1 {
                 let pair = (buf[start], buf[start + 1]);
 
-                if let Some(&new_id) = self.data.merge_map.get(&pair)
-                    && (best_pair.is_none() || (new_id < best_pair.unwrap().1))
+                if let Some(&new_token) = self.data.merge_map.get(&pair)
+                    && (best_match.is_none() || (new_token < best_match.unwrap().1))
                 {
-                    best_pair = Some((i, new_id));
+                    best_match = Some((idx, new_token));
                 }
             }
 
             // If we found a pair to merge, apply it
-            if let Some((idx, new_id)) = best_pair {
+            if let Some((idx, new_id)) = best_match {
                 buf[idx] = new_id;
                 buf.remove(idx + 1);
             } else {
@@ -185,7 +185,7 @@ impl<T: TokenType> CPSEncoder<T> {
     ) -> Vec<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
-        let mut cache = AHashMap::with_capacity(tokens.len());
+        let mut cache = AHashMap::with_capacity(tokens.len() / 100);
         for chunk in self.regex.find_iter(text).map(|m| m.unwrap().as_str()) {
             self.append_encode_chunk(&mut tokens, chunk.as_bytes(), Some(&mut cache));
         }
