@@ -139,8 +139,8 @@ impl<T: TokenType> CPSEncoder<T> {
             // Find the best pair to merge
             let mut best_pair: Option<(usize, T)> = None;
 
-            for (i, w) in buf[start..].windows(2).enumerate() {
-                let pair = (w[0], w[1]);
+            for i in start..buf.len() - 1 {
+                let pair = (buf[start], buf[start + 1]);
 
                 if let Some(&new_id) = self.data.merge_map.get(&pair)
                     && (best_pair.is_none() || (new_id < best_pair.unwrap().1))
