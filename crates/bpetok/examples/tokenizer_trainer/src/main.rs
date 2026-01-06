@@ -138,9 +138,9 @@ fn main() -> anyhow::Result<()> {
         }
         println!();
         println!("Samples Summary:");
-        let count = samples.len();
-        println!("- count: {}", count);
-        let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / count;
+        let sample_count = samples.len();
+        println!("- count: {}", sample_count);
+        let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / sample_count;
         println!("- avg size: {avg_size}");
 
         let sample_batches: Vec<&[String]> = samples.chunks(args.batch_size).collect::<Vec<_>>();
@@ -162,11 +162,14 @@ fn main() -> anyhow::Result<()> {
 
                 t1.duration_since(t0).as_nanos() as u64
             });
-            let avg_ns = times_ns.sum::<u64>() / count as u64;
-            println!("- batch avg: {:#?}", Duration::from_nanos(avg_ns));
+            let times_sum_ns = times_ns.sum::<u64>();
+            println!(
+                "- batch avg: {:#?}",
+                Duration::from_nanos(times_sum_ns / num_batches as u64)
+            );
             println!(
                 "- sample avg: {:#?}",
-                Duration::from_nanos(avg_ns / args.batch_size as u64)
+                Duration::from_nanos(times_sum_ns / sample_count as u64)
             );
         }
 
@@ -177,7 +180,6 @@ fn main() -> anyhow::Result<()> {
             &expansion_decoder,
             &sample_batches,
             &token_batches,
-            args.batch_size,
         );
 
         println!();
@@ -187,7 +189,6 @@ fn main() -> anyhow::Result<()> {
             &dict_decoder,
             &sample_batches,
             &token_batches,
-            args.batch_size,
         );
 
         println!();
@@ -197,7 +198,6 @@ fn main() -> anyhow::Result<()> {
             &corpus_decoder,
             &sample_batches,
             &token_batches,
-            args.batch_size,
         );
     }
 
@@ -209,9 +209,8 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     decoder: &D,
     sample_batches: &[&[String]],
     token_batches: &[Vec<Vec<T>>],
-    batch_size: usize,
 ) {
-    let count = token_batches.len();
+    let num_batches = token_batches.len();
     println!("Timing Decode: {name}");
     println!("- decoder est bytes: {}", decoder.size_estimate());
 
@@ -229,10 +228,18 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
             delta.as_nanos() as u64
         });
 
-    let avg_ns = times_ns.sum::<u64>() / count as u64;
-    println!("- batch avg: {:?}", Duration::from_nanos(avg_ns));
+    let time_sum_ns = times_ns.sum::<u64>();
+    println!(
+        "- batch avg: {:?}",
+        Duration::from_nanos(time_sum_ns / num_batches as u64)
+    );
+
+    let sample_count = sample_batches
+        .iter()
+        .map(|batch| batch.len())
+        .sum::<usize>();
     println!(
         "- sample avg: {:?}",
-        Duration::from_nanos(avg_ns / batch_size as u64)
+        Duration::from_nanos(time_sum_ns / sample_count as u64)
     );
 }
