@@ -121,29 +121,36 @@ fn main() -> anyhow::Result<()> {
         // TODO: `indicatif` for optional progress bar for users waiting on this.
 
         let mut samples = Vec::new();
-        let num_batches = 8;
-        for batch in cache.read_cached_batches(shards[0])?.take(num_batches) {
-            let batch = batch?;
-            let column = batch
-                .column_by_name("text")
-                .expect("failed to find 'text' column in batch")
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
+        {
+            let num_shard_batches = 8;
+            for batch in cache
+                .read_cached_batches(shards[0])?
+                .take(num_shard_batches)
+            {
+                let batch = batch?;
+                let column = batch
+                    .column_by_name("text")
+                    .expect("failed to find 'text' column in batch")
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .unwrap();
 
-            for val in column {
-                let val = val.unwrap().to_string();
-                samples.push(val);
+                for val in column {
+                    let val = val.unwrap().to_string();
+                    samples.push(val);
+                }
             }
         }
+
         println!();
         println!("Samples Summary:");
-        let count = samples.len();
-        println!("- count: {}", count);
-        let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / count;
+        let sample_count = samples.len();
+        println!("- count: {}", sample_count);
+        let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / sample_count;
         println!("- avg size: {avg_size}");
 
         let sample_batches: Vec<&[String]> = samples.chunks(args.batch_size).collect::<Vec<_>>();
+        let num_batches = sample_batches.len();
 
         println!();
         println!("Timing Config:");
@@ -153,7 +160,7 @@ fn main() -> anyhow::Result<()> {
         println!("Timing CPSEncoder Encode:");
         let mut token_batches: Vec<Vec<Vec<T>>> = Vec::with_capacity(sample_batches.len());
         {
-            let times_ns = sample_batches.iter().map(|batch| {
+            let batch_times_ns = sample_batches.iter().map(|batch| {
                 let t0 = std::time::Instant::now();
                 let token_batch: Vec<Vec<T>> = tokenizer.encode_batch(batch);
                 let t1 = std::time::Instant::now();
@@ -162,11 +169,17 @@ fn main() -> anyhow::Result<()> {
 
                 t1.duration_since(t0).as_nanos() as u64
             });
-            let avg_ns = times_ns.sum::<u64>() / count as u64;
-            println!("- batch avg: {:#?}", Duration::from_nanos(avg_ns));
+
+            let avg_batch_time_ns = batch_times_ns.sum::<u64>() / num_batches as u64;
+            println!(
+                "- batch avg: {:#?}",
+                Duration::from_nanos(avg_batch_time_ns)
+            );
+
+            let avg_sample_time_ns = avg_batch_time_ns / args.batch_size as u64;
             println!(
                 "- sample avg: {:#?}",
-                Duration::from_nanos(avg_ns / args.batch_size as u64)
+                Duration::from_nanos(avg_sample_time_ns)
             );
         }
 
@@ -211,11 +224,11 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
     token_batches: &[Vec<Vec<T>>],
     batch_size: usize,
 ) {
-    let count = token_batches.len();
+    let num_batches = token_batches.len();
     println!("Timing Decode: {name}");
     println!("- decoder est bytes: {}", decoder.size_estimate());
 
-    let times_ns = sample_batches
+    let batch_times_ns = sample_batches
         .iter()
         .zip(token_batches.iter())
         .map(|(sample, batch)| {
@@ -229,10 +242,12 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
             delta.as_nanos() as u64
         });
 
-    let avg_ns = times_ns.sum::<u64>() / count as u64;
-    println!("- batch avg: {:?}", Duration::from_nanos(avg_ns));
+    let avg_batch_time_ns = batch_times_ns.sum::<u64>() / num_batches as u64;
+    println!("- batch avg: {:?}", Duration::from_nanos(avg_batch_time_ns));
+
+    let avg_sample_time_ns = avg_batch_time_ns / batch_size as u64;
     println!(
         "- sample avg: {:?}",
-        Duration::from_nanos(avg_ns / batch_size as u64)
+        Duration::from_nanos(avg_sample_time_ns)
     );
 }

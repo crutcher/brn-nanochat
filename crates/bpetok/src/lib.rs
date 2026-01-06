@@ -2,6 +2,7 @@
 #![warn(missing_docs, unused)]
 
 pub mod decoder;
+pub mod regex_pool;
 pub mod tokenizer;
 pub mod types;
 pub mod validators;
