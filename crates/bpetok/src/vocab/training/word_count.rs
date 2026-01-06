@@ -130,7 +130,7 @@ where
     pub fn new(options: WordCounterOptions) -> Self {
         let pattern = options.pattern;
         let regex = fancy_regex::Regex::new(&pattern).unwrap();
-        let regex_pool = RegexPool::new(regex.clone(), 10);
+        let regex_pool = RegexPool::new(regex.clone());
 
         let parallel = options.parallel;
 
