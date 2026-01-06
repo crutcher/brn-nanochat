@@ -4,7 +4,7 @@ use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
-use crate::types::{Pair, TokenType, VocabMap};
+use crate::types::{TokenType, VocabMap};
 use crate::validators::expect_regex;
 use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
@@ -134,21 +134,23 @@ impl<T: TokenType> CPSEncoder<T> {
         let start = buf.len();
         chunk.iter().for_each(|&b| buf.push(T::from_u8(b).unwrap()));
 
-        while (buf.len() - start) >= 2 {
+        let stop = start + 2;
+        while buf.len() >= stop {
             // Find the best pair to merge
-            let mut best_pair: Option<(usize, Pair<T>, T)> = None;
+            let mut best_pair: Option<(usize, T)> = None;
 
-            for i in start..(buf.len() - 1) {
-                let pair: Pair<T> = (buf[i], buf[i + 1]);
+            for (i, w) in buf[start..].windows(2).enumerate() {
+                let pair = (w[0], w[1]);
+
                 if let Some(&new_id) = self.data.merge_map.get(&pair)
-                    && (best_pair.is_none() || new_id < best_pair.unwrap().2)
+                    && (best_pair.is_none() || (new_id < best_pair.unwrap().1))
                 {
-                    best_pair = Some((i, pair, new_id));
+                    best_pair = Some((i, new_id));
                 }
             }
 
             // If we found a pair to merge, apply it
-            if let Some((idx, _pair, new_id)) = best_pair {
+            if let Some((idx, new_id)) = best_pair {
                 buf[idx] = new_id;
                 buf.remove(idx + 1);
             } else {
