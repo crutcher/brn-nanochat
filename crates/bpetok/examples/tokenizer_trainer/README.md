@@ -47,7 +47,9 @@ python -m scripts.tok_train --max_chars=2000000000
 - Note: my machine is a beast (64-core Threadripper; NVME data disk).
 
 ```terminaloutput
-$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 256 --tiktoken-save-path /home/crutcher/junk/nanochat.tiktoken
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset 
+--shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 512 --tiktoken-save-path 
+/home/crutcher/junk/nanochat.tiktoken
    Compiling bpetok v0.0.1 (/home/crutcher/git/brn-nanochat/crates/bpetok)
    Compiling tokenizer_trainer v0.0.0 (/home/crutcher/git/brn-nanochat/crates/bpetok/examples/tokenizer_trainer)
     Finished `release` profile [optimized] target(s) in 1.99s
@@ -92,26 +94,26 @@ Samples Summary:
 - avg size: 4712
 
 Timing Config:
-- batch size: 256
+- batch size: 512
 
 Timing CPSEncoder Encode:
-- batch avg: 191.163µs
-- sample avg: 746ns
+- batch avg: 83.000408ms
+- sample avg: 162.11µs
 
 Timing Decode: ExpansionDecoder
 - decoder est bytes: 1566720
-- batch avg: 2.10314ms
-- sample avg: 8.215µs
+- batch avg: 2.853622ms
+- sample avg: 5.573µs
 
 Timing Decode: DictionaryDecoder
 - decoder est bytes: 1860233
-- batch avg: 1.343481ms
-- sample avg: 5.247µs
+- batch avg: 1.687986ms
+- sample avg: 3.296µs
 
 Timing Decode: CorpusDecoder
 - decoder est bytes: 1820714
-- batch avg: 1.248797ms
-- sample avg: 4.878µs
+- batch avg: 1.765541ms
+- sample avg: 3.448µs
 
 real	1m20.341s
 user	81m59.549s
