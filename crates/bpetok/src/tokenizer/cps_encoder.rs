@@ -128,7 +128,7 @@ impl<T: TokenType> CPSEncoder<T> {
         // Reuse the output buffer as a stack.
         // Append the byte-tokens to the buffer.
         let start = buf.len();
-        buf.extend(chunk.into_iter().map(|&b| T::from_u8(b).unwrap()));
+        buf.extend(chunk.iter().map(|&b| T::from_u8(b).unwrap()));
 
         // Incrementally shrink the "stack" (the new buffer end)
         // Until we can no longer find pairs to merge.
