@@ -124,28 +124,31 @@ impl<T: TokenType> CPSEncoder<T> {
             return;
         }
 
-        // Reuse the output buffer for the merges.
+        // Reuse the output buffer as a stack.
+        // Append the byte-tokens to the buffer.
         let start = buf.len();
         chunk.iter().for_each(|&b| buf.push(T::from_u8(b).unwrap()));
 
+        // Incrementally shrink the "stack" (the new buffer end)
+        // Until we can no longer find pairs to merge.
         let stop = start + 2;
         while buf.len() >= stop {
-            // Find the best pair to merge
+            // Find the pair which merges to the lowest ranked token.
             let mut best_match: Option<(usize, T)> = None;
 
             for idx in start..buf.len() - 1 {
                 let pair = (buf[idx], buf[idx + 1]);
 
-                if let Some(&new_token) = self.data.merge_map.get(&pair)
-                    && (best_match.is_none() || (new_token < best_match.unwrap().1))
+                if let Some(&merge_token) = self.data.merge_map.get(&pair)
+                    && (best_match.is_none() || (merge_token < best_match.unwrap().1))
                 {
-                    best_match = Some((idx, new_token));
+                    best_match = Some((idx, merge_token));
                 }
             }
 
-            // If we found a pair to merge, apply it
-            if let Some((idx, new_id)) = best_match {
-                buf[idx] = new_id;
+            if let Some((idx, merge_token)) = best_match {
+                // buf[idx..=idx+1] (a, b) -> buf[idx] t
+                buf[idx] = merge_token;
                 buf.remove(idx + 1);
             } else {
                 // No more merges possible
