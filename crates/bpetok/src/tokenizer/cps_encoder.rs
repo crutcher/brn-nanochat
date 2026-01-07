@@ -5,12 +5,12 @@ use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::{TokenType, VocabMap};
-use crate::validators::expect_regex;
+use crate::util::regex::regex_pool::RegexWrapperPool;
+use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
 use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
 use ahash::AHashMap;
-use fancy_regex::Regex;
 use std::collections::hash_map;
 use std::ops::Range;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ pub struct CPSEncoder<T: TokenType> {
     /// Tokenizer options.
     pub options: CPSEncoderOptions,
 
-    regex: Regex,
+    regex_pool: RegexWrapperPool,
 
     vocab_map: VocabMap<T>,
 }
@@ -71,7 +71,12 @@ impl<T: TokenType> CPSEncoder<T> {
         }
 
         let data = data.into();
-        let regex = expect_regex(&data.pattern);
+
+        let regex: Arc<RegexWrapper> = RegexPatternLabel::Adaptive(data.pattern.clone())
+            .compile()
+            .unwrap()
+            .into();
+        let regex_pool = RegexWrapperPool::from(regex);
 
         let decoder = DictionaryDecoder::from_data(&data);
         let chunk_map = decoder
@@ -82,7 +87,7 @@ impl<T: TokenType> CPSEncoder<T> {
         Self {
             data,
             options,
-            regex,
+            regex_pool,
             vocab_map: chunk_map,
         }
     }
@@ -106,7 +111,6 @@ impl<T: TokenType> CPSEncoder<T> {
     }
 
     /// Append a chunk of text into token IDs.
-    #[tracing::instrument(skip(self, buf, chunk))]
     pub fn append_encode_chunk<'a>(
         &self,
         buf: &mut Vec<T>,
@@ -165,7 +169,7 @@ impl<T: TokenType> CPSEncoder<T> {
     }
 
     /// Encode a chunk of text into token IDs.
-    #[tracing::instrument(skip(self, chunk))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, chunk)))]
     pub fn encode_chunk<S: AsRef<str>>(
         &self,
         chunk: S,
@@ -185,9 +189,11 @@ impl<T: TokenType> CPSEncoder<T> {
     ) -> Vec<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
-        let mut cache = AHashMap::with_capacity(tokens.len() / 100);
-        for chunk in self.regex.find_iter(text).map(|m| m.unwrap().as_str()) {
-            self.append_encode_chunk(&mut tokens, chunk.as_bytes(), Some(&mut cache));
+
+        // let mut cache = AHashMap::with_capacity(tokens.len() / 100);
+
+        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
+            self.append_encode_chunk(&mut tokens, chunk.as_bytes(), None);
         }
         tokens
     }
@@ -205,9 +211,10 @@ impl<T: TokenType> CPSEncoder<T> {
         // This is significantly worse?
 
         let text1 = text.as_ref();
-        self.regex
+        self.regex_pool
+            .get()
             .find_iter(text1)
-            .map(|m| m.unwrap().as_str())
+            .map(|m| m.as_str())
             .collect::<Vec<_>>()
             .into_par_iter()
             .flat_map(|chunk| self.encode_chunk(chunk))
@@ -229,7 +236,7 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
         self.data.pair_tokens()
     }
 
-    #[tracing::instrument(skip(self, text))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
     fn encode<S: AsRef<str>>(
         &self,
         text: S,

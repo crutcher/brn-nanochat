@@ -156,7 +156,7 @@ where
     }
 
     /// Update word counts inplace from a sample iterator.
-    #[tracing::instrument(skip(self, samples))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, samples)))]
     pub fn update_from_samples<I>(
         &mut self,
         samples: I,

@@ -56,7 +56,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
     /// * `words` - the slice of words; Words are assumed to be unique.
     /// * `word_counts` - `word_counts[i]` is the count of `words[i]`.
     /// * `options` - options for building the index.
-    #[tracing::instrument(skip(words, word_counts))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(words, word_counts)))]
     pub fn index_unique_word_counts_table(
         words: &[Word<T>],
         word_counts: &[C],
@@ -73,7 +73,10 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
         }
     }
 
-    #[tracing::instrument(skip(pair_counts, pair_to_word_index, index, w, word_count))]
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(skip(pair_counts, pair_to_word_index, index, w, word_count))
+    )]
     fn observe_word(
         pair_counts: &mut PairCountMap<T, C>,
         pair_to_word_index: &mut PairIndexMap<T>,

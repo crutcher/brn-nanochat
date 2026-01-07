@@ -1,0 +1,176 @@
+//! # Regex Wrapper
+//! This modules provides mechanisms to mix `regex` and `fancy_regex` types.
+
+/// Error wrapper for regex patterns.
+#[non_exhaustive]
+#[derive(Clone, Debug)]
+pub enum ErrorWrapper {
+    /// Error from `regex`.
+    Basic(regex::Error),
+
+    /// Error from `fancy_regex`.
+    Fancy(fancy_regex::Error),
+}
+
+impl From<regex::Error> for ErrorWrapper {
+    fn from(err: regex::Error) -> Self {
+        Self::Basic(err)
+    }
+}
+
+impl From<fancy_regex::Error> for ErrorWrapper {
+    fn from(err: fancy_regex::Error) -> Self {
+        Self::Fancy(err)
+    }
+}
+
+impl core::fmt::Display for ErrorWrapper {
+    fn fmt(
+        &self,
+        f: &mut core::fmt::Formatter<'_>,
+    ) -> core::fmt::Result {
+        match self {
+            Self::Basic(err) => err.fmt(f),
+            Self::Fancy(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for ErrorWrapper {}
+
+/// Label for regex patterns.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum RegexPatternLabel {
+    /// This is a pattern for the `regex` crate.
+    Basic(String),
+
+    /// This is a pattern for the `fancy_regex` crate.
+    Fancy(String),
+
+    /// This pattern will try the `regex` crate first,
+    /// and fallback to `fancy_regex` if it fails.
+    Adaptive(String),
+}
+
+impl<S: AsRef<str>> From<S> for RegexPatternLabel {
+    fn from(pattern: S) -> Self {
+        Self::Adaptive(pattern.as_ref().to_string())
+    }
+}
+
+impl RegexPatternLabel {
+    /// Compile the regex pattern into a `RegexWrapper`.
+    pub fn compile(&self) -> Result<RegexWrapper, ErrorWrapper> {
+        match self {
+            Self::Basic(pattern) => regex::Regex::new(pattern)
+                .map(RegexWrapper::from)
+                .map_err(ErrorWrapper::from),
+            Self::Fancy(pattern) => fancy_regex::Regex::new(pattern)
+                .map(RegexWrapper::from)
+                .map_err(ErrorWrapper::from),
+            Self::Adaptive(pattern) => {
+                regex::Regex::new(pattern)
+                    .map(RegexWrapper::from)
+                    .or_else(|_| {
+                        fancy_regex::Regex::new(pattern)
+                            .map(RegexWrapper::from)
+                            .map_err(ErrorWrapper::from)
+                    })
+            }
+        }
+    }
+}
+
+/// Wrapper for regex patterns.
+#[derive(Debug, Clone)]
+pub enum RegexWrapper {
+    /// Wrapper for `regex::Regex`.
+    Basic(regex::Regex),
+
+    /// Wrapper for `fancy_regex::Regex`.
+    Fancy(fancy_regex::Regex),
+}
+
+impl From<regex::Regex> for RegexWrapper {
+    fn from(regex: regex::Regex) -> Self {
+        Self::Basic(regex)
+    }
+}
+
+impl From<fancy_regex::Regex> for RegexWrapper {
+    fn from(regex: fancy_regex::Regex) -> Self {
+        Self::Fancy(regex)
+    }
+}
+
+impl RegexWrapper {
+    /// Is this `Basic`?
+    pub fn is_basic(&self) -> bool {
+        match self {
+            Self::Basic(_) => true,
+            Self::Fancy(_) => false,
+        }
+    }
+
+    /// Is this `Fancy`?
+    pub fn is_fancy(&self) -> bool {
+        match self {
+            Self::Basic(_) => false,
+            Self::Fancy(_) => true,
+        }
+    }
+
+    /// Get the underlying regex pattern.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Basic(regex) => regex.as_str(),
+            Self::Fancy(regex) => regex.as_str(),
+        }
+    }
+
+    /// Wrapper for `find_iter`.
+    pub fn find_iter<'r, 'h>(
+        &'r self,
+        haystack: &'h str,
+    ) -> MatchesWrapper<'r, 'h> {
+        match self {
+            Self::Basic(regex) => regex.find_iter(haystack).into(),
+            Self::Fancy(regex) => regex.find_iter(haystack).into(),
+        }
+    }
+}
+
+/// Wrapper for regex matches.
+pub enum MatchesWrapper<'r, 'h> {
+    /// Wrapper for `regex::Matches`.
+    Regex(regex::Matches<'r, 'h>),
+
+    /// Wrapper for `fancy_regex::Matches`.
+    FancyRegex(fancy_regex::Matches<'r, 'h>),
+}
+
+impl<'r, 'h> From<regex::Matches<'r, 'h>> for MatchesWrapper<'r, 'h> {
+    fn from(matches: regex::Matches<'r, 'h>) -> Self {
+        Self::Regex(matches)
+    }
+}
+
+impl<'r, 'h> From<fancy_regex::Matches<'r, 'h>> for MatchesWrapper<'r, 'h> {
+    fn from(matches: fancy_regex::Matches<'r, 'h>) -> Self {
+        Self::FancyRegex(matches)
+    }
+}
+
+impl<'r, 'h> Iterator for MatchesWrapper<'r, 'h> {
+    type Item = regex::Match<'h>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Regex(matches) => matches.next(),
+            Self::FancyRegex(matches) => matches
+                .next()
+                .map(|m| unsafe { std::mem::transmute(m.unwrap()) }),
+        }
+    }
+}

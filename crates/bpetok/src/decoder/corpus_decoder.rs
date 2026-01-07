@@ -32,13 +32,13 @@ impl<T: TokenType> CorpusDecoder<T> {
     }
 
     /// Creates a new corpus decoder.
-    #[tracing::instrument(skip(data))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
     pub fn from_data(data: &TokenVocabData<T>) -> Self {
         Self::from_merge_map(&data.merge_map)
     }
 
     /// Creates a new corpus decoder.
-    #[tracing::instrument(skip(merge_map))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
     pub fn from_merge_map(merge_map: &MergeMap<T>) -> Self {
         let expansion_map: ExpansionMap<T> = merge_map
             .iter()
@@ -106,7 +106,7 @@ impl<T: TokenType> TokenDecoder<T> for CorpusDecoder<T> {
         self.slices.keys().copied()
     }
 
-    #[tracing::instrument(skip(self, buf, tokens))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,
@@ -137,7 +137,10 @@ struct MaterializationMap<T: TokenType> {
 
 impl<T: TokenType> MaterializationMap<T> {
     /// Creates a new materialization map for the given token.
-    #[tracing::instrument(skip(token, expansion_map, maybe_slice))]
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(skip(token, expansion_map, maybe_slice))
+    )]
     fn materialize<'a, F>(
         token: T,
         expansion_map: &ExpansionMap<T>,
@@ -162,7 +165,10 @@ impl<T: TokenType> MaterializationMap<T> {
         mmap
     }
 
-    #[tracing::instrument(skip(self, token, expansion_map, maybe_slice))]
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(skip(self, token, expansion_map, maybe_slice))
+    )]
     fn expand<'a, F>(
         &mut self,
         token: T,
