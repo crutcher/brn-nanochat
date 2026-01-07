@@ -41,7 +41,7 @@ impl<T> TokenType for T where
 
 /// Returns true if the token is a byte token.
 pub fn is_byte_token<T: TokenType>(token: T) -> bool {
-    token < T::from_usize(crate::validators::U8_SIZE).unwrap()
+    token < T::from_usize(crate::util::validators::U8_SIZE).unwrap()
 }
 
 /// A pair of tokens.

@@ -1,12 +1,13 @@
 //! # Vocab Trainer
 
 use crate::types::{CountType, MergeMap, Pair, StringChunkType, TokenType};
-use crate::validators::U8_SIZE;
+use crate::util::validators;
+use crate::util::validators::U8_SIZE;
 use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::pair_index::{PairIndex, PairIndexOptions};
 use crate::vocab::training::word::Word;
 use crate::vocab::training::word_count::{WordCounter, WordCounterOptions};
-use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, validators};
+use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use std::cmp::Ordering;
