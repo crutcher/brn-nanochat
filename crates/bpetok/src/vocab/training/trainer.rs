@@ -121,7 +121,10 @@ impl VocabTrainer {
     /// # Arguments
     /// * `words` - the words, takes ownership.
     /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
-    #[tracing::instrument(skip(self, words, word_counts))]
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(skip(self, words, word_counts))
+    )]
     pub fn train_vocab_from_word_count_table<T, C>(
         self,
         mut words: Vec<Word<T>>,

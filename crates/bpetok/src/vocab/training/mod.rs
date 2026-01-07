@@ -4,5 +4,3 @@ pub mod pair_index;
 pub mod trainer;
 pub mod word;
 pub mod word_count;
-
-pub mod tiktoken_io;

@@ -703,6 +703,7 @@ dependencies = [
  "log",
  "num-traits",
  "rayon",
+ "regex",
  "serde",
  "tracing",
 ]

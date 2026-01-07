@@ -29,3 +29,51 @@ TODO:
 See:
 
 - [examples/tokenizer_trainer](examples/tokenizer_trainer)
+
+# training and timing
+
+- Note: my machine is a beast (64-core Threadripper; NVME data disk).
+
+```terminaloutput
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 512 --num-timing-batches 60
+   Compiling tokenizer_trainer v0.0.0 (/home/crutcher/git/brn-nanochat/crates/bpetok/examples/tokenizer_trainer)
+    Finished `release` profile [optimized] target(s) in 1.54s
+     Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --shards ..8 --vocab-size=65536 --time-encode-decode --batch-size 512 --num-timing-batches 60`
+Loading Shards ...: [0, 1, 2, 3, 4, 5, 6, 7]
+
+Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
+- training_duration: 74.15810139s
+- vocab_size: 65535
+- size_estimate: 917613
+
+Samples Summary:
+- count: 53248
+- avg size: 4783
+
+Timing Config:
+- batch size: 512
+
+Timing CPSEncoder Encode:
+- batch avg: 83.835533ms
+- sample avg: 163.741µs
+- avg bps: 29.21 MB/s
+
+Timing Decode: ExpansionDecoder
+- decoder est bytes: 1566720
+- batch avg: 2.219528ms
+- sample avg: 4.335µs
+
+Timing Decode: DictionaryDecoder
+- decoder est bytes: 1860233
+- batch avg: 1.463183ms
+- sample avg: 2.857µs
+
+Timing Decode: CorpusDecoder
+- decoder est bytes: 1820714
+- batch avg: 1.485641ms
+- sample avg: 2.901µs
+
+real    1m26.091s
+user    86m4.472s
+sys     27m10.539s
+```

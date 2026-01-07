@@ -49,5 +49,6 @@ tempdir = "^0.3"
 parquet = "^57.1"
 arrow = "^57.1"
 
+regex = "^1.12"
 fancy-regex = "^0.17"
 

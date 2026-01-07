@@ -24,13 +24,13 @@ impl<T: TokenType> ExpansionDecoder<T> {
     }
 
     /// Build a [`ExpansionDecoder`] from this [`TokenVocabData`].
-    #[tracing::instrument(skip(data))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
     pub fn from_data(data: &TokenVocabData<T>) -> Self {
         Self::from_merge_map(&data.merge_map)
     }
 
     /// Build a [`ExpansionDecoder`] from this [`Tokenizer`].
-    #[tracing::instrument(skip(merge_map))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
     pub fn from_merge_map(merge_map: &MergeMap<T>) -> Self {
         let expansion_map =
             AHashMap::from_iter(merge_map.iter().map(|(&pair, &token)| (token, pair)));
@@ -43,7 +43,7 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
         self.expansion_map.keys().copied()
     }
 
-    #[tracing::instrument(skip(self, buf, tokens))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,

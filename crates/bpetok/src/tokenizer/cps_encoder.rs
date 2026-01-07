@@ -3,16 +3,14 @@
 use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
-use crate::regex_pool::RegexPool;
 use crate::tokenizer::TokenEncoder;
-use crate::types::{Pair, TokenType, VocabMap};
-use crate::validators::expect_regex;
+use crate::types::{TokenType, VocabMap};
+use crate::util::regex::regex_pool::RegexWrapperPool;
+use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
 use crate::vocab::data::TokenVocabData;
-use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
+use crate::vocab::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
-use ahash::AHashMap;
 use std::collections::hash_map;
-use std::ops::Range;
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -51,7 +49,7 @@ pub struct CPSEncoder<T: TokenType> {
     /// Tokenizer options.
     pub options: CPSEncoderOptions,
 
-    regex_pool: RegexPool,
+    regex_pool: RegexWrapperPool,
 
     vocab_map: VocabMap<T>,
 }
@@ -71,7 +69,12 @@ impl<T: TokenType> CPSEncoder<T> {
         }
 
         let data = data.into();
-        let regex_pool = RegexPool::new(expect_regex(&data.pattern));
+
+        let regex: Arc<RegexWrapper> = RegexPatternLabel::Adaptive(data.pattern.clone())
+            .compile()
+            .unwrap()
+            .into();
+        let regex_pool = RegexWrapperPool::from(regex);
 
         let decoder = DictionaryDecoder::from_data(&data);
         let chunk_map = decoder
@@ -106,12 +109,10 @@ impl<T: TokenType> CPSEncoder<T> {
     }
 
     /// Append a chunk of text into token IDs.
-    #[tracing::instrument(skip(self, buf, chunk))]
-    pub fn append_encode_chunk<'a>(
+    pub fn append_encode_chunk(
         &self,
         buf: &mut Vec<T>,
-        chunk: &'a [u8],
-        cache: Option<&mut AHashMap<&'a [u8], Range<usize>>>,
+        chunk: &[u8],
     ) {
         if chunk.len() == 1 {
             buf.push(T::from_u8(chunk[0]).unwrap());
@@ -123,32 +124,27 @@ impl<T: TokenType> CPSEncoder<T> {
             return;
         }
 
-        if let Some(cache) = &cache
-            && let Some(r) = cache.get(chunk)
-        {
-            buf.extend_from_within(r.clone());
-            return;
-        }
-
         // Reuse the output buffer for the merges.
         let start = buf.len();
         chunk.iter().for_each(|&b| buf.push(T::from_u8(b).unwrap()));
 
-        while (buf.len() - start) >= 2 {
+        let stop = start + 2;
+        while buf.len() >= stop {
             // Find the best pair to merge
-            let mut best_pair: Option<(usize, Pair<T>, T)> = None;
+            let mut best_match: Option<(usize, T)> = None;
 
-            for i in start..(buf.len() - 1) {
-                let pair: Pair<T> = (buf[i], buf[i + 1]);
-                if let Some(&new_id) = self.data.merge_map.get(&pair)
-                    && (best_pair.is_none() || new_id < best_pair.unwrap().2)
+            for idx in start..buf.len() - 1 {
+                let pair = (buf[start], buf[start + 1]);
+
+                if let Some(&new_token) = self.data.merge_map.get(&pair)
+                    && (best_match.is_none() || (new_token < best_match.unwrap().1))
                 {
-                    best_pair = Some((i, pair, new_id));
+                    best_match = Some((idx, new_token));
                 }
             }
 
             // If we found a pair to merge, apply it
-            if let Some((idx, _pair, new_id)) = best_pair {
+            if let Some((idx, new_id)) = best_match {
                 buf[idx] = new_id;
                 buf.remove(idx + 1);
             } else {
@@ -156,66 +152,18 @@ impl<T: TokenType> CPSEncoder<T> {
                 break;
             }
         }
-
-        if let Some(cache) = cache {
-            cache.insert(chunk, start..buf.len());
-        }
     }
 
     /// Encode a chunk of text into token IDs.
-    #[tracing::instrument(skip(self, chunk))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, chunk)))]
     pub fn encode_chunk<S: AsRef<str>>(
         &self,
         chunk: S,
     ) -> Vec<T> {
         let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
         let mut tokens = Vec::with_capacity(chunk_bytes.len());
-        self.append_encode_chunk(&mut tokens, chunk_bytes, None);
+        self.append_encode_chunk(&mut tokens, chunk_bytes);
         tokens
-    }
-
-    /// Encode a string into token IDs serially.
-    ///
-    /// Uses serial processing, ignoring the `parallel` flag.
-    pub fn encode_serial<S: AsRef<str>>(
-        &self,
-        text: S,
-    ) -> Vec<T> {
-        let text = text.as_ref();
-        let mut tokens = Vec::with_capacity(text.len());
-        let mut cache = AHashMap::with_capacity(tokens.len());
-        for chunk in self
-            .regex_pool
-            .get()
-            .find_iter(text)
-            .map(|m| m.unwrap().as_str())
-        {
-            self.append_encode_chunk(&mut tokens, chunk.as_bytes(), Some(&mut cache));
-        }
-        tokens
-    }
-
-    /// Encode a string into token IDs in parallel.
-    ///
-    /// Uses parallel processing, ignoring the `parallel` flag.
-    #[cfg(feature = "rayon")]
-    pub fn encode_rayon<S: AsRef<str>>(
-        &self,
-        text: S,
-    ) -> Vec<T> {
-        use rayon::prelude::*;
-
-        // This is significantly worse?
-
-        let text1 = text.as_ref();
-        self.regex_pool
-            .get()
-            .find_iter(text1)
-            .map(|m| m.unwrap().as_str())
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .flat_map(|chunk| self.encode_chunk(chunk))
-            .collect()
     }
 
     /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
@@ -233,19 +181,18 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
         self.data.pair_tokens()
     }
 
-    #[tracing::instrument(skip(self, text))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
     fn encode<S: AsRef<str>>(
         &self,
         text: S,
     ) -> Vec<T> {
-        if self.options.parallel {
-            #[cfg(not(feature = "rayon"))]
-            panic!("Parallel processing requires the `rayon` feature to be enabled.");
+        let text = text.as_ref();
+        let mut tokens = Vec::with_capacity(text.len());
 
-            // We just fall back to serial because rayon is currently slower.
+        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
+            self.append_encode_chunk(&mut tokens, chunk.as_bytes());
         }
-
-        self.encode_serial(text)
+        tokens
     }
 
     /// Encode a batch of text into tokens.
@@ -260,13 +207,10 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
             #[cfg(feature = "rayon")]
             {
                 use rayon::prelude::*;
-                batch
-                    .par_iter()
-                    .map(|text| self.encode_serial(text))
-                    .collect()
+                batch.par_iter().map(|text| self.encode(text)).collect()
             }
         } else {
-            batch.iter().map(|text| self.encode_serial(text)).collect()
+            batch.iter().map(|text| self.encode(text)).collect()
         }
     }
 }

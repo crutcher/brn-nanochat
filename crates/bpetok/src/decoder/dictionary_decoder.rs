@@ -25,7 +25,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 
     /// Build a [`DictionaryDecoder`] from a [`ExpansionDecoder`].
-    #[tracing::instrument(skip(decoder))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(decoder)))]
     pub fn from_tokenizer<D: TokenDecoder<T>>(decoder: &D) -> Self {
         let mut dictionary = AHashMap::with_capacity(decoder.max_token().to_usize().unwrap());
         for token in decoder.pair_tokens() {
@@ -35,13 +35,13 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    #[tracing::instrument(skip(data))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
     pub fn from_data(data: &TokenVocabData<T>) -> DictionaryDecoder<T> {
         Self::from_merge_map(&data.merge_map)
     }
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    #[tracing::instrument(skip(merges))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(merges)))]
     pub fn from_merge_map(merges: &MergeMap<T>) -> DictionaryDecoder<T> {
         let gd = ExpansionDecoder::from_merge_map(merges);
         Self::from_tokenizer(&gd)
@@ -53,7 +53,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         self.dictionary.keys().copied()
     }
 
-    #[tracing::instrument(skip(self, buf, tokens))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,
