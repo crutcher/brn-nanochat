@@ -5,7 +5,6 @@ pub mod decoder;
 pub mod tokenizer;
 pub mod types;
 pub mod util;
-pub mod validators;
 pub mod vocab;
 
 /// Default GPT-4 style regex pattern for splitting text
