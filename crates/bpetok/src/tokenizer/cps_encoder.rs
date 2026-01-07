@@ -8,7 +8,7 @@ use crate::types::{TokenType, VocabMap};
 use crate::util::regex::regex_pool::RegexWrapperPool;
 use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
 use crate::vocab::data::TokenVocabData;
-use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
+use crate::vocab::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
 use std::collections::hash_map;
 use std::sync::Arc;
