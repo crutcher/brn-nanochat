@@ -128,7 +128,7 @@ impl<T: TokenType> CPSEncoder<T> {
         // Reuse the output buffer as a stack.
         // Append the byte-tokens to the buffer.
         let start = buf.len();
-        chunk.iter().for_each(|&b| buf.push(T::from_u8(b).unwrap()));
+        buf.extend(chunk.into_iter().map(|&b| T::from_u8(b).unwrap()));
 
         // Incrementally shrink the "stack" (the new buffer end)
         // Until we can no longer find pairs to merge.
@@ -156,18 +156,6 @@ impl<T: TokenType> CPSEncoder<T> {
                 break;
             }
         }
-    }
-
-    /// Encode a chunk of text into token IDs.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, chunk)))]
-    pub fn encode_chunk<S: AsRef<str>>(
-        &self,
-        chunk: S,
-    ) -> Vec<T> {
-        let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
-        let mut tokens = Vec::with_capacity(chunk_bytes.len());
-        self.append_encode_chunk(&mut tokens, chunk_bytes);
-        tokens
     }
 
     /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
