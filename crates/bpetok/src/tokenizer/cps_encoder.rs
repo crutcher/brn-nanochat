@@ -10,9 +10,7 @@ use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
 use crate::vocab::data::TokenVocabData;
 use crate::vocab::training::tiktoken_io::save_tiktoken_vocab;
 use crate::{DEFAULT_PARALLEL, validators};
-use ahash::AHashMap;
 use std::collections::hash_map;
-use std::ops::Range;
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -111,11 +109,10 @@ impl<T: TokenType> CPSEncoder<T> {
     }
 
     /// Append a chunk of text into token IDs.
-    pub fn append_encode_chunk<'a>(
+    pub fn append_encode_chunk(
         &self,
         buf: &mut Vec<T>,
-        chunk: &'a [u8],
-        cache: Option<&mut AHashMap<&'a [u8], Range<usize>>>,
+        chunk: &[u8],
     ) {
         if chunk.len() == 1 {
             buf.push(T::from_u8(chunk[0]).unwrap());
@@ -124,13 +121,6 @@ impl<T: TokenType> CPSEncoder<T> {
 
         if let Some(token) = self.vocab_map.get(chunk) {
             buf.push(*token);
-            return;
-        }
-
-        if let Some(cache) = &cache
-            && let Some(r) = cache.get(chunk)
-        {
-            buf.extend_from_within(r.clone());
             return;
         }
 
@@ -162,10 +152,6 @@ impl<T: TokenType> CPSEncoder<T> {
                 break;
             }
         }
-
-        if let Some(cache) = cache {
-            cache.insert(chunk, start..buf.len());
-        }
     }
 
     /// Encode a chunk of text into token IDs.
@@ -176,49 +162,8 @@ impl<T: TokenType> CPSEncoder<T> {
     ) -> Vec<T> {
         let chunk_bytes: &[u8] = chunk.as_ref().as_bytes();
         let mut tokens = Vec::with_capacity(chunk_bytes.len());
-        self.append_encode_chunk(&mut tokens, chunk_bytes, None);
+        self.append_encode_chunk(&mut tokens, chunk_bytes);
         tokens
-    }
-
-    /// Encode a string into token IDs serially.
-    ///
-    /// Uses serial processing, ignoring the `parallel` flag.
-    pub fn encode_serial<S: AsRef<str>>(
-        &self,
-        text: S,
-    ) -> Vec<T> {
-        let text = text.as_ref();
-        let mut tokens = Vec::with_capacity(text.len());
-
-        // let mut cache = AHashMap::with_capacity(tokens.len() / 100);
-
-        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
-            self.append_encode_chunk(&mut tokens, chunk.as_bytes(), None);
-        }
-        tokens
-    }
-
-    /// Encode a string into token IDs in parallel.
-    ///
-    /// Uses parallel processing, ignoring the `parallel` flag.
-    #[cfg(feature = "rayon")]
-    pub fn encode_rayon<S: AsRef<str>>(
-        &self,
-        text: S,
-    ) -> Vec<T> {
-        use rayon::prelude::*;
-
-        // This is significantly worse?
-
-        let text1 = text.as_ref();
-        self.regex_pool
-            .get()
-            .find_iter(text1)
-            .map(|m| m.as_str())
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .flat_map(|chunk| self.encode_chunk(chunk))
-            .collect()
     }
 
     /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
@@ -241,14 +186,13 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
         &self,
         text: S,
     ) -> Vec<T> {
-        if self.options.parallel {
-            #[cfg(not(feature = "rayon"))]
-            panic!("Parallel processing requires the `rayon` feature to be enabled.");
+        let text = text.as_ref();
+        let mut tokens = Vec::with_capacity(text.len());
 
-            // We just fall back to serial because rayon is currently slower.
+        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
+            self.append_encode_chunk(&mut tokens, chunk.as_bytes());
         }
-
-        self.encode_serial(text)
+        tokens
     }
 
     /// Encode a batch of text into tokens.
@@ -263,13 +207,10 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
             #[cfg(feature = "rayon")]
             {
                 use rayon::prelude::*;
-                batch
-                    .par_iter()
-                    .map(|text| self.encode_serial(text))
-                    .collect()
+                batch.par_iter().map(|text| self.encode(text)).collect()
             }
         } else {
-            batch.iter().map(|text| self.encode_serial(text)).collect()
+            batch.iter().map(|text| self.encode(text)).collect()
         }
     }
 }

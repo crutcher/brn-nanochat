@@ -18,16 +18,16 @@ use std::time::Duration;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Shards to load.
-    #[arg(short, long, value_delimiter = ',', default_value = "0")]
-    pub shards: Vec<Slice>,
-
     /// Path to dataset directory.
     #[arg(long)]
     pub dataset_dir: String,
 
+    /// Shards to load.
+    #[arg(short, long, value_delimiter = ',', default_value = "..8")]
+    pub shards: Vec<Slice>,
+
     /// Vocab size.
-    #[arg(long, default_value = "100_000")]
+    #[arg(long, default_value = "65536")]
     pub vocab_size: usize,
 
     /// Time the avg encode/decode.
@@ -35,20 +35,32 @@ pub struct Args {
     pub time_encode_decode: bool,
 
     /// Encode/Decode Batch size.
-    #[arg(long, default_value = "32")]
+    #[arg(long, default_value = "512")]
     pub batch_size: usize,
 
     /// Optional Tiktoken save path.
     #[arg(long)]
     pub tiktoken_save_path: Option<String>,
+
+    /// Number of timing batches to use.
+    #[arg(long, default_value = "20")]
+    pub num_timing_batches: usize,
+
+    /// Enable verbose output.
+    #[arg(long, default_value = "false")]
+    pub verbose: bool,
 }
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    println!("{:#?}", args);
+    if args.verbose {
+        println!("{:#?}", args);
+    }
 
     let cache_config = DatasetCacheConfig::new().with_cache_dir(args.dataset_dir);
-    println!("{:#?}", cache_config);
+    if args.verbose {
+        println!("{:#?}", cache_config);
+    }
 
     let shards: Vec<usize> = {
         let max_shard = cache_config.source.max_shard;
@@ -66,51 +78,55 @@ fn main() -> anyhow::Result<()> {
 
     let mut cache = cache_config.init()?;
 
-    println!("Loading Shards ...: {shards:?}");
+    // TODO: `indicatif` for optional progress bar for users waiting on this.
+    println!("Loading Shards: {shards:?}");
+    println!("...");
     cache.load_shards(&shards)?;
 
     type T = u32;
     type C = u32;
     type K = CompactString;
 
-    let trainer = VocabTrainer::new_with_vocab_size(args.vocab_size);
+    let tokenizer = {
+        println!();
+        println!("Training Tokenizer on shards: {:?}", shards);
+        let t0 = std::time::Instant::now();
 
-    println!();
-    println!("Training Tokenizer on shards: {:?}", shards);
-    let t0 = std::time::Instant::now();
+        let cache_ref = &cache;
 
-    let cache_ref = &cache;
+        // Note: rather than repeating this, this should be a func to generate the Iterator.
+        // But I can't work out the lifetimes.
+        let samples = shards.clone().into_iter().flat_map(move |shard| {
+            cache_ref
+                .read_cached_batches(shard)
+                .expect("failed to read batch")
+                .flat_map(|batch| {
+                    batch
+                        .iter()
+                        .flat_map(|sample| {
+                            let text = sample
+                                .column(0)
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            text.iter()
+                                .map(|s| s.unwrap().to_string())
+                                .collect::<Vec<_>>()
+                        })
+                        .collect::<Vec<_>>()
+                })
+        });
 
-    // Note: rather than repeating this, this should be a func to generate the Iterator.
-    // But I can't work out the lifetimes.
-    let samples = shards.clone().into_iter().flat_map(move |shard| {
-        cache_ref
-            .read_cached_batches(shard)
-            .expect("failed to read batch")
-            .flat_map(|batch| {
-                batch
-                    .iter()
-                    .flat_map(|sample| {
-                        let text = sample
-                            .column(0)
-                            .as_any()
-                            .downcast_ref::<StringArray>()
-                            .unwrap();
-                        text.iter()
-                            .map(|s| s.unwrap().to_string())
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>()
-            })
-    });
+        // TODO: `indicatif` for optional progress bar for users waiting on this.
+        let data: TokenVocabData<T> = VocabTrainer::new_with_vocab_size(args.vocab_size)
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples);
+        let training_duration = std::time::Instant::now().duration_since(t0);
+        println!("- training_duration: {:#?}", training_duration);
+        println!("- vocab_size: {:#?}", data.max_token());
+        println!("- size_estimate: {:#?}", data.size_estimate());
 
-    let data: TokenVocabData<T> = trainer.train_vocab_from_sample_iter::<T, K, C, _>(samples);
-    let tokenizer = CPSEncoder::new(data.clone(), Default::default());
-
-    let training_duration = std::time::Instant::now().duration_since(t0);
-    println!("- training_duration: {:#?}", training_duration);
-    println!("- vocab_size: {:#?}", tokenizer.max_token());
-    println!("- size_estimate: {:#?}", tokenizer.size_estimate());
+        CPSEncoder::new(data.clone(), Default::default())
+    };
 
     if let Some(path) = args.tiktoken_save_path {
         tokenizer.save_tiktoken_vocab(&path)?;
@@ -118,14 +134,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     if args.time_encode_decode {
-        // TODO: `indicatif` for optional progress bar for users waiting on this.
-
         let mut samples = Vec::new();
         {
-            let num_shard_batches = 8;
             for batch in cache
                 .read_cached_batches(shards[0])?
-                .take(num_shard_batches)
+                .take(args.num_timing_batches)
             {
                 let batch = batch?;
                 let column = batch
@@ -181,10 +194,15 @@ fn main() -> anyhow::Result<()> {
                 "- sample avg: {:#?}",
                 Duration::from_nanos(avg_sample_time_ns)
             );
+
+            let b_p_ns = avg_size as f64 / avg_sample_time_ns as f64;
+            let b_p_s = b_p_ns * 1e9;
+            let mb_p_s = b_p_s / 1e6;
+            println!("- avg bps: {:.2} MB/s", mb_p_s);
         }
 
         println!();
-        let expansion_decoder = ExpansionDecoder::from_data(&data);
+        let expansion_decoder = ExpansionDecoder::from_data(&tokenizer.data);
         time_decoder(
             "ExpansionDecoder",
             &expansion_decoder,
@@ -204,7 +222,7 @@ fn main() -> anyhow::Result<()> {
         );
 
         println!();
-        let corpus_decoder = CorpusDecoder::from_data(&data);
+        let corpus_decoder = CorpusDecoder::from_data(&tokenizer.data);
         time_decoder(
             "CorpusDecoder",
             &corpus_decoder,
