@@ -134,7 +134,7 @@ impl<T: TokenType> CPSEncoder<T> {
             let mut best_match: Option<(usize, T)> = None;
 
             for idx in start..buf.len() - 1 {
-                let pair = (buf[start], buf[start + 1]);
+                let pair = (buf[idx], buf[idx + 1]);
 
                 if let Some(&new_token) = self.data.merge_map.get(&pair)
                     && (best_match.is_none() || (new_token < best_match.unwrap().1))
