@@ -15,7 +15,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn special_vocab(&self) -> Option<&WordMapTokenVocab<T>>;
 
     /// Split text using the attached pattern and specials.
-    fn split_text<'a>(
+    fn split_words<'a>(
         &self,
         text: &'a str,
     ) -> Vec<WordRef<'a>>;
@@ -34,7 +34,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         text: &str,
         tokens: &mut Vec<T>,
     ) {
-        self.split_text(text).into_iter().for_each(|wr| match wr {
+        self.split_words(text).into_iter().for_each(|wr| match wr {
             WordRef::Normal(w) => self.encode_append_word(w, tokens),
             WordRef::Special(s) => {
                 tokens.push(
