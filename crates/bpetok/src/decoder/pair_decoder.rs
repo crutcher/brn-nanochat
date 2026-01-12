@@ -1,6 +1,6 @@
 //! # Expansion Decoder
 
-use crate::decoder::TokenDecoder;
+use crate::decoder::{DecodeContext, TokenDecoder};
 use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
 
 /// An [`ExpansionMap`] [`TokenDecoder<T>`].
@@ -36,22 +36,22 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append_stack(
+    fn decode_context(
         &self,
-        stack: &mut Vec<T>,
-        buf: &mut Vec<u8>,
-    ) {
-        while let Some(t) = stack.pop() {
+        ctx: &mut DecodeContext<T>,
+    ) -> bool {
+        while let Some(t) = ctx.stack.pop() {
             if let Some(b) = t.to_u8() {
-                buf.push(b);
+                ctx.buf.push(b);
             } else if let Some((a, b)) = self.token_to_pair.get(&t) {
-                stack.push(*b);
-                stack.push(*a);
+                ctx.stack.push(*b);
+                ctx.stack.push(*a);
             } else {
-                stack.push(t);
+                ctx.stack.push(t);
                 break;
             }
         }
+        ctx.stack.is_empty()
     }
 }
 

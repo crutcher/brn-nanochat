@@ -1,6 +1,6 @@
 //! # Dictionary Decoder
 
-use crate::decoder::TokenDecoder;
+use crate::decoder::{DecodeContext, TokenDecoder};
 use crate::types::{TokenToWordMap, TokenType};
 
 /// A token dictionary [`TokenDecoder<T>`].
@@ -26,21 +26,21 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append_stack(
+    fn decode_context(
         &self,
-        stack: &mut Vec<T>,
-        buf: &mut Vec<u8>,
-    ) {
-        while let Some(t) = stack.pop() {
+        ctx: &mut DecodeContext<T>,
+    ) -> bool {
+        while let Some(t) = ctx.stack.pop() {
             if let Some(b) = t.to_u8() {
-                buf.push(b);
+                ctx.buf.push(b);
             } else if let Some(w) = self.token_to_word.get(&t) {
-                buf.extend_from_slice(w.as_slice());
+                ctx.buf.extend_from_slice(w.as_slice());
             } else {
-                stack.push(t);
+                ctx.stack.push(t);
                 break;
             }
         }
+        ctx.stack.is_empty()
     }
 }
 

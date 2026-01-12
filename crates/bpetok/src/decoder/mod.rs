@@ -29,6 +29,29 @@ use crate::vocab::byte_tokens_iter;
 pub mod dictionary_decoder;
 pub mod pair_decoder;
 
+/// Representation of a token decoding context.
+#[derive(Clone)]
+pub struct DecodeContext<T: TokenType> {
+    /// Append buffer for decoded bytes.
+    pub buf: Vec<u8>,
+
+    /// FILO stack of tokens to be decoded.
+    pub stack: Vec<T>,
+}
+
+impl<T: TokenType> DecodeContext<T> {
+    /// Creates a new decoding context.
+    pub fn for_tokens(
+        tokens: Vec<T>,
+        size_hint: usize,
+    ) -> Self {
+        let buf = Vec::with_capacity(tokens.len() * size_hint);
+        let mut stack = tokens;
+        stack.reverse();
+        Self { buf, stack }
+    }
+}
+
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType>: Send + Sync {
     /// Returns an iterator over all tokens.
@@ -44,47 +67,28 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         self.compound_tokens_iter().max().unwrap()
     }
 
-    /// Incrementally decodes from `stack` to `buf`.
+    /// Incrementally decodes the context.
     ///
-    /// Work will progress until `stack` is empty,
-    /// or the top token on `stack` is not defined in this decoder.
+    /// Progresses until `ctx.stack` is empty,
+    /// or the top token cannot be decoded by this decoder.
     ///
-    /// # Arguments
-    /// * `stack` - mutable FIFO stack, holding the tokens to be decoded.
-    /// * `buf` - a mutable byte vector, to be appended to.
-    fn decode_append_stack(
+    /// # Returns
+    /// `ctx.stack.is_empty()`
+    fn decode_context(
         &self,
-        stack: &mut Vec<T>,
-        buf: &mut Vec<u8>,
-    );
-
-    /// Decode tokens into a byte vector.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append(
-        &self,
-        buf: &mut Vec<u8>,
-        tokens: &[T],
-    ) {
-        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
-        stack.extend(tokens.iter().rev());
-
-        self.decode_append_stack(&mut stack, buf);
-
-        if !stack.is_empty() {
-            let tok = stack[stack.len()];
-            panic!("Token ({tok:?}) not defined for decoder");
-        }
-    }
+        ctx: &mut DecodeContext<T>,
+    ) -> bool;
 
     /// Decodes tokens into bytes.
     fn decode_to_bytes<S: AsRef<[T]>>(
         &self,
         tokens: S,
     ) -> Vec<u8> {
-        let tokens = tokens.as_ref();
-        let mut buf = Vec::with_capacity(tokens.len() * 2);
-        self.decode_append(&mut buf, tokens);
-        buf
+        let mut context = DecodeContext::for_tokens(tokens.as_ref().to_vec(), 2);
+        if !self.decode_context(&mut context) {
+            panic!("Failed to decode token: {:?}", context.stack.pop().unwrap());
+        }
+        context.buf
     }
 
     /// Decodes a batch of tokens into a vector of byte vectors.
