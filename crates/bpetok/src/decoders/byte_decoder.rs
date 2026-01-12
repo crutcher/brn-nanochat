@@ -2,11 +2,11 @@
 //!
 //! Mainly used for testing.
 
-use crate::decoder::{DecodeContext, TokenDecoder};
+use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 
-/// A decoder that only decodes byte tokens.
+/// A decoders that only decodes byte tokens.
 #[derive(Clone, Default)]
 pub struct ByteDecoder<T: TokenType> {
     _marker: std::marker::PhantomData<T>,
@@ -22,7 +22,7 @@ impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn incremental_decode(
         &self,
-        ctx: &mut DecodeContext<T>,
+        ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         while let Some(t) = ctx.stack.pop() {
             if let Some(b) = t.to_u8() {
@@ -63,7 +63,7 @@ mod tests {
         );
         tokens.extend_from_slice(&[256, 3000]);
 
-        let mut ctx = DecodeContext::for_tokens(tokens, 2);
+        let mut ctx = TokenDecodeContext::for_tokens(tokens, 2);
         assert!(!decoder.incremental_decode(&mut ctx));
 
         assert_eq!(ctx.buf, "hello world".as_bytes().to_vec());

@@ -1,6 +1,6 @@
 //! # Token Decoder Trait
 
-use crate::decoder::DecodeContext;
+use crate::decoders::TokenDecodeContext;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 
@@ -9,13 +9,13 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     /// Incrementally decodes the context.
     ///
     /// Progresses until `ctx.stack` is empty,
-    /// or the top token cannot be decoded by this decoder.
+    /// or the top token cannot be decoded by this decoders.
     ///
     /// # Returns
     /// `ctx.stack.is_empty()`
     fn incremental_decode(
         &self,
-        ctx: &mut DecodeContext<T>,
+        ctx: &mut TokenDecodeContext<T>,
     ) -> bool;
 
     /// Decodes tokens into bytes.
@@ -25,8 +25,8 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn decode_to_context<S: AsRef<[T]>>(
         &self,
         tokens: S,
-    ) -> DecodeContext<T> {
-        let mut context = DecodeContext::for_tokens(tokens.as_ref().to_vec(), 2);
+    ) -> TokenDecodeContext<T> {
+        let mut context = TokenDecodeContext::for_tokens(tokens.as_ref().to_vec(), 2);
         self.incremental_decode(&mut context);
         context
     }
@@ -71,7 +71,7 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoder::byte_decoder::ByteDecoder;
+    use crate::decoders::byte_decoder::ByteDecoder;
     use num_traits::FromPrimitive;
 
     #[test]
@@ -96,7 +96,7 @@ mod tests {
         );
         tokens.extend_from_slice(&[256, 3000]);
 
-        let mut ctx = DecodeContext::for_tokens(tokens, 2);
+        let mut ctx = TokenDecodeContext::for_tokens(tokens, 2);
         assert!(!decoder.incremental_decode(&mut ctx));
 
         assert_eq!(ctx.buf, "hello world".as_bytes().to_vec());

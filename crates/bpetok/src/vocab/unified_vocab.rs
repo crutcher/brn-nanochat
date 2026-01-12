@@ -1,6 +1,6 @@
 //! # Unified Vocabulary Data
 
-use crate::decoder::dictionary_decoder::DictionaryDecoder;
+use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapperPattern;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
@@ -110,7 +110,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         dictionary
     }
 
-    /// Compile the unified vocabulary into a dictionary decoder.
+    /// Compile the unified vocabulary into a dictionary decoders.
     pub fn to_decoder(&self) -> DictionaryDecoder<T> {
         DictionaryDecoder::new(self.compiled_dictionary())
     }

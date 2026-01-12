@@ -3,7 +3,7 @@
 use crate::types::{Pair, TokenType};
 use core::hash::Hash;
 
-/// A word in a BPE-based tokenizer.
+/// A word in a BPE-based encoders.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Word<T: TokenType> {
     tokens: Vec<T>,

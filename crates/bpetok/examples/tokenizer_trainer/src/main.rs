@@ -1,7 +1,7 @@
 use arrow::array::StringArray;
-use bpetok::decoder::parallel_decoder::ParallelDecoder;
-use bpetok::decoder::token_decoder::TokenDecoder;
-use bpetok::tokenizer::{TokenEncoder, UnifiedVocabEncoder};
+use bpetok::decoders::parallel_decoder::ParallelDecoder;
+use bpetok::decoders::token_decoder::TokenDecoder;
+use bpetok::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::types::TokenType;
 use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Example tokenizer trainer.
+/// Example encoders trainer.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
