@@ -1,9 +1,9 @@
 //! # Tokenizer Structures
 
-pub mod scanning_encoder;
+pub mod unified_encoder;
 
 use crate::types::TokenType;
-pub use scanning_encoder::*;
+pub use unified_encoder::*;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType> {

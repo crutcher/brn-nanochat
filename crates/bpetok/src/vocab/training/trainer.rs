@@ -331,7 +331,7 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::scanning_encoder::ScanningEncoder;
+    use crate::tokenizer::unified_encoder::ScanningEncoder;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::data::unified::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};

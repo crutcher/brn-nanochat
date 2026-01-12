@@ -84,7 +84,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 mod tests {
     use super::*;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::scanning_encoder::ScanningEncoder;
+    use crate::tokenizer::unified_encoder::ScanningEncoder;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::data::unified::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};

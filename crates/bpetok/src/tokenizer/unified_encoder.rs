@@ -13,12 +13,12 @@ use std::sync::Arc;
 
 /// Config options for the [`ScanningEncoder`].
 #[derive(Debug, Clone)]
-pub struct ScanningEncoderOptions {
+pub struct UnifiedVocabEncoder {
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
 }
 
-impl ScanningEncoderOptions {
+impl UnifiedVocabEncoder {
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub fn with_parallel(
         self,
@@ -30,7 +30,7 @@ impl ScanningEncoderOptions {
     }
 }
 
-impl Default for ScanningEncoderOptions {
+impl Default for UnifiedVocabEncoder {
     fn default() -> Self {
         Self {
             parallel: DEFAULT_PARALLEL,
@@ -45,7 +45,7 @@ pub struct ScanningEncoder<T: TokenType> {
     pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Tokenizer options.
-    pub options: ScanningEncoderOptions,
+    pub options: UnifiedVocabEncoder,
 
     /// Regex for word splitting.
     pub word_regex: RegexWrapper,
@@ -55,7 +55,7 @@ impl<T: TokenType> ScanningEncoder<T> {
     /// Construct a new encoder..
     pub fn new(
         data: Arc<UnifiedTokenVocab<T>>,
-        options: ScanningEncoderOptions,
+        options: UnifiedVocabEncoder,
     ) -> Self {
         #[cfg(not(feature = "rayon"))]
         if options.parallel {
@@ -168,7 +168,7 @@ impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
 mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::scanning_encoder::ScanningEncoder;
+    use crate::tokenizer::unified_encoder::ScanningEncoder;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::data::unified::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
