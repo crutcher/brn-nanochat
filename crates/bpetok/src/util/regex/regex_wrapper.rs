@@ -60,6 +60,15 @@ impl<S: AsRef<str>> From<S> for RegexWrapperPattern {
 }
 
 impl RegexWrapperPattern {
+    /// Get the underlying regex pattern.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Basic(pattern) => pattern,
+            Self::Fancy(pattern) => pattern,
+            Self::Adaptive(pattern) => pattern,
+        }
+    }
+
     /// Compile the regex pattern into a `RegexWrapper`.
     pub fn compile(&self) -> Result<RegexWrapper, ErrorWrapper> {
         match self {

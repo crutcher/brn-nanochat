@@ -3,9 +3,16 @@
 use crate::encoders::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
+use crate::vocab::word_vocab::WordMapTokenVocab;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
+    /// Return the regex pattern used for text splitting.
+    fn pattern(&self) -> String;
+
+    /// Return the special vocabulary, if any.
+    fn special_vocab(&self) -> Option<WordMapTokenVocab<T>>;
+
     /// Split text using the attached pattern and specials.
     fn split_text<'a>(
         &self,
