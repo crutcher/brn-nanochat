@@ -240,13 +240,7 @@ mod tests {
         let mut vocab: UnifiedTokenVocab<T> =
             UnifiedTokenVocab::new(word_pattern.into()).with_pair_vocab(pair_vocab);
 
-        vocab.specials = Some(Default::default());
-        vocab
-            .specials
-            .as_mut()
-            .unwrap()
-            .words
-            .insert("<|HI|>".into(), 3000);
+        vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 
         let special_sample = "hello <|HI|> world";
 

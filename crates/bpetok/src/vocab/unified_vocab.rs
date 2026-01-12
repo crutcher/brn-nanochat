@@ -38,6 +38,16 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         }
     }
 
+    /// Mutable reference to the special tokens vocabulary.
+    ///
+    /// Will create the vocabulary if it doesn't exist.
+    pub fn specials_vocab_mut(&mut self) -> &mut WordMapTokenVocab<T> {
+        if self.specials.is_none() {
+            self.specials = Some(Default::default());
+        }
+        self.specials.as_mut().unwrap()
+    }
+
     /// Replace the word-split regex pattern.
     pub fn with_word_pattern(
         self,
