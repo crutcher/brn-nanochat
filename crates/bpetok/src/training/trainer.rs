@@ -334,6 +334,7 @@ mod tests {
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::TokenVocabIndex;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use compact_str::CompactString;
