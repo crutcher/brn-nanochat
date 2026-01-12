@@ -28,22 +28,14 @@ impl<T: TokenType> ExpansionDecoder<T> {
             .collect();
         Self::new(expansion_map)
     }
-}
-
-impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.token_to_pair.keys().copied()
-    }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append(
+    fn decode_append_stack(
         &self,
         buf: &mut Vec<u8>,
-        tokens: &[T],
+        stack: &mut Vec<T>,
     ) {
-        let mut tokens = tokens.iter();
-        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
-        while let Some(t) = stack.pop().or_else(|| tokens.next().copied()) {
+        while let Some(t) = stack.pop() {
             if let Some(b) = t.to_u8() {
                 buf.push(b);
                 continue;
@@ -55,6 +47,38 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
             stack.push(*b);
             stack.push(*a);
         }
+    }
+}
+
+impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.token_to_pair.keys().copied()
+    }
+
+    /// Decode tokens into a byte vector.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
+    fn decode_append(
+        &self,
+        buf: &mut Vec<u8>,
+        tokens: &[T],
+    ) {
+        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
+        stack.extend(tokens.iter().rev());
+        self.decode_append_stack(buf, &mut stack);
+    }
+
+    /// Decodes tokens into bytes.
+    fn decode_to_bytes<S: AsRef<[T]>>(
+        &self,
+        tokens: S,
+    ) -> Vec<u8> {
+        let mut stack = tokens.as_ref().to_vec();
+        stack.reverse();
+
+        let mut buf = Vec::with_capacity(stack.len() * 4);
+
+        self.decode_append_stack(&mut buf, &mut stack);
+        buf
     }
 }
 

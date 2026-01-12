@@ -45,6 +45,7 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
     }
 
     /// Decode tokens into a byte vector.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,
