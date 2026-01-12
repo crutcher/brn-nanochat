@@ -46,6 +46,42 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         }
         ctx.stack.is_empty()
     }
+
+    fn decode_batch_to_bytes(
+        &self,
+        batch: &[Vec<T>],
+    ) -> Vec<Vec<u8>> {
+        #[cfg(feature = "rayon")]
+        {
+            use rayon::prelude::*;
+
+            batch
+                .into_par_iter()
+                .map(|tokens| self.decode_to_bytes(tokens))
+                .collect()
+        }
+
+        #[cfg(not(feature = "rayon"))]
+        batch.iter().map(|t| self.decode_to_bytes(t)).collect()
+    }
+
+    fn decode_batch_to_strings(
+        &self,
+        batch: &[Vec<T>],
+    ) -> Vec<String> {
+        #[cfg(feature = "rayon")]
+        {
+            use rayon::prelude::*;
+
+            batch
+                .into_par_iter()
+                .map(|tokens| self.decode_to_string(tokens))
+                .collect()
+        }
+
+        #[cfg(not(feature = "rayon"))]
+        batch.iter().map(|t| self.decode_to_string(t)).collect()
+    }
 }
 
 #[cfg(test)]

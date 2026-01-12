@@ -35,17 +35,6 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         &self,
         batch: &[Vec<T>],
     ) -> Vec<Vec<u8>> {
-        #[cfg(feature = "rayon")]
-        {
-            use rayon::prelude::*;
-
-            batch
-                .into_par_iter()
-                .map(|tokens| self.decode_to_bytes(tokens))
-                .collect()
-        }
-
-        #[cfg(not(feature = "rayon"))]
         batch.iter().map(|t| self.decode_to_bytes(t)).collect()
     }
 
@@ -63,17 +52,99 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         &self,
         batch: &[Vec<T>],
     ) -> Vec<String> {
-        #[cfg(feature = "rayon")]
-        {
-            use rayon::prelude::*;
+        self.decode_batch_to_bytes(batch)
+            .iter()
+            .map(|b| String::from_utf8(b.to_vec()).unwrap())
+            .collect()
+    }
+}
 
-            batch
-                .into_par_iter()
-                .map(|tokens| self.decode_to_string(tokens))
-                .collect()
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_traits::FromPrimitive;
+
+    /// A decoder that only decodes byte tokens.
+    #[derive(Clone)]
+    struct ByteDecoder<T: TokenType> {
+        _marker: std::marker::PhantomData<T>,
+    }
+
+    impl<T: TokenType> ByteDecoder<T> {
+        fn new() -> Self {
+            Self {
+                _marker: std::marker::PhantomData,
+            }
         }
+    }
 
-        #[cfg(not(feature = "rayon"))]
-        batch.iter().map(|t| self.decode_to_string(t)).collect()
+    impl<T: TokenType> TokenVocabIndex<T> for ByteDecoder<T> {
+        fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+            vec![].into_iter()
+        }
+    }
+
+    impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
+        #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
+        fn decode_context(
+            &self,
+            ctx: &mut DecodeContext<T>,
+        ) -> bool {
+            while let Some(t) = ctx.stack.pop() {
+                if let Some(b) = t.to_u8() {
+                    ctx.buf.push(b);
+                } else {
+                    ctx.stack.push(t);
+                    break;
+                }
+            }
+            ctx.stack.is_empty()
+        }
+    }
+
+    #[test]
+    fn test_decode_context() {
+        type T = u32;
+        let decoder: ByteDecoder<T> = ByteDecoder::new();
+
+        let mut tokens = vec![];
+        tokens.extend(
+            "hello world"
+                .as_bytes()
+                .iter()
+                .map(|b| T::from_u8(*b).unwrap()),
+        );
+        tokens.extend_from_slice(&[256, 3000]);
+
+        let mut ctx = DecodeContext::for_tokens(tokens, 2);
+        assert!(!decoder.decode_context(&mut ctx));
+
+        assert_eq!(ctx.buf, "hello world".as_bytes().to_vec());
+        assert_eq!(ctx.stack, [3000, 256]);
+    }
+
+    #[test]
+    fn test_decode_batch_to_strings() {
+        type T = u32;
+        let decoder: ByteDecoder<T> = ByteDecoder::new();
+
+        let str_samples = vec![
+            "hello world",
+            "hello san francisco",
+            "it's not the heat, it's the salt",
+        ];
+
+        let token_batch: Vec<Vec<T>> = str_samples
+            .iter()
+            .map(|s| {
+                s.as_bytes()
+                    .iter()
+                    .map(|b| T::from_u8(*b).unwrap())
+                    .collect()
+            })
+            .collect();
+
+        let string_batch = decoder.decode_batch_to_strings(&token_batch);
+        assert_eq!(string_batch, str_samples);
     }
 }
