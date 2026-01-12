@@ -3,7 +3,6 @@ use bpetok::decoders::parallel_decoder::ParallelDecoder;
 use bpetok::decoders::token_decoder::TokenDecoder;
 use bpetok::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
-use bpetok::types::TokenType;
 use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
 use bpetok::vocab::vocab_index::TokenVocabIndex;
 use burn::tensor::{AsIndex, Slice};
@@ -178,81 +177,66 @@ fn main() -> anyhow::Result<()> {
         println!("- batch size: {}", args.batch_size);
 
         println!();
-        println!("Timing CPSEncoder Encode:");
+        println!("Timing Encode:");
         let mut token_batches: Vec<Vec<Vec<T>>> = Vec::with_capacity(sample_batches.len());
-        {
-            let batch_times_ns = sample_batches.iter().map(|batch| {
-                let t0 = std::time::Instant::now();
-                let token_batch: Vec<Vec<T>> = encoder.encode_batch(batch);
-                let t1 = std::time::Instant::now();
+        let batch_times_ns = sample_batches.iter().map(|batch| {
+            let t0 = std::time::Instant::now();
+            let token_batch: Vec<Vec<T>> = encoder.encode_batch(batch);
+            let t1 = std::time::Instant::now();
 
-                token_batches.push(token_batch);
+            token_batches.push(token_batch);
 
-                t1.duration_since(t0).as_nanos() as u64
-            });
+            let delay = t1.duration_since(t0);
+            delay.as_nanos() as u64
+        });
 
-            let avg_batch_time_ns = batch_times_ns.sum::<u64>() / num_batches as u64;
-            println!(
-                "- batch avg: {:#?}",
-                Duration::from_nanos(avg_batch_time_ns)
-            );
+        let avg_batch_time_ns = batch_times_ns.sum::<u64>() / num_batches as u64;
+        println!(
+            "- batch avg: {:#?}",
+            Duration::from_nanos(avg_batch_time_ns)
+        );
 
-            let avg_sample_time_ns = avg_batch_time_ns / args.batch_size as u64;
-            println!(
-                "- sample avg: {:#?}",
-                Duration::from_nanos(avg_sample_time_ns)
-            );
+        let avg_sample_time_ns = avg_batch_time_ns / args.batch_size as u64;
+        println!(
+            "- sample avg: {:#?}",
+            Duration::from_nanos(avg_sample_time_ns)
+        );
 
-            let b_p_ns = avg_size as f64 / avg_sample_time_ns as f64;
-            let b_p_s = b_p_ns * 1e9;
-            let mb_p_s = b_p_s / 1e6;
-            println!("- avg bps: {:.2} MB/s", mb_p_s);
-        }
+        let b_p_ns = avg_size as f64 / avg_sample_time_ns as f64;
+        let b_p_s = b_p_ns * 1e9;
+        let mb_p_s = b_p_s / 1e6;
+        println!("- avg bps: {:.2} MB/s", mb_p_s);
 
         println!();
         let decoder = ParallelDecoder::new(encoder.to_decoder());
-        time_decoder(
-            "UnifiedDecoder",
-            &decoder,
-            &sample_batches,
-            &token_batches,
-            args.batch_size,
+        let batch_size = args.batch_size;
+        let num_batches1 = token_batches.len();
+        println!("Timing Decode:");
+
+        let batch_times_ns =
+            sample_batches
+                .iter()
+                .zip(token_batches.iter())
+                .map(|(sample, batch)| {
+                    let t0 = std::time::Instant::now();
+                    let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
+                    let t1 = std::time::Instant::now();
+
+                    assert_eq!(sample, &decoded_sample);
+
+                    let delay = t1.duration_since(t0);
+                    delay.as_nanos() as u64
+                });
+
+        let avg_batch_time_ns = batch_times_ns.sum::<u64>() / num_batches1 as u64;
+        println!("- batch avg: {:?}", Duration::from_nanos(avg_batch_time_ns));
+
+        let avg_sample_time_ns = avg_batch_time_ns / batch_size as u64;
+        println!(
+            "- sample avg: {:?}",
+            Duration::from_nanos(avg_sample_time_ns)
         );
     }
 
     Ok(())
-}
-
-fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
-    name: &str,
-    decoder: &D,
-    sample_batches: &[&[String]],
-    token_batches: &[Vec<Vec<T>>],
-    batch_size: usize,
-) {
-    let num_batches = token_batches.len();
-    println!("Timing Decode: {name}");
-
-    let batch_times_ns = sample_batches
-        .iter()
-        .zip(token_batches.iter())
-        .map(|(sample, batch)| {
-            let t0 = std::time::Instant::now();
-            let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
-            let t1 = std::time::Instant::now();
-            let delta = t1.duration_since(t0);
-
-            assert_eq!(sample, &decoded_sample);
-
-            delta.as_nanos() as u64
-        });
-
-    let avg_batch_time_ns = batch_times_ns.sum::<u64>() / num_batches as u64;
-    println!("- batch avg: {:?}", Duration::from_nanos(avg_batch_time_ns));
-
-    let avg_sample_time_ns = avg_batch_time_ns / batch_size as u64;
-    println!(
-        "- sample avg: {:?}",
-        Duration::from_nanos(avg_sample_time_ns)
-    );
 }

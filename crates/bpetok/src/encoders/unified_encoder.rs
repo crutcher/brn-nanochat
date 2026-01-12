@@ -70,36 +70,59 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
         }
     }
 
-    /// Append a chunk of text into token IDs.
-    pub fn append_encode_chunk(
+    /// Build a [`TokenDecoder`] from this [`UnifiedVocabEncoder`].
+    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
+        self.data.to_decoder()
+    }
+
+    /// Split a text into word references.
+    ///
+    /// TODO: model as ``Vec<WordRef<'a>>``
+    /// With ``WordRef := Special(&'a str) | Normal(&'a str)``
+    pub fn split_words<'a>(
         &self,
-        buf: &mut Vec<T>,
-        chunk: &[u8],
+        text: &'a str,
+    ) -> Vec<&'a str> {
+        self.regex_pool
+            .get()
+            .find_iter(text)
+            .map(|m| m.as_str())
+            .collect()
+    }
+}
+
+impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
+    /// Encode a word chunk into token IDs.
+    fn encode_append_word(
+        &self,
+        word: &str,
+        tokens: &mut Vec<T>,
     ) {
+        let chunk = word.as_bytes();
         if chunk.len() == 1 {
-            buf.push(T::from_u8(chunk[0]).unwrap());
+            tokens.push(T::from_u8(chunk[0]).unwrap());
             return;
         }
 
         if let Some(token) = self.data.word_vocab.lookup_token(chunk) {
-            buf.push(token);
+            tokens.push(token);
             return;
         }
 
         // Reuse the output buffer as a stack.
         // Append the byte-tokens to the buffer.
-        let start = buf.len();
-        buf.extend(chunk.iter().map(|&b| T::from_u8(b).unwrap()));
+        let start = tokens.len();
+        tokens.extend(chunk.iter().map(|&b| T::from_u8(b).unwrap()));
 
         // Incrementally shrink the "stack" (the new buffer end)
         // Until we can no longer find pairs to merge.
         let stop = start + 2;
-        while buf.len() >= stop {
+        while tokens.len() >= stop {
             // Find the pair which merges to the lowest ranked token.
             let mut best_match: Option<(usize, T)> = None;
 
-            for idx in start..buf.len() - 1 {
-                let pair = (buf[idx], buf[idx + 1]);
+            for idx in start..tokens.len() - 1 {
+                let pair = (tokens[idx], tokens[idx + 1]);
 
                 if let Some(&merge_token) = self.data.pair_vocab.pairs.get(&pair)
                     && (best_match.is_none() || (merge_token < best_match.unwrap().1))
@@ -110,8 +133,8 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 
             if let Some((idx, merge_token)) = best_match {
                 // buf[idx..=idx+1] (a, b) -> buf[idx] t
-                buf[idx] = merge_token;
-                buf.remove(idx + 1);
+                tokens[idx] = merge_token;
+                tokens.remove(idx + 1);
             } else {
                 // No more merges possible
                 break;
@@ -119,29 +142,15 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
         }
     }
 
-    /// Build a [`TokenDecoder`] from this [`UnifiedVocabEncoder`].
-    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
-        self.data.to_decoder()
-    }
-}
-
-impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
-    fn max_token(&self) -> T {
-        self.data.max_token()
-    }
-
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
-    fn encode<S: AsRef<str>>(
+    fn encode_append(
         &self,
-        text: S,
-    ) -> Vec<T> {
-        let text = text.as_ref();
-        let mut tokens = Vec::with_capacity(text.len());
-
-        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
-            self.append_encode_chunk(&mut tokens, chunk.as_bytes());
-        }
-        tokens
+        text: &str,
+        tokens: &mut Vec<T>,
+    ) {
+        self.split_words(text)
+            .into_iter()
+            .for_each(|w| self.encode_append_word(w, tokens))
     }
 
     /// Encode a batch of text into tokens.
@@ -164,6 +173,15 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     }
 }
 
+impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.data.compound_tokens_iter()
+    }
+    fn max_token(&self) -> T {
+        self.data.max_token()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
@@ -171,6 +189,7 @@ mod tests {
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::TokenVocabIndex;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use compact_str::CompactString;
     use std::sync::Arc;
