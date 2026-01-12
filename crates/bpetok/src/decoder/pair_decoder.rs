@@ -3,6 +3,7 @@
 use crate::decoder::context::DecodeContext;
 use crate::decoder::token_decoder::TokenDecoder;
 use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
+use crate::vocab::TokenVocabIndex;
 
 /// An [`ExpansionMap`] [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -31,11 +32,13 @@ impl<T: TokenType> PairExpansionDecoder<T> {
     }
 }
 
-impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
+impl<T: TokenType> TokenVocabIndex<T> for PairExpansionDecoder<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.token_to_pair.keys().copied()
     }
+}
 
+impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_context(
         &self,

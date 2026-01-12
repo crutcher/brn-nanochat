@@ -3,8 +3,8 @@
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapperPattern;
-use crate::vocab::TokenVocab;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
+use crate::vocab::vocab_index::TokenVocabIndex;
 use crate::vocab::word_vocab::WordMapTokenVocab;
 use ahash::{AHashMap, AHashSet};
 
@@ -116,7 +116,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 }
 
-impl<T: TokenType> TokenVocab<T> for UnifiedTokenVocab<T> {
+impl<T: TokenType> TokenVocabIndex<T> for UnifiedTokenVocab<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         let mut tokens = self.pair_vocab.compound_tokens_iter().collect::<Vec<_>>();
 

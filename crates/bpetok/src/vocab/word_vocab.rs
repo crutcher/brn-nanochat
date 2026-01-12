@@ -3,8 +3,8 @@
 use crate::decoder::pair_decoder::PairExpansionDecoder;
 use crate::decoder::token_decoder::TokenDecoder;
 use crate::types::{TokenType, WordToTokenMap};
-use crate::vocab::TokenVocab;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
+use crate::vocab::vocab_index::TokenVocabIndex;
 use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
@@ -47,7 +47,7 @@ impl<T: TokenType> WordMapTokenVocab<T> {
     }
 }
 
-impl<T: TokenType> TokenVocab<T> for WordMapTokenVocab<T> {
+impl<T: TokenType> TokenVocabIndex<T> for WordMapTokenVocab<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.words.values().copied()
     }

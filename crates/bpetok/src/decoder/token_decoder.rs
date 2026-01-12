@@ -2,23 +2,10 @@
 
 use crate::decoder::DecodeContext;
 use crate::types::TokenType;
-use crate::vocab::byte_tokens_iter;
+use crate::vocab::TokenVocabIndex;
 
 /// Trait for token decoders.
-pub trait TokenDecoder<T: TokenType>: Send + Sync {
-    /// Returns an iterator over all tokens.
-    fn all_tokens_iter(&self) -> impl Iterator<Item = T> {
-        byte_tokens_iter().chain(self.compound_tokens_iter())
-    }
-
-    /// Returns an iterator over the non-byte tokens.
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T>;
-
-    /// Returns the maximum token id in this decoder.
-    fn max_token(&self) -> T {
-        self.compound_tokens_iter().max().unwrap()
-    }
-
+pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     /// Incrementally decodes the context.
     ///
     /// Progresses until `ctx.stack` is empty,

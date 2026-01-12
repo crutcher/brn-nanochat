@@ -3,6 +3,7 @@
 use crate::decoder::context::DecodeContext;
 use crate::decoder::token_decoder::TokenDecoder;
 use crate::types::{TokenToWordMap, TokenType};
+use crate::vocab::TokenVocabIndex;
 
 /// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -21,11 +22,13 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 }
 
-impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
+impl<T: TokenType> TokenVocabIndex<T> for DictionaryDecoder<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.token_to_word.keys().copied()
     }
+}
 
+impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_context(
         &self,

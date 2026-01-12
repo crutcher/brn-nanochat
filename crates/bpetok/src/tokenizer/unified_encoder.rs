@@ -6,8 +6,8 @@ use crate::tokenizer::TokenEncoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
-use crate::vocab::TokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
+use crate::vocab::vocab_index::TokenVocabIndex;
 use std::sync::Arc;
 
 /// Config options for the [`ScanningEncoder`].
