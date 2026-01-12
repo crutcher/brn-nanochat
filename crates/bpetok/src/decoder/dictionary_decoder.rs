@@ -9,20 +9,20 @@ pub struct DictionaryDecoder<T: TokenType> {
     /// Token to bytes mapping.
     ///
     /// Does not include byte-tokens.
-    pub dictionary: TokenToWordMap<T>,
+    pub token_to_word: TokenToWordMap<T>,
 }
 
 impl<T: TokenType> DictionaryDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut dictionary: TokenToWordMap<T>) -> Self {
-        dictionary.shrink_to_fit();
-        Self { dictionary }
+    pub fn new(mut token_to_word: TokenToWordMap<T>) -> Self {
+        token_to_word.shrink_to_fit();
+        Self { token_to_word }
     }
 }
 
 impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.dictionary.keys().copied()
+        self.token_to_word.keys().copied()
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
@@ -36,7 +36,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
                 buf.push(b);
             } else {
                 let slice = self
-                    .dictionary
+                    .token_to_word
                     .get(t)
                     .expect("Token not found in slice map")
                     .as_slice();

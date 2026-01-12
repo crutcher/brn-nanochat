@@ -9,14 +9,14 @@ pub struct ExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
     ///
     /// Does not include byte-tokens.
-    pub expansion_map: TokenToPairMap<T>,
+    pub token_to_pair: TokenToPairMap<T>,
 }
 
 impl<T: TokenType> ExpansionDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut expansion_map: TokenToPairMap<T>) -> Self {
-        expansion_map.shrink_to_fit();
-        Self { expansion_map }
+    pub fn new(mut token_to_pair: TokenToPairMap<T>) -> Self {
+        token_to_pair.shrink_to_fit();
+        Self { token_to_pair }
     }
 
     /// Build a [`ExpansionDecoder`] from this [`Tokenizer`].
@@ -32,7 +32,7 @@ impl<T: TokenType> ExpansionDecoder<T> {
 
 impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.expansion_map.keys().copied()
+        self.token_to_pair.keys().copied()
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
@@ -49,7 +49,7 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
                 continue;
             }
             let (a, b) = self
-                .expansion_map
+                .token_to_pair
                 .get(&t)
                 .expect("Token not found in slice map");
             stack.push(*b);
