@@ -28,8 +28,8 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append_stack(
         &self,
-        buf: &mut Vec<u8>,
         stack: &mut Vec<T>,
+        buf: &mut Vec<u8>,
     ) {
         while let Some(t) = stack.pop() {
             if let Some(b) = t.to_u8() {
@@ -37,6 +37,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
             } else if let Some(w) = self.token_to_word.get(&t) {
                 buf.extend_from_slice(w.as_slice());
             } else {
+                stack.push(t);
                 break;
             }
         }

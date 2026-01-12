@@ -44,14 +44,18 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         self.compound_tokens_iter().max().unwrap()
     }
 
-    /// Decodes tokens from the (mutable) stack into bytes.
+    /// Incrementally decodes from `stack` to `buf`.
     ///
-    /// Returns when no more tokens can be decoded.
-    /// - If there are remaining tokens, they will be on the stack.
+    /// Work will progress until `stack` is empty,
+    /// or the top token on `stack` is not defined in this decoder.
+    ///
+    /// # Arguments
+    /// * `stack` - mutable FIFO stack, holding the tokens to be decoded.
+    /// * `buf` - a mutable byte vector, to be appended to.
     fn decode_append_stack(
         &self,
-        buf: &mut Vec<u8>,
         stack: &mut Vec<T>,
+        buf: &mut Vec<u8>,
     );
 
     /// Decode tokens into a byte vector.
@@ -64,7 +68,7 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
         stack.extend(tokens.iter().rev());
 
-        self.decode_append_stack(buf, &mut stack);
+        self.decode_append_stack(&mut stack, buf);
 
         if !stack.is_empty() {
             let tok = stack[stack.len()];

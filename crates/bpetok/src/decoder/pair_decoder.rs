@@ -38,8 +38,8 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append_stack(
         &self,
-        buf: &mut Vec<u8>,
         stack: &mut Vec<T>,
+        buf: &mut Vec<u8>,
     ) {
         while let Some(t) = stack.pop() {
             if let Some(b) = t.to_u8() {
@@ -48,6 +48,7 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
                 stack.push(*b);
                 stack.push(*a);
             } else {
+                stack.push(t);
                 break;
             }
         }
