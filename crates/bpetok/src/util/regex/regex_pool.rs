@@ -63,11 +63,11 @@ impl RegexWrapperPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::regex::regex_wrapper::RegexPatternLabel;
+    use crate::util::regex::regex_wrapper::RegexWrapperPattern;
 
     #[test]
     fn test_regex_pool() {
-        let pattern: RegexPatternLabel = r"foo".into();
+        let pattern: RegexWrapperPattern = r"foo".into();
         let regex = pattern.compile().unwrap().into();
 
         let pool = RegexWrapperPool::new(regex);

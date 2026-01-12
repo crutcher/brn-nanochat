@@ -1,7 +1,7 @@
 //! # Unified Vocabulary Data
 
 use crate::types::TokenType;
-use crate::util::regex::regex_wrapper::RegexPatternLabel;
+use crate::util::regex::regex_wrapper::RegexWrapperPattern;
 use crate::vocab::data::{BPEMapTokenVocab, TokenVocab, WordMapTokenVocab};
 use ahash::AHashSet;
 
@@ -9,7 +9,7 @@ use ahash::AHashSet;
 #[derive(Clone)]
 pub struct UnifiedTokenVocab<T: TokenType> {
     /// Regex pattern for word splitting.
-    pub word_pattern: RegexPatternLabel,
+    pub word_pattern: RegexWrapperPattern,
 
     /// Special tokens vocabulary.
     pub specials: Option<WordMapTokenVocab<T>>,
@@ -26,7 +26,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     ///
     /// # Arguments
     /// * `word_pattern`: Regex pattern for word splitting.
-    pub fn new(word_pattern: RegexPatternLabel) -> Self {
+    pub fn new(word_pattern: RegexWrapperPattern) -> Self {
         Self {
             word_pattern,
             specials: None,
@@ -38,7 +38,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Replace the word-split regex pattern.
     pub fn with_word_pattern(
         self,
-        word_pattern: RegexPatternLabel,
+        word_pattern: RegexWrapperPattern,
     ) -> Self {
         Self {
             word_pattern,
