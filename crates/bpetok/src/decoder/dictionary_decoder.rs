@@ -56,7 +56,7 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn test_corpus_decoder() {
+    fn test_dictionary_decoder() {
         type T = u16;
         type C = u32;
         type K = CompactString;
@@ -78,7 +78,6 @@ mod tests {
 
         let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
             .with_pair_vocab(pair_vocab)
-            .expand_words_from_bpe()
             .into();
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
