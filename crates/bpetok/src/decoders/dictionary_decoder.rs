@@ -84,7 +84,7 @@ mod tests {
             .with_pair_vocab(pair_vocab)
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
 
         let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);

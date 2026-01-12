@@ -95,7 +95,7 @@ mod tests {
             .with_pair_vocab(pair_vocab)
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
 
         let decoder = PairExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs);
         check_is_send(&decoder);

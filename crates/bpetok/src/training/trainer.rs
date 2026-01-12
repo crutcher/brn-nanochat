@@ -400,7 +400,7 @@ mod tests {
             .expand_words_from_bpe()
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
