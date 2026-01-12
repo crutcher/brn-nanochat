@@ -12,7 +12,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn pattern(&self) -> String;
 
     /// Return the special vocabulary, if any.
-    fn special_vocab(&self) -> Option<WordMapTokenVocab<T>>;
+    fn special_vocab(&self) -> Option<&WordMapTokenVocab<T>>;
 
     /// Split text using the attached pattern and specials.
     fn split_text<'a>(
@@ -33,7 +33,19 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         &self,
         text: &str,
         tokens: &mut Vec<T>,
-    );
+    ) {
+        self.split_text(text).into_iter().for_each(|wr| match wr {
+            WordRef::Normal(w) => self.encode_append_word(w, tokens),
+            WordRef::Special(s) => {
+                tokens.push(
+                    self.special_vocab()
+                        .unwrap()
+                        .lookup_token(s.as_bytes())
+                        .unwrap(),
+                );
+            }
+        });
+    }
 
     /// Encode text into tokens.
     fn encode<S: AsRef<str>>(
