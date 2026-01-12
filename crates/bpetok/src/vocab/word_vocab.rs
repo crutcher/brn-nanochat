@@ -1,7 +1,7 @@
 //! # Word Map Vocabulary Data
 
-use crate::decoder::pair_decoder::PairExpansionDecoder;
-use crate::decoder::token_decoder::TokenDecoder;
+use crate::decoders::pair_decoder::PairExpansionDecoder;
+use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenType, WordToTokenMap};
 use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;

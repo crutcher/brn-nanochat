@@ -4,7 +4,7 @@ use crate::types::TokenType;
 
 /// Representation of a token decoding context.
 #[derive(Clone)]
-pub struct DecodeContext<T: TokenType> {
+pub struct TokenDecodeContext<T: TokenType> {
     /// Append buffer for decoded bytes.
     pub buf: Vec<u8>,
 
@@ -12,7 +12,7 @@ pub struct DecodeContext<T: TokenType> {
     pub stack: Vec<T>,
 }
 
-impl<T: TokenType> DecodeContext<T> {
+impl<T: TokenType> TokenDecodeContext<T> {
     /// Creates a new decoding context.
     pub fn for_tokens(
         tokens: Vec<T>,

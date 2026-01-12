@@ -1,8 +1,8 @@
 //! # BPE Tokenizer
 #![warn(missing_docs, unused)]
 
-pub mod decoder;
-pub mod tokenizer;
+pub mod decoders;
+pub mod encoders;
 pub mod training;
 pub mod types;
 pub mod util;

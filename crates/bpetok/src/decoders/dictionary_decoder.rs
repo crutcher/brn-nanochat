@@ -1,55 +1,44 @@
-//! # Expansion Decoder
+//! # Dictionary Decoder
 
-use crate::decoder::context::DecodeContext;
-use crate::decoder::token_decoder::TokenDecoder;
-use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
+use crate::decoders::decode_context::TokenDecodeContext;
+use crate::decoders::token_decoder::TokenDecoder;
+use crate::types::{TokenToWordMap, TokenType};
 use crate::vocab::TokenVocabIndex;
 
-/// An [`ExpansionMap`] [`TokenDecoder<T>`].
+/// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
-pub struct PairExpansionDecoder<T: TokenType> {
-    /// Token to pair mapping.
+pub struct DictionaryDecoder<T: TokenType> {
+    /// Token to bytes mapping.
     ///
     /// Does not include byte-tokens.
-    pub token_to_pair: TokenToPairMap<T>,
+    pub token_to_word: TokenToWordMap<T>,
 }
 
-impl<T: TokenType> PairExpansionDecoder<T> {
+impl<T: TokenType> DictionaryDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut token_to_pair: TokenToPairMap<T>) -> Self {
-        token_to_pair.shrink_to_fit();
-        Self { token_to_pair }
-    }
-
-    /// Build a [`PairExpansionDecoder`] from this [`Tokenizer`].
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
-    pub fn from_pair_map(merge_map: &PairToTokenMap<T>) -> Self {
-        let expansion_map = merge_map
-            .iter()
-            .map(|(&pair, &token)| (token, pair))
-            .collect();
-        Self::new(expansion_map)
+    pub fn new(mut token_to_word: TokenToWordMap<T>) -> Self {
+        token_to_word.shrink_to_fit();
+        Self { token_to_word }
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for PairExpansionDecoder<T> {
+impl<T: TokenType> TokenVocabIndex<T> for DictionaryDecoder<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.token_to_pair.keys().copied()
+        self.token_to_word.keys().copied()
     }
 }
 
-impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
+impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn incremental_decode(
         &self,
-        ctx: &mut DecodeContext<T>,
+        ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         while let Some(t) = ctx.stack.pop() {
             if let Some(b) = t.to_u8() {
                 ctx.buf.push(b);
-            } else if let Some((a, b)) = self.token_to_pair.get(&t) {
-                ctx.stack.push(*b);
-                ctx.stack.push(*a);
+            } else if let Some(w) = self.token_to_word.get(&t) {
+                ctx.buf.extend_from_slice(w.as_slice());
             } else {
                 ctx.stack.push(t);
                 break;
@@ -62,8 +51,8 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::unified_encoder::UnifiedVocabEncoder;
+    use crate::encoders::TokenEncoder;
+    use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -71,7 +60,7 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn test_pair_decoder() {
+    fn test_dictionary_decoder() {
         type T = u16;
         type C = u32;
         type K = CompactString;
@@ -97,7 +86,7 @@ mod tests {
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = PairExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs);
+        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

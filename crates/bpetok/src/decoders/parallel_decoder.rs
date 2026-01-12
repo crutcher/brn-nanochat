@@ -1,6 +1,6 @@
 //! # Parallel Decoder
 
-use crate::decoder::{DecodeContext, TokenDecoder};
+use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 
@@ -18,7 +18,7 @@ where
     T: TokenType,
     D: TokenDecoder<T>,
 {
-    /// Create a new parallel token decoder.
+    /// Create a new parallel token decoders.
     pub fn new(inner: D) -> Self {
         Self {
             inner,
@@ -44,7 +44,7 @@ where
 {
     fn incremental_decode(
         &self,
-        ctx: &mut DecodeContext<T>,
+        ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         self.inner.incremental_decode(ctx)
     }
@@ -71,8 +71,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoder::DictionaryDecoder;
-    use crate::tokenizer::{TokenEncoder, UnifiedVocabEncoder};
+    use crate::decoders::DictionaryDecoder;
+    use crate::encoders::{TokenEncoder, UnifiedVocabEncoder};
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;

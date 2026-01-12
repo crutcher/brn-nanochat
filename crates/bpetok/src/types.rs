@@ -4,7 +4,7 @@ use num_traits::{FromPrimitive, Num, ToPrimitive, Unsigned};
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, SubAssign};
 
-/// A type that can be used as a token in a BPE-based tokenizer.
+/// A type that can be used as a token in a BPE-based encoders.
 pub trait TokenType:
     'static
     + Default

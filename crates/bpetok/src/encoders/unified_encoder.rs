@@ -1,8 +1,8 @@
 //! # Chunk Pair Scan Tokenizer
 
 use crate::DEFAULT_PARALLEL;
-use crate::decoder::dictionary_decoder::DictionaryDecoder;
-use crate::tokenizer::TokenEncoder;
+use crate::decoders::dictionary_decoder::DictionaryDecoder;
+use crate::encoders::TokenEncoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_pool::RegexWrapperPool;
 use crate::util::regex::regex_wrapper::RegexWrapper;
@@ -41,7 +41,7 @@ impl Default for UnifiedVocabEncoderOptions {
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
 pub struct UnifiedVocabEncoder<T: TokenType> {
-    /// Data for the encoder.
+    /// Data for the encoders.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Tokenizer options.
@@ -51,7 +51,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
 }
 
 impl<T: TokenType> UnifiedVocabEncoder<T> {
-    /// Construct a new encoder..
+    /// Construct a new encoders..
     pub fn new(
         data: Arc<UnifiedTokenVocab<T>>,
         options: UnifiedVocabEncoderOptions,
@@ -166,9 +166,9 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::decoder::token_decoder::TokenDecoder;
-    use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::unified_encoder::UnifiedVocabEncoder;
+    use crate::decoders::token_decoder::TokenDecoder;
+    use crate::encoders::TokenEncoder;
+    use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;

@@ -7,7 +7,7 @@ pub use unified_encoder::*;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType> {
-    /// Returns the maximum token id in this decoder.
+    /// Returns the maximum token id in this decoders.
     fn max_token(&self) -> T;
 
     /// Encode text into tokens.
