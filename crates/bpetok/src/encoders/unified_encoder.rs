@@ -42,6 +42,15 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
     }
 }
 
+impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.data.compound_tokens_iter()
+    }
+    fn max_token(&self) -> T {
+        self.data.max_token()
+    }
+}
+
 impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     fn pattern(&self) -> String {
         self.data.word_pattern.as_str().to_string()
@@ -51,7 +60,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         self.data.specials.as_ref()
     }
 
-    fn split_text<'a>(
+    fn split_words<'a>(
         &self,
         text: &'a str,
     ) -> Vec<WordRef<'a>> {
@@ -106,15 +115,6 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
                 break;
             }
         }
-    }
-}
-
-impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.data.compound_tokens_iter()
-    }
-    fn max_token(&self) -> T {
-        self.data.max_token()
     }
 }
 

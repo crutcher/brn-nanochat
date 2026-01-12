@@ -52,11 +52,11 @@ where
         self.inner.special_vocab()
     }
 
-    fn split_text<'a>(
+    fn split_words<'a>(
         &self,
         text: &'a str,
     ) -> Vec<WordRef<'a>> {
-        self.inner.split_text(text)
+        self.inner.split_words(text)
     }
 
     fn encode_append_word(
