@@ -52,7 +52,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 mod tests {
     use super::*;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::unified_encoder::ScanningEncoder;
+    use crate::tokenizer::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -84,7 +84,7 @@ mod tests {
             .with_pair_vocab(pair_vocab)
             .into();
 
-        let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
 
         let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);

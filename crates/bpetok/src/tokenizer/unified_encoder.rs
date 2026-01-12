@@ -4,20 +4,21 @@ use crate::DEFAULT_PARALLEL;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::TokenType;
+use crate::util::regex::regex_pool::RegexWrapperPool;
 use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use std::sync::Arc;
 
-/// Config options for the [`ScanningEncoder`].
+/// Config options for the [`UnifiedVocabEncoder`].
 #[derive(Debug, Clone)]
-pub struct UnifiedVocabEncoder {
+pub struct UnifiedVocabEncoderOptions {
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
 }
 
-impl UnifiedVocabEncoder {
+impl UnifiedVocabEncoderOptions {
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub fn with_parallel(
         self,
@@ -29,7 +30,7 @@ impl UnifiedVocabEncoder {
     }
 }
 
-impl Default for UnifiedVocabEncoder {
+impl Default for UnifiedVocabEncoderOptions {
     fn default() -> Self {
         Self {
             parallel: DEFAULT_PARALLEL,
@@ -39,22 +40,21 @@ impl Default for UnifiedVocabEncoder {
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
-pub struct ScanningEncoder<T: TokenType> {
+pub struct UnifiedVocabEncoder<T: TokenType> {
     /// Data for the encoder.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Tokenizer options.
-    pub options: UnifiedVocabEncoder,
+    pub options: UnifiedVocabEncoderOptions,
 
-    /// Regex for word splitting.
-    pub word_regex: RegexWrapper,
+    regex_pool: RegexWrapperPool,
 }
 
-impl<T: TokenType> ScanningEncoder<T> {
+impl<T: TokenType> UnifiedVocabEncoder<T> {
     /// Construct a new encoder..
     pub fn new(
         data: Arc<UnifiedTokenVocab<T>>,
-        options: UnifiedVocabEncoder,
+        options: UnifiedVocabEncoderOptions,
     ) -> Self {
         #[cfg(not(feature = "rayon"))]
         if options.parallel {
@@ -62,10 +62,11 @@ impl<T: TokenType> ScanningEncoder<T> {
         }
 
         let word_regex: RegexWrapper = data.word_pattern.compile().unwrap();
+        let regex_pool = RegexWrapperPool::new(word_regex.into());
         Self {
             data,
             options,
-            word_regex,
+            regex_pool,
         }
     }
 
@@ -118,13 +119,13 @@ impl<T: TokenType> ScanningEncoder<T> {
         }
     }
 
-    /// Build a [`TokenDecoder`] from this [`ScanningEncoder`].
+    /// Build a [`TokenDecoder`] from this [`UnifiedVocabEncoder`].
     pub fn to_decoder(&self) -> DictionaryDecoder<T> {
         self.data.to_decoder()
     }
 }
 
-impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
+impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     fn max_token(&self) -> T {
         self.data.max_token()
     }
@@ -137,7 +138,7 @@ impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
 
-        for chunk in self.word_regex.find_iter(text).map(|m| m.as_str()) {
+        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
             self.append_encode_chunk(&mut tokens, chunk.as_bytes());
         }
         tokens
@@ -167,7 +168,7 @@ impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
 mod tests {
     use crate::decoder::token_decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::unified_encoder::ScanningEncoder;
+    use crate::tokenizer::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -210,7 +211,7 @@ mod tests {
             .expand_words_from_bpe()
             .into();
 
-        let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

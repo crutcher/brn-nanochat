@@ -1,7 +1,7 @@
 use arrow::array::StringArray;
 use bpetok::decoder::parallel_decoder::ParallelDecoder;
 use bpetok::decoder::token_decoder::TokenDecoder;
-use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
+use bpetok::tokenizer::{TokenEncoder, UnifiedVocabEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::types::TokenType;
 use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
@@ -133,8 +133,8 @@ fn main() -> anyhow::Result<()> {
         .expand_words_from_bpe()
         .into();
 
-    let encoder: ScanningEncoder<T> =
-        ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
+    let encoder: UnifiedVocabEncoder<T> =
+        UnifiedVocabEncoder::<T>::new(encoder_data.clone(), Default::default());
 
     if let Some(path) = args.tiktoken_save_path {
         encoder_data.word_vocab.save_to_tiktoken_vocab(&path)?;
