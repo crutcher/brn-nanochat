@@ -1,10 +1,11 @@
 use arrow::array::StringArray;
-use bpetok::decoder::TokenDecoder;
+use bpetok::decoder::parallel_decoder::ParallelDecoder;
+use bpetok::decoder::token_decoder::TokenDecoder;
 use bpetok::tokenizer::{TokenEncoder, UnifiedVocabEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::types::TokenType;
-use bpetok::vocab::TokenVocab;
 use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
+use bpetok::vocab::vocab_index::TokenVocabIndex;
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -209,7 +210,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         println!();
-        let decoder = encoder.to_decoder();
+        let decoder = ParallelDecoder::new(encoder.to_decoder());
         time_decoder(
             "UnifiedDecoder",
             &decoder,
@@ -237,7 +238,7 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
         .zip(token_batches.iter())
         .map(|(sample, batch)| {
             let t0 = std::time::Instant::now();
-            let decoded_sample = decoder.decode_batch_to_strings(batch);
+            let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
             let t1 = std::time::Instant::now();
             let delta = t1.duration_since(t0);
 

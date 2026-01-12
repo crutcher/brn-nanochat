@@ -1,7 +1,9 @@
 //! # Dictionary Decoder
 
-use crate::decoder::TokenDecoder;
+use crate::decoder::context::DecodeContext;
+use crate::decoder::token_decoder::TokenDecoder;
 use crate::types::{TokenToWordMap, TokenType};
+use crate::vocab::TokenVocabIndex;
 
 /// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -20,26 +22,29 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 }
 
-impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
+impl<T: TokenType> TokenVocabIndex<T> for DictionaryDecoder<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.token_to_word.keys().copied()
     }
+}
 
+impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append_stack(
+    fn incremental_decode(
         &self,
-        buf: &mut Vec<u8>,
-        stack: &mut Vec<T>,
-    ) {
-        while let Some(t) = stack.pop() {
+        ctx: &mut DecodeContext<T>,
+    ) -> bool {
+        while let Some(t) = ctx.stack.pop() {
             if let Some(b) = t.to_u8() {
-                buf.push(b);
+                ctx.buf.push(b);
             } else if let Some(w) = self.token_to_word.get(&t) {
-                buf.extend_from_slice(w.as_slice());
+                ctx.buf.extend_from_slice(w.as_slice());
             } else {
+                ctx.stack.push(t);
                 break;
             }
         }
+        ctx.stack.is_empty()
     }
 }
 
@@ -55,7 +60,7 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn test_corpus_decoder() {
+    fn test_dictionary_decoder() {
         type T = u16;
         type C = u32;
         type K = CompactString;
@@ -77,7 +82,6 @@ mod tests {
 
         let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
             .with_pair_vocab(pair_vocab)
-            .expand_words_from_bpe()
             .into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
@@ -88,7 +92,7 @@ mod tests {
 
         for sample in samples {
             let tokens = encoder.encode(sample);
-            let decoded = decoder.decode_to_string(&tokens);
+            let decoded = decoder.try_decode_to_string(&tokens).unwrap();
             assert_eq!(decoded, sample);
         }
     }

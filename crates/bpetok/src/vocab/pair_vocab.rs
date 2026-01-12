@@ -1,7 +1,7 @@
 //! # Binary-Pair Encoding Vocabulary Data
 
 use crate::types::{PairToTokenMap, TokenType};
-use crate::vocab::TokenVocab;
+use crate::vocab::vocab_index::TokenVocabIndex;
 use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a binary-pair encoding map of ``{ (T, T) -> T }``.
@@ -12,7 +12,7 @@ pub struct PairMapTokenVocab<T: TokenType> {
     pub pairs: PairToTokenMap<T>,
 }
 
-impl<T: TokenType> TokenVocab<T> for PairMapTokenVocab<T> {
+impl<T: TokenType> TokenVocabIndex<T> for PairMapTokenVocab<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.pairs.values().copied()
     }

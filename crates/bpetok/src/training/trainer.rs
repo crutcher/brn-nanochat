@@ -329,7 +329,7 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 
 #[cfg(test)]
 mod tests {
-    use crate::decoder::TokenDecoder;
+    use crate::decoder::token_decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
@@ -410,7 +410,8 @@ mod tests {
         check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(encoder.encode(sample)), sample);
+            let tokens = encoder.encode(sample);
+            assert_eq!(decoder.try_decode_to_string(tokens).unwrap(), sample);
         }
     }
 

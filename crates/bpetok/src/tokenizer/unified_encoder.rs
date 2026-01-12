@@ -7,8 +7,8 @@ use crate::types::TokenType;
 use crate::util::regex::regex_pool::RegexWrapperPool;
 use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
-use crate::vocab::TokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
+use crate::vocab::vocab_index::TokenVocabIndex;
 use std::sync::Arc;
 
 /// Config options for the [`UnifiedVocabEncoder`].
@@ -166,7 +166,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::decoder::TokenDecoder;
+    use crate::decoder::token_decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
@@ -222,7 +222,8 @@ mod tests {
         check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(encoder.encode(sample)), sample);
+            let tokens = encoder.encode(sample);
+            assert_eq!(decoder.try_decode_to_string(tokens).unwrap(), sample);
         }
     }
 }
