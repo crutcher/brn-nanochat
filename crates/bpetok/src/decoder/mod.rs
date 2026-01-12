@@ -24,27 +24,53 @@
 //! ```
 
 use crate::types::TokenType;
+use crate::vocab::byte_tokens_iter;
 
-pub mod corpus_decoder;
 pub mod dictionary_decoder;
-pub mod expansion_decoder;
+pub mod pair_decoder;
 
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType>: Send + Sync {
-    /// Returns an iterator over the non-byte tokens in this map.
-    fn pair_tokens(&self) -> impl Iterator<Item = T>;
+    /// Returns an iterator over all tokens.
+    fn all_tokens_iter(&self) -> impl Iterator<Item = T> {
+        byte_tokens_iter().chain(self.compound_tokens_iter())
+    }
+
+    /// Returns an iterator over the non-byte tokens.
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T>;
 
     /// Returns the maximum token id in this decoder.
     fn max_token(&self) -> T {
-        self.pair_tokens().max().unwrap()
+        self.compound_tokens_iter().max().unwrap()
     }
 
+    /// Decodes tokens from the (mutable) stack into bytes.
+    ///
+    /// Returns when no more tokens can be decoded.
+    /// - If there are remaining tokens, they will be on the stack.
+    fn decode_append_stack(
+        &self,
+        buf: &mut Vec<u8>,
+        stack: &mut Vec<T>,
+    );
+
     /// Decode tokens into a byte vector.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,
         tokens: &[T],
-    );
+    ) {
+        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
+        stack.extend(tokens.iter().rev());
+
+        self.decode_append_stack(buf, &mut stack);
+
+        if !stack.is_empty() {
+            let tok = stack[stack.len()];
+            panic!("Token ({tok:?}) not defined for decoder");
+        }
+    }
 
     /// Decodes tokens into bytes.
     fn decode_to_bytes<S: AsRef<[T]>>(
@@ -103,9 +129,4 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         #[cfg(not(feature = "rayon"))]
         batch.iter().map(|t| self.decode_to_string(t)).collect()
     }
-
-    /// Estimates the memory usage of this decoder.
-    ///
-    /// Returns a (metadata, buffers) pair.
-    fn size_estimate(&self) -> usize;
 }

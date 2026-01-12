@@ -41,7 +41,7 @@ impl std::error::Error for ErrorWrapper {}
 /// Label for regex patterns.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum RegexPatternLabel {
+pub enum RegexWrapperPattern {
     /// This is a pattern for the `regex` crate.
     Basic(String),
 
@@ -53,13 +53,13 @@ pub enum RegexPatternLabel {
     Adaptive(String),
 }
 
-impl<S: AsRef<str>> From<S> for RegexPatternLabel {
+impl<S: AsRef<str>> From<S> for RegexWrapperPattern {
     fn from(pattern: S) -> Self {
         Self::Adaptive(pattern.as_ref().to_string())
     }
 }
 
-impl RegexPatternLabel {
+impl RegexWrapperPattern {
     /// Compile the regex pattern into a `RegexWrapper`.
     pub fn compile(&self) -> Result<RegexWrapper, ErrorWrapper> {
         match self {

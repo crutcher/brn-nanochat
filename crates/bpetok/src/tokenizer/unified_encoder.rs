@@ -1,27 +1,23 @@
 //! # Chunk Pair Scan Tokenizer
 
 use crate::DEFAULT_PARALLEL;
-use crate::decoder::TokenDecoder;
-use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
-use crate::types::{TokenType, VocabMap};
-use crate::util::regex::regex_pool::RegexWrapperPool;
-use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
+use crate::types::TokenType;
+use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
-use crate::vocab::data::TokenVocabData;
-use crate::vocab::tiktoken_io::save_tiktoken_vocab;
-use std::collections::hash_map;
+use crate::vocab::TokenVocab;
+use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use std::sync::Arc;
 
-/// Config options for the [`CPSEncoder`].
+/// Config options for the [`ScanningEncoder`].
 #[derive(Debug, Clone)]
-pub struct CPSEncoderOptions {
+pub struct UnifiedVocabEncoder {
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
 }
 
-impl CPSEncoderOptions {
+impl UnifiedVocabEncoder {
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub fn with_parallel(
         self,
@@ -33,7 +29,7 @@ impl CPSEncoderOptions {
     }
 }
 
-impl Default for CPSEncoderOptions {
+impl Default for UnifiedVocabEncoder {
     fn default() -> Self {
         Self {
             parallel: DEFAULT_PARALLEL,
@@ -43,70 +39,34 @@ impl Default for CPSEncoderOptions {
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
-pub struct CPSEncoder<T: TokenType> {
-    /// Core data describing a BPE Tokenizer.
-    pub data: Arc<TokenVocabData<T>>,
+pub struct ScanningEncoder<T: TokenType> {
+    /// Data for the encoder.
+    pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Tokenizer options.
-    pub options: CPSEncoderOptions,
+    pub options: UnifiedVocabEncoder,
 
-    regex_pool: RegexWrapperPool,
-
-    vocab_map: VocabMap<T>,
+    /// Regex for word splitting.
+    pub word_regex: RegexWrapper,
 }
 
-impl<T: TokenType> CPSEncoder<T> {
-    /// Construct a new Tokenizer.
-    pub fn new<D>(
-        data: D,
-        options: CPSEncoderOptions,
-    ) -> Self
-    where
-        D: Into<Arc<TokenVocabData<T>>>,
-    {
+impl<T: TokenType> ScanningEncoder<T> {
+    /// Construct a new encoder..
+    pub fn new(
+        data: Arc<UnifiedTokenVocab<T>>,
+        options: UnifiedVocabEncoder,
+    ) -> Self {
         #[cfg(not(feature = "rayon"))]
         if options.parallel {
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
         }
 
-        let data = data.into();
-
-        let regex: Arc<RegexWrapper> = RegexPatternLabel::Adaptive(data.pattern.clone())
-            .compile()
-            .unwrap()
-            .into();
-        let regex_pool = RegexWrapperPool::from(regex);
-
-        let decoder = DictionaryDecoder::from_data(&data);
-        let chunk_map = decoder
-            .dictionary
-            .into_iter()
-            .map(|(k, v)| (v, k))
-            .collect();
+        let word_regex: RegexWrapper = data.word_pattern.compile().unwrap();
         Self {
             data,
             options,
-            regex_pool,
-            vocab_map: chunk_map,
+            word_regex,
         }
-    }
-
-    /// Save the chunk map to a tiktoken vocab file.
-    pub fn save_tiktoken_vocab(
-        &self,
-        path: &str,
-    ) -> anyhow::Result<()> {
-        save_tiktoken_vocab(&self.vocab_map, path)
-    }
-
-    /// Memory usage estimate in bytes.
-    pub fn size_estimate(&self) -> usize {
-        let data_size = self.data.size_estimate();
-
-        let chunk_meta = size_of::<hash_map::Entry<Vec<u8>, T>>() * self.vocab_map.len();
-        let chunk_sum = self.vocab_map.keys().map(|b| b.len()).sum::<usize>();
-
-        data_size + chunk_meta + chunk_sum
     }
 
     /// Append a chunk of text into token IDs.
@@ -120,8 +80,8 @@ impl<T: TokenType> CPSEncoder<T> {
             return;
         }
 
-        if let Some(token) = self.vocab_map.get(chunk) {
-            buf.push(*token);
+        if let Some(token) = self.data.word_vocab.lookup_token(chunk) {
+            buf.push(token);
             return;
         }
 
@@ -140,7 +100,7 @@ impl<T: TokenType> CPSEncoder<T> {
             for idx in start..buf.len() - 1 {
                 let pair = (buf[idx], buf[idx + 1]);
 
-                if let Some(&merge_token) = self.data.merge_map.get(&pair)
+                if let Some(&merge_token) = self.data.pair_vocab.pairs.get(&pair)
                     && (best_match.is_none() || (merge_token < best_match.unwrap().1))
                 {
                     best_match = Some((idx, merge_token));
@@ -158,19 +118,15 @@ impl<T: TokenType> CPSEncoder<T> {
         }
     }
 
-    /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
-    pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        CorpusDecoder::from_data(&self.data)
+    /// Build a [`TokenDecoder`] from this [`ScanningEncoder`].
+    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
+        self.data.to_decoder()
     }
 }
 
-impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
-    fn data(&self) -> &Arc<TokenVocabData<T>> {
-        &self.data
-    }
-
-    fn pair_tokens(&self) -> impl Iterator<Item = T> {
-        self.data.pair_tokens()
+impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
+    fn max_token(&self) -> T {
+        self.data.max_token()
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
@@ -181,7 +137,7 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
 
-        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
+        for chunk in self.word_regex.find_iter(text).map(|m| m.as_str()) {
             self.append_encode_chunk(&mut tokens, chunk.as_bytes());
         }
         tokens
@@ -211,10 +167,12 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
 mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::cps_encoder::CPSEncoder;
-    use crate::types;
-    use crate::vocab::training::trainer::VocabTrainer;
+    use crate::tokenizer::unified_encoder::ScanningEncoder;
+    use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
+    use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use compact_str::CompactString;
+    use std::sync::Arc;
 
     #[test]
     #[cfg(feature = "rayon")]
@@ -232,7 +190,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = VocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
+        let options = BPETokenVocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
@@ -240,23 +198,30 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data = options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
-        let tokenizer = CPSEncoder::new(data, Default::default());
+        let TrainResults {
+            word_pattern,
+            pair_vocab,
+        } = options
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
+            .unwrap();
 
-        // compile time checks.
-        types::check_is_send(&tokenizer);
-        types::check_is_sync(&tokenizer);
+        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+            .with_pair_vocab(pair_vocab)
+            .expand_words_from_bpe()
+            .into();
 
-        assert_eq!(tokenizer.max_token(), 292);
+        let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
+        check_is_send(&encoder);
+        check_is_sync(&encoder);
 
-        let decoder = tokenizer.to_decoder();
+        assert_eq!(encoder.max_token(), 292);
 
-        // compile time checks.
-        types::check_is_send(&decoder);
-        types::check_is_sync(&decoder);
+        let decoder = encoder.to_decoder();
+        check_is_send(&decoder);
+        check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample);
+            assert_eq!(decoder.decode_to_string(encoder.encode(sample)), sample);
         }
     }
 }

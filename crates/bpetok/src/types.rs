@@ -7,6 +7,7 @@ use std::ops::{AddAssign, SubAssign};
 /// A type that can be used as a token in a BPE-based tokenizer.
 pub trait TokenType:
     'static
+    + Default
     + Debug
     + Clone
     + Copy
@@ -24,6 +25,7 @@ pub trait TokenType:
 
 impl<T> TokenType for T where
     T: 'static
+        + Default
         + Debug
         + Clone
         + Copy
@@ -113,13 +115,16 @@ mod tests {
 }
 
 /// [`Pair<T>`] to T map.
-pub type MergeMap<T> = ahash::AHashMap<Pair<T>, T>;
+pub type PairToTokenMap<T> = ahash::AHashMap<Pair<T>, T>;
 
 /// T to [`Pair<T>`] map.
-pub type ExpansionMap<T> = ahash::AHashMap<T, Pair<T>>;
+pub type TokenToPairMap<T> = ahash::AHashMap<T, Pair<T>>;
 
 /// Byte vector to T map.
-pub type VocabMap<T> = ahash::AHashMap<Vec<u8>, T>;
+pub type WordToTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
+
+/// T to byte vector map.
+pub type TokenToWordMap<T> = ahash::AHashMap<T, Vec<u8>>;
 
 /// Check if a type is `Send`.
 #[cfg(test)]

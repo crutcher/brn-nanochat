@@ -3,6 +3,7 @@
 
 pub mod decoder;
 pub mod tokenizer;
+pub mod training;
 pub mod types;
 pub mod util;
 pub mod vocab;

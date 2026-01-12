@@ -1,17 +1,16 @@
 use arrow::array::StringArray;
 use bpetok::decoder::TokenDecoder;
-use bpetok::decoder::corpus_decoder::CorpusDecoder;
-use bpetok::decoder::dictionary_decoder::DictionaryDecoder;
-use bpetok::decoder::expansion_decoder::ExpansionDecoder;
-use bpetok::tokenizer::{CPSEncoder, TokenEncoder};
+use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
+use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::types::TokenType;
-use bpetok::vocab::data::TokenVocabData;
-use bpetok::vocab::training::trainer::VocabTrainer;
+use bpetok::vocab::TokenVocab;
+use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Example tokenizer trainer.
@@ -87,49 +86,57 @@ fn main() -> anyhow::Result<()> {
     type C = u32;
     type K = CompactString;
 
-    let tokenizer = {
-        println!();
-        println!("Training Tokenizer on shards: {:?}", shards);
-        let t0 = std::time::Instant::now();
+    println!();
+    println!("Training Tokenizer on shards: {:?}", shards);
+    let t0 = std::time::Instant::now();
 
-        let cache_ref = &cache;
+    let cache_ref = &cache;
 
-        // Note: rather than repeating this, this should be a func to generate the Iterator.
-        // But I can't work out the lifetimes.
-        let samples = shards.clone().into_iter().flat_map(move |shard| {
-            cache_ref
-                .read_cached_batches(shard)
-                .expect("failed to read batch")
-                .flat_map(|batch| {
-                    batch
-                        .iter()
-                        .flat_map(|sample| {
-                            let text = sample
-                                .column(0)
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .unwrap();
-                            text.iter()
-                                .map(|s| s.unwrap().to_string())
-                                .collect::<Vec<_>>()
-                        })
-                        .collect::<Vec<_>>()
-                })
-        });
+    // Note: rather than repeating this, this should be a func to generate the Iterator.
+    // But I can't work out the lifetimes.
+    let samples = shards.clone().into_iter().flat_map(move |shard| {
+        cache_ref
+            .read_cached_batches(shard)
+            .expect("failed to read batch")
+            .flat_map(|batch| {
+                batch
+                    .iter()
+                    .flat_map(|sample| {
+                        let text = sample
+                            .column(0)
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap();
+                        text.iter()
+                            .map(|s| s.unwrap().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            })
+    });
 
-        // TODO: `indicatif` for optional progress bar for users waiting on this.
-        let data: TokenVocabData<T> = VocabTrainer::new_with_vocab_size(args.vocab_size)
-            .train_vocab_from_sample_iter::<T, K, C, _>(samples);
-        let training_duration = std::time::Instant::now().duration_since(t0);
-        println!("- training_duration: {:#?}", training_duration);
-        println!("- vocab_size: {:#?}", data.max_token());
-        println!("- size_estimate: {:#?}", data.size_estimate());
+    // TODO: `indicatif` for optional progress bar for users waiting on this.
+    let TrainResults::<T> {
+        word_pattern,
+        pair_vocab,
+    } = BPETokenVocabTrainer::new_with_vocab_size(args.vocab_size)
+        .train_vocab_from_sample_iter::<T, K, C, _>(samples)
+        .expect("training failed");
 
-        CPSEncoder::new(data.clone(), Default::default())
-    };
+    let training_duration = std::time::Instant::now().duration_since(t0);
+    println!("- training_duration: {:#?}", training_duration);
+    println!("- vocab_size: {:#?}", pair_vocab.max_token());
+
+    let encoder_data: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+        .with_pair_vocab(pair_vocab)
+        .expand_words_from_bpe()
+        .into();
+
+    let encoder: ScanningEncoder<T> =
+        ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
 
     if let Some(path) = args.tiktoken_save_path {
-        tokenizer.save_tiktoken_vocab(&path)?;
+        encoder_data.word_vocab.save_to_tiktoken_vocab(&path)?;
         println!("- tiktoken vocab: {path:?}");
     }
 
@@ -175,7 +182,7 @@ fn main() -> anyhow::Result<()> {
         {
             let batch_times_ns = sample_batches.iter().map(|batch| {
                 let t0 = std::time::Instant::now();
-                let token_batch: Vec<Vec<T>> = tokenizer.encode_batch(batch);
+                let token_batch: Vec<Vec<T>> = encoder.encode_batch(batch);
                 let t1 = std::time::Instant::now();
 
                 token_batches.push(token_batch);
@@ -202,30 +209,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         println!();
-        let expansion_decoder = ExpansionDecoder::from_data(&tokenizer.data);
+        let decoder = encoder.to_decoder();
         time_decoder(
-            "ExpansionDecoder",
-            &expansion_decoder,
-            &sample_batches,
-            &token_batches,
-            args.batch_size,
-        );
-
-        println!();
-        let dict_decoder = DictionaryDecoder::from_tokenizer(&expansion_decoder);
-        time_decoder(
-            "DictionaryDecoder",
-            &dict_decoder,
-            &sample_batches,
-            &token_batches,
-            args.batch_size,
-        );
-
-        println!();
-        let corpus_decoder = CorpusDecoder::from_data(&tokenizer.data);
-        time_decoder(
-            "CorpusDecoder",
-            &corpus_decoder,
+            "UnifiedDecoder",
+            &decoder,
             &sample_batches,
             &token_batches,
             args.batch_size,
@@ -244,7 +231,6 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
 ) {
     let num_batches = token_batches.len();
     println!("Timing Decode: {name}");
-    println!("- decoder est bytes: {}", decoder.size_estimate());
 
     let batch_times_ns = sample_batches
         .iter()
