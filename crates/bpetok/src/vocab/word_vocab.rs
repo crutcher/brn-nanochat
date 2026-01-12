@@ -24,7 +24,8 @@ impl<T: TokenType> WordMapTokenVocab<T> {
         let decoder = PairExpansionDecoder::from_pair_map(&pair_vocab.pairs);
         let mut words = WordToTokenMap::default();
         for token in pair_vocab.compound_tokens_iter() {
-            let chunk = decoder.decode_to_bytes([token]);
+            let tokens = [token];
+            let chunk = decoder.try_decode_to_bytes(tokens).unwrap();
             words.insert(chunk, token);
         }
         Self { words }

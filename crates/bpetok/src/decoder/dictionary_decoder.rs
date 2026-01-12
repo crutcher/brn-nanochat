@@ -30,7 +30,7 @@ impl<T: TokenType> TokenVocabIndex<T> for DictionaryDecoder<T> {
 
 impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_context(
+    fn incremental_decode(
         &self,
         ctx: &mut DecodeContext<T>,
     ) -> bool {
@@ -47,40 +47,22 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         ctx.stack.is_empty()
     }
 
-    fn decode_batch_to_bytes(
+    fn try_decode_batch_to_bytes(
         &self,
         batch: &[Vec<T>],
-    ) -> Vec<Vec<u8>> {
+    ) -> anyhow::Result<Vec<Vec<u8>>> {
         #[cfg(feature = "rayon")]
         {
             use rayon::prelude::*;
 
             batch
                 .into_par_iter()
-                .map(|tokens| self.decode_to_bytes(tokens))
+                .map(|tokens| self.try_decode_to_bytes(tokens))
                 .collect()
         }
 
         #[cfg(not(feature = "rayon"))]
-        batch.iter().map(|t| self.decode_to_bytes(t)).collect()
-    }
-
-    fn decode_batch_to_strings(
-        &self,
-        batch: &[Vec<T>],
-    ) -> Vec<String> {
-        #[cfg(feature = "rayon")]
-        {
-            use rayon::prelude::*;
-
-            batch
-                .into_par_iter()
-                .map(|tokens| self.decode_to_string(tokens))
-                .collect()
-        }
-
-        #[cfg(not(feature = "rayon"))]
-        batch.iter().map(|t| self.decode_to_string(t)).collect()
+        batch.iter().map(|t| self.try_decode_to_bytes(t)).collect()
     }
 }
 
@@ -128,7 +110,7 @@ mod tests {
 
         for sample in samples {
             let tokens = encoder.encode(sample);
-            let decoded = decoder.decode_to_string(&tokens);
+            let decoded = decoder.try_decode_to_string(&tokens).unwrap();
             assert_eq!(decoded, sample);
         }
     }

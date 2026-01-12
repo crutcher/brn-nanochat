@@ -221,7 +221,8 @@ mod tests {
         check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(encoder.encode(sample)), sample);
+            let tokens = encoder.encode(sample);
+            assert_eq!(decoder.try_decode_to_string(tokens).unwrap(), sample);
         }
     }
 }

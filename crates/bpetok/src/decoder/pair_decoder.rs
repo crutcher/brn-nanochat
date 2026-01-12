@@ -40,7 +40,7 @@ impl<T: TokenType> TokenVocabIndex<T> for PairExpansionDecoder<T> {
 
 impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_context(
+    fn incremental_decode(
         &self,
         ctx: &mut DecodeContext<T>,
     ) -> bool {
@@ -103,7 +103,7 @@ mod tests {
 
         for sample in samples {
             let tokens = encoder.encode(sample);
-            let decoded = decoder.decode_to_string(&tokens);
+            let decoded = decoder.try_decode_to_string(&tokens).unwrap();
             assert_eq!(decoded, sample);
         }
     }

@@ -237,7 +237,7 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
         .zip(token_batches.iter())
         .map(|(sample, batch)| {
             let t0 = std::time::Instant::now();
-            let decoded_sample = decoder.decode_batch_to_strings(batch);
+            let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
             let t1 = std::time::Instant::now();
             let delta = t1.duration_since(t0);
 

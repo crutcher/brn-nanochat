@@ -23,4 +23,26 @@ impl<T: TokenType> DecodeContext<T> {
         stack.reverse();
         Self { buf, stack }
     }
+
+    /// Is complete?
+    pub fn is_complete(&self) -> bool {
+        self.stack.is_empty()
+    }
+
+    /// Returns the decoded buffer, or an error if the stack is not empty.
+    pub fn try_complete(self) -> anyhow::Result<Vec<u8>> {
+        if self.is_complete() {
+            Ok(self.buf)
+        } else {
+            Err(anyhow::anyhow!(
+                "Incomplete context: [{:?}, ...]",
+                self.stack[self.stack.len() - 1]
+            ))
+        }
+    }
+
+    /// Returns the decoded buffer, panics if the stack is not empty.
+    pub fn expect_complete(self) -> Vec<u8> {
+        self.try_complete().unwrap()
+    }
 }
