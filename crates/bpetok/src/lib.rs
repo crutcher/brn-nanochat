@@ -19,3 +19,6 @@ pub const DEFAULT_PATTERN: &str = GPT4_PATTERN;
 pub const DEFAULT_PARALLEL: bool = true;
 #[cfg(not(feature = "rayon"))]
 pub const DEFAULT_PARALLEL: bool = false;
+
+/// Constant guess for the expected bytes/token ratio.
+pub const BYTES_PER_TOKEN_HINT: f64 = 4.0;

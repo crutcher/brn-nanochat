@@ -1,4 +1,4 @@
-use arrow::array::StringArray;
+use arrow::array::{Array, StringArray};
 use bpetok::decoders::parallel_decoder::ParallelDecoder;
 use bpetok::decoders::token_decoder::TokenDecoder;
 use bpetok::encoders::UnifiedVocabEncoder;
@@ -167,8 +167,9 @@ fn main() -> anyhow::Result<()> {
         println!("Samples Summary:");
         let sample_count = samples.len();
         println!("- count: {}", sample_count);
-        let avg_size = samples.iter().map(|s| s.len()).sum::<usize>() / sample_count;
-        println!("- avg size: {avg_size}");
+        let total_sample_bytes = samples.iter().map(|s| s.len()).sum::<usize>();
+        let avg_sample_size = total_sample_bytes / sample_count;
+        println!("- avg size: {avg_sample_size}");
 
         let sample_batches: Vec<&[String]> = samples.chunks(args.batch_size).collect::<Vec<_>>();
         let num_batches = sample_batches.len();
@@ -180,10 +181,13 @@ fn main() -> anyhow::Result<()> {
         println!();
         println!("Timing Encode:");
         let mut token_batches: Vec<Vec<Vec<T>>> = Vec::with_capacity(sample_batches.len());
+        let mut total_token_count = 0;
         let batch_times_ns = sample_batches.iter().map(|batch| {
             let t0 = std::time::Instant::now();
             let token_batch: Vec<Vec<T>> = encoder.encode_batch(batch);
             let t1 = std::time::Instant::now();
+
+            total_token_count += token_batch.iter().map(|tokens| tokens.len()).sum::<usize>();
 
             token_batches.push(token_batch);
 
@@ -202,11 +206,19 @@ fn main() -> anyhow::Result<()> {
             "- sample avg: {:#?}",
             Duration::from_nanos(avg_sample_time_ns)
         );
-
-        let b_p_ns = avg_size as f64 / avg_sample_time_ns as f64;
+        let b_p_ns = avg_sample_size as f64 / avg_sample_time_ns as f64;
         let b_p_s = b_p_ns * 1e9;
         let mb_p_s = b_p_s / 1e6;
         println!("- avg bps: {:.2} MB/s", mb_p_s);
+
+        println!();
+        println!("Observed Bytes/Token Stats:");
+        println!("- total bytes: {}", total_sample_bytes);
+        println!("- total tokens: {}", total_token_count);
+        println!(
+            "- sample byte/token: {:.2}",
+            total_sample_bytes as f64 / total_token_count as f64
+        );
 
         println!();
         let decoder = ParallelDecoder::new(encoder.to_decoder());

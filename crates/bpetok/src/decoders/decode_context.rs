@@ -1,5 +1,6 @@
 //! # Decoder Context
 
+use crate::BYTES_PER_TOKEN_HINT;
 use crate::types::TokenType;
 
 /// Representation of a token decoding context.
@@ -14,11 +15,17 @@ pub struct TokenDecodeContext<T: TokenType> {
 
 impl<T: TokenType> TokenDecodeContext<T> {
     /// Creates a new decoding context.
-    pub fn for_tokens(
+    pub fn for_tokens(tokens: Vec<T>) -> Self {
+        Self::for_tokens_with_hint(tokens, BYTES_PER_TOKEN_HINT)
+    }
+
+    /// Creates a new decoding context.
+    pub fn for_tokens_with_hint(
         tokens: Vec<T>,
-        size_hint: usize,
+        bytes_per_token_hint: f64,
     ) -> Self {
-        let buf = Vec::with_capacity(tokens.len() * size_hint);
+        let capacity = tokens.len() as f64 * bytes_per_token_hint * 1.25;
+        let buf = Vec::with_capacity(capacity as usize);
         let mut stack = tokens;
         stack.reverse();
         Self { buf, stack }
