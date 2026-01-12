@@ -77,8 +77,8 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 
     /// Split a text into word references.
     ///
-    /// TODO: model as Vec<WordRef<'a>>
-    /// With WordRef := Special(&'a str) | Normal(&'a str)
+    /// TODO: model as ``Vec<WordRef<'a>>``
+    /// With ``WordRef := Special(&'a str) | Normal(&'a str)``
     pub fn split_words<'a>(
         &self,
         text: &'a str,
