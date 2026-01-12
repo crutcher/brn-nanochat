@@ -2,8 +2,8 @@
 
 use crate::decoder::TokenDecoder;
 use crate::decoder::expansion_decoder::ExpansionDecoder;
-use crate::types::{MergeMap, TokenType};
-use crate::vocab::data::TokenVocabData;
+use crate::types::{BinaryPairMap, TokenType};
+use crate::vocab::data::BPEMapTokenVocab;
 use ahash::AHashMap;
 use std::collections::hash_map;
 
@@ -24,7 +24,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
         Self { dictionary }
     }
 
-    /// Build a [`DictionaryDecoder`] from a [`ExpansionDecoder`].
+    /// Build a [`DictionaryDecoder`] from a [`TokenDecoder`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(decoder)))]
     pub fn from_tokenizer<D: TokenDecoder<T>>(decoder: &D) -> Self {
         let mut dictionary = AHashMap::with_capacity(decoder.max_token().to_usize().unwrap());
@@ -36,14 +36,14 @@ impl<T: TokenType> DictionaryDecoder<T> {
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
-    pub fn from_data(data: &TokenVocabData<T>) -> DictionaryDecoder<T> {
-        Self::from_merge_map(&data.merge_map)
+    pub fn from_bpe(data: &BPEMapTokenVocab<T>) -> DictionaryDecoder<T> {
+        Self::from_merge_map(&data.pairs)
     }
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(merges)))]
-    pub fn from_merge_map(merges: &MergeMap<T>) -> DictionaryDecoder<T> {
-        let gd = ExpansionDecoder::from_merge_map(merges);
+    pub fn from_merge_map(merges: &BinaryPairMap<T>) -> DictionaryDecoder<T> {
+        let gd = ExpansionDecoder::from_pair_map(merges);
         Self::from_tokenizer(&gd)
     }
 }
@@ -86,9 +86,11 @@ mod tests {
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::cps_encoder::CPSEncoder;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::TokenVocabData;
-    use crate::vocab::training::trainer::VocabTrainer;
+    use crate::util::regex::regex_wrapper::RegexPatternLabel;
+    use crate::vocab::data::WordMapTokenVocab;
+    use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
+    use std::sync::Arc;
 
     #[test]
     fn test_corpus_decoder() {
@@ -96,7 +98,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = VocabTrainer::new_with_vocab_size(1000);
+        let options = BPETokenVocabTrainer::new_with_vocab_size(1000);
 
         let samples = vec![
             "hello world",
@@ -104,17 +106,30 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data: TokenVocabData<T> =
-            options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
+        let TrainResults {
+            pattern,
+            vocab: bpe_vocab,
+        } = options
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
+            .unwrap();
 
-        let tokenizer = CPSEncoder::new(data.clone(), Default::default());
+        let pattern = RegexPatternLabel::Adaptive(pattern);
+        let bpe_vocab = Arc::new(bpe_vocab);
+        let word_vocab = Arc::new(WordMapTokenVocab::from_bpe(&bpe_vocab));
 
-        let decoder = DictionaryDecoder::from_data(&data);
+        let encoder = CPSEncoder::new(
+            pattern,
+            word_vocab.clone(),
+            bpe_vocab.clone(),
+            Default::default(),
+        );
+
+        let decoder = DictionaryDecoder::from_bpe(&bpe_vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
         for sample in samples {
-            let tokens = tokenizer.encode(sample);
+            let tokens = encoder.encode(sample);
             let decoded = decoder.decode_to_string(&tokens);
             assert_eq!(decoded, sample);
         }

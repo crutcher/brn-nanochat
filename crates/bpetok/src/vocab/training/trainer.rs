@@ -1,9 +1,9 @@
 //! # Vocab Trainer
 
-use crate::types::{CountType, MergeMap, Pair, StringChunkType, TokenType};
+use crate::types::{BinaryPairMap, CountType, Pair, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
-use crate::vocab::data::TokenVocabData;
+use crate::vocab::data::BPEMapTokenVocab;
 use crate::vocab::training::pair_index::{PairIndex, PairIndexOptions};
 use crate::vocab::training::word::Word;
 use crate::vocab::training::word_count::{WordCounter, WordCounterOptions};
@@ -14,7 +14,7 @@ use std::cmp::Ordering;
 
 /// A training for [`Tokenizer`]s.
 #[derive(Debug)]
-pub struct VocabTrainer {
+pub struct BPETokenVocabTrainer {
     /// The regex pattern used for text splitting.
     pub pattern: String,
 
@@ -25,8 +25,8 @@ pub struct VocabTrainer {
     pub parallel: bool,
 }
 
-impl VocabTrainer {
-    /// Creates a new [`VocabTrainer`].
+impl BPETokenVocabTrainer {
+    /// Creates a new [`BPETokenVocabTrainer`].
     ///
     /// # Arguments
     /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
@@ -39,7 +39,17 @@ impl VocabTrainer {
     }
 }
 
-impl VocabTrainer {
+/// Training results.
+#[derive(Debug, Clone)]
+pub struct TrainResults<T: TokenType> {
+    /// The regex pattern used for text splitting.
+    pub pattern: String,
+
+    /// The trained BPE vocab.
+    pub vocab: BPEMapTokenVocab<T>,
+}
+
+impl BPETokenVocabTrainer {
     /// Sets the vocab size.
     ///
     /// # Arguments
@@ -83,7 +93,7 @@ impl VocabTrainer {
     pub fn train_vocab_from_sample_iter<T, K, C, I>(
         self,
         samples: I,
-    ) -> TokenVocabData<T>
+    ) -> anyhow::Result<TrainResults<T>>
     where
         T: TokenType,
         K: StringChunkType,
@@ -108,7 +118,7 @@ impl VocabTrainer {
     pub fn train_vocab_from_word_count_map<T, C>(
         self,
         words: AHashMap<Word<T>, C>,
-    ) -> TokenVocabData<T>
+    ) -> anyhow::Result<TrainResults<T>>
     where
         T: TokenType,
         C: CountType,
@@ -130,7 +140,7 @@ impl VocabTrainer {
         self,
         mut words: Vec<Word<T>>,
         word_counts: &[C],
-    ) -> TokenVocabData<T>
+    ) -> anyhow::Result<TrainResults<T>>
     where
         T: TokenType,
         C: CountType,
@@ -143,7 +153,7 @@ impl VocabTrainer {
         // Prefer to fail before we do all the work below.
         let _ = validators::expect_regex(&self.pattern);
 
-        let mut merge_map: MergeMap<T> = AHashMap::with_capacity(num_merges);
+        let mut pairs: BinaryPairMap<T> = AHashMap::with_capacity(num_merges);
 
         log::info!("Building pair index...");
         let PairIndex {
@@ -208,7 +218,7 @@ impl VocabTrainer {
             next_token_index += 1;
 
             // Record merge
-            merge_map.insert(job.pair, new_token);
+            pairs.insert(job.pair, new_token);
 
             // Merge this pair in all words where it occurs
             let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> =
@@ -257,14 +267,14 @@ impl VocabTrainer {
             }
         }
 
-        merge_map.shrink_to_fit();
+        pairs.shrink_to_fit();
 
         log::info!("Finished training: {} merges completed", merges_done);
 
-        TokenVocabData {
+        Ok(TrainResults {
             pattern: self.pattern,
-            merge_map,
-        }
+            vocab: BPEMapTokenVocab { pairs },
+        })
     }
 }
 
@@ -322,15 +332,18 @@ mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::cps_encoder::CPSEncoder;
-    use crate::vocab::data::TokenVocabData;
-    use crate::vocab::training::trainer::{MergeJob, VocabTrainer};
-    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN, types};
+    use crate::types::{check_is_send, check_is_sync};
+    use crate::util::regex::regex_wrapper::RegexPatternLabel;
+    use crate::vocab::data::WordMapTokenVocab;
+    use crate::vocab::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
+    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use compact_str::CompactString;
     use std::cmp::Ordering;
+    use std::sync::Arc;
 
     #[test]
     fn test_tokenizer_options() {
-        let options = VocabTrainer::new_with_vocab_size(1000);
+        let options = BPETokenVocabTrainer::new_with_vocab_size(1000);
         assert_eq!(options.vocab_size, 1000);
         assert_eq!(options.pattern, DEFAULT_PATTERN);
         assert_eq!(options.parallel, DEFAULT_PARALLEL);
@@ -348,7 +361,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "regex pattern compilation failed")]
     fn test_tokenizer_options_bad_pattern() {
-        let _ = VocabTrainer::new_with_vocab_size(1000).with_pattern(r"(");
+        let _ = BPETokenVocabTrainer::new_with_vocab_size(1000).with_pattern(r"(");
     }
 
     #[test]
@@ -367,7 +380,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = VocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
+        let options = BPETokenVocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
@@ -375,25 +388,34 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data: TokenVocabData<T> =
-            options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
+        let TrainResults {
+            pattern,
+            vocab: bpe_vocab,
+        } = options
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
+            .unwrap();
 
-        let tokenizer = CPSEncoder::new(data, Default::default());
+        let pattern = RegexPatternLabel::Adaptive(pattern);
+        let bpe_vocab = Arc::new(bpe_vocab);
+        let word_vocab = Arc::new(WordMapTokenVocab::from_bpe(&bpe_vocab));
 
-        // compile time checks.
-        types::check_is_send(&tokenizer);
-        types::check_is_sync(&tokenizer);
+        let encoder = CPSEncoder::new(
+            pattern,
+            word_vocab.clone(),
+            bpe_vocab.clone(),
+            Default::default(),
+        );
+        check_is_send(&encoder);
+        check_is_sync(&encoder);
 
-        assert_eq!(tokenizer.max_token(), 292);
+        assert_eq!(encoder.max_token(), 292);
 
-        let decoder = tokenizer.to_decoder();
-
-        // compile time checks.
-        types::check_is_send(&decoder);
-        types::check_is_sync(&decoder);
+        let decoder = encoder.to_decoder();
+        check_is_send(&decoder);
+        check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample);
+            assert_eq!(decoder.decode_to_string(encoder.encode(sample)), sample);
         }
     }
 

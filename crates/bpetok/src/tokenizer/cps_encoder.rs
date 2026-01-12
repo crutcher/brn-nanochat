@@ -3,15 +3,12 @@
 use crate::DEFAULT_PARALLEL;
 use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
-use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
-use crate::types::{TokenType, VocabMap};
+use crate::types::TokenType;
 use crate::util::regex::regex_pool::RegexWrapperPool;
 use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
 use crate::util::validators;
-use crate::vocab::data::TokenVocabData;
-use crate::vocab::tiktoken_io::save_tiktoken_vocab;
-use std::collections::hash_map;
+use crate::vocab::data::{BPEMapTokenVocab, TokenVocab, WordMapTokenVocab};
 use std::sync::Arc;
 
 /// Config options for the [`CPSEncoder`].
@@ -44,69 +41,40 @@ impl Default for CPSEncoderOptions {
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
 pub struct CPSEncoder<T: TokenType> {
-    /// Core data describing a BPE Tokenizer.
-    pub data: Arc<TokenVocabData<T>>,
+    /// ``{ Vec<u8> -> T }`` vocabulary.
+    pub word_vocab: Arc<WordMapTokenVocab<T>>,
+
+    /// ``{ (T, T) -> T }`` vocabulary.
+    pub bpe_vocab: Arc<BPEMapTokenVocab<T>>,
 
     /// Tokenizer options.
     pub options: CPSEncoderOptions,
 
     regex_pool: RegexWrapperPool,
-
-    vocab_map: VocabMap<T>,
 }
 
 impl<T: TokenType> CPSEncoder<T> {
     /// Construct a new Tokenizer.
-    pub fn new<D>(
-        data: D,
+    pub fn new(
+        pattern: RegexPatternLabel,
+        word_vocab: Arc<WordMapTokenVocab<T>>,
+        bpe_vocab: Arc<BPEMapTokenVocab<T>>,
         options: CPSEncoderOptions,
-    ) -> Self
-    where
-        D: Into<Arc<TokenVocabData<T>>>,
-    {
+    ) -> Self {
         #[cfg(not(feature = "rayon"))]
         if options.parallel {
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
         }
 
-        let data = data.into();
-
-        let regex: Arc<RegexWrapper> = RegexPatternLabel::Adaptive(data.pattern.clone())
-            .compile()
-            .unwrap()
-            .into();
+        let regex: Arc<RegexWrapper> = pattern.compile().unwrap().into();
         let regex_pool = RegexWrapperPool::from(regex);
 
-        let decoder = DictionaryDecoder::from_data(&data);
-        let chunk_map = decoder
-            .dictionary
-            .into_iter()
-            .map(|(k, v)| (v, k))
-            .collect();
         Self {
-            data,
+            word_vocab,
+            bpe_vocab,
             options,
             regex_pool,
-            vocab_map: chunk_map,
         }
-    }
-
-    /// Save the chunk map to a tiktoken vocab file.
-    pub fn save_tiktoken_vocab(
-        &self,
-        path: &str,
-    ) -> anyhow::Result<()> {
-        save_tiktoken_vocab(&self.vocab_map, path)
-    }
-
-    /// Memory usage estimate in bytes.
-    pub fn size_estimate(&self) -> usize {
-        let data_size = self.data.size_estimate();
-
-        let chunk_meta = size_of::<hash_map::Entry<Vec<u8>, T>>() * self.vocab_map.len();
-        let chunk_sum = self.vocab_map.keys().map(|b| b.len()).sum::<usize>();
-
-        data_size + chunk_meta + chunk_sum
     }
 
     /// Append a chunk of text into token IDs.
@@ -120,8 +88,8 @@ impl<T: TokenType> CPSEncoder<T> {
             return;
         }
 
-        if let Some(token) = self.vocab_map.get(chunk) {
-            buf.push(*token);
+        if let Some(token) = self.word_vocab.get(chunk) {
+            buf.push(token);
             return;
         }
 
@@ -140,7 +108,7 @@ impl<T: TokenType> CPSEncoder<T> {
             for idx in start..buf.len() - 1 {
                 let pair = (buf[idx], buf[idx + 1]);
 
-                if let Some(&merge_token) = self.data.merge_map.get(&pair)
+                if let Some(&merge_token) = self.bpe_vocab.pairs.get(&pair)
                     && (best_match.is_none() || (merge_token < best_match.unwrap().1))
                 {
                     best_match = Some((idx, merge_token));
@@ -160,17 +128,13 @@ impl<T: TokenType> CPSEncoder<T> {
 
     /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
     pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        CorpusDecoder::from_data(&self.data)
+        CorpusDecoder::from_bpe(&self.bpe_vocab)
     }
 }
 
 impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
-    fn data(&self) -> &Arc<TokenVocabData<T>> {
-        &self.data
-    }
-
-    fn pair_tokens(&self) -> impl Iterator<Item = T> {
-        self.data.pair_tokens()
+    fn max_token(&self) -> T {
+        self.bpe_vocab.max_token()
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
@@ -212,9 +176,12 @@ mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::cps_encoder::CPSEncoder;
-    use crate::types;
-    use crate::vocab::training::trainer::VocabTrainer;
+    use crate::types::{check_is_send, check_is_sync};
+    use crate::util::regex::regex_wrapper::RegexPatternLabel;
+    use crate::vocab::data::WordMapTokenVocab;
+    use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
+    use std::sync::Arc;
 
     #[test]
     #[cfg(feature = "rayon")]
@@ -232,7 +199,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = VocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
+        let options = BPETokenVocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
@@ -240,23 +207,34 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let data = options.train_vocab_from_sample_iter::<T, K, C, _>(samples.iter());
-        let tokenizer = CPSEncoder::new(data, Default::default());
+        let TrainResults {
+            pattern,
+            vocab: bpe_vocab,
+        } = options
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
+            .unwrap();
 
-        // compile time checks.
-        types::check_is_send(&tokenizer);
-        types::check_is_sync(&tokenizer);
+        let pattern = RegexPatternLabel::Adaptive(pattern);
+        let bpe_vocab = Arc::new(bpe_vocab);
+        let word_vocab = Arc::new(WordMapTokenVocab::from_bpe(&bpe_vocab));
 
-        assert_eq!(tokenizer.max_token(), 292);
+        let encoder = CPSEncoder::new(
+            pattern,
+            word_vocab.clone(),
+            bpe_vocab.clone(),
+            Default::default(),
+        );
+        check_is_send(&encoder);
+        check_is_sync(&encoder);
 
-        let decoder = tokenizer.to_decoder();
+        assert_eq!(encoder.max_token(), 292);
 
-        // compile time checks.
-        types::check_is_send(&decoder);
-        types::check_is_sync(&decoder);
+        let decoder = encoder.to_decoder();
+        check_is_send(&decoder);
+        check_is_sync(&decoder);
 
         for sample in samples {
-            assert_eq!(decoder.decode_to_string(tokenizer.encode(sample)), sample);
+            assert_eq!(decoder.decode_to_string(encoder.encode(sample)), sample);
         }
     }
 }

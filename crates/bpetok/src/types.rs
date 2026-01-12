@@ -113,13 +113,13 @@ mod tests {
 }
 
 /// [`Pair<T>`] to T map.
-pub type MergeMap<T> = ahash::AHashMap<Pair<T>, T>;
+pub type BinaryPairMap<T> = ahash::AHashMap<Pair<T>, T>;
 
 /// T to [`Pair<T>`] map.
 pub type ExpansionMap<T> = ahash::AHashMap<T, Pair<T>>;
 
 /// Byte vector to T map.
-pub type VocabMap<T> = ahash::AHashMap<Vec<u8>, T>;
+pub type WordToTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
 
 /// Check if a type is `Send`.
 #[cfg(test)]

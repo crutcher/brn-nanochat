@@ -1,13 +1,13 @@
 //! # Tiktoken IO
 
-use crate::types::{TokenType, VocabMap};
+use crate::types::{TokenType, WordToTokenMap};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 
 /// Save the chunk map to a tiktoken vocab file.
 pub fn save_tiktoken_vocab<T: TokenType>(
-    vocab_map: &VocabMap<T>,
+    vocab_map: &WordToTokenMap<T>,
     path: &str,
 ) -> anyhow::Result<()> {
     let mut vocab: Vec<_> = vocab_map.iter().collect();
@@ -27,9 +27,9 @@ pub fn save_tiktoken_vocab<T: TokenType>(
     Ok(())
 }
 
-/// Load a tiktoken vocab file into a [`VocabMap`].
-pub fn load_tiktoken_vocab<T: TokenType>(path: &str) -> anyhow::Result<VocabMap<T>> {
-    let mut vocab = VocabMap::new();
+/// Load a tiktoken vocab file into a [`WordToTokenMap`].
+pub fn load_tiktoken_vocab<T: TokenType>(path: &str) -> anyhow::Result<WordToTokenMap<T>> {
+    let mut vocab = WordToTokenMap::new();
     let file = std::fs::File::open(path)?;
     let reader = BufReader::new(file);
     for line in reader.lines() {
