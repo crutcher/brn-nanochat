@@ -3,7 +3,7 @@
 use crate::decoder::TokenDecoder;
 use crate::decoder::expansion_decoder::ExpansionDecoder;
 use crate::types::{TokenType, WordToTokenMap};
-use crate::vocab::data::{BPEMapTokenVocab, TokenVocab};
+use crate::vocab::data::{PairMapTokenVocab, TokenVocab};
 use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
@@ -19,10 +19,10 @@ pub struct WordMapTokenVocab<T: TokenType> {
 
 impl<T: TokenType> WordMapTokenVocab<T> {
     /// Build word vocabulary from a BPE map vocabulary.
-    pub fn from_bpe(bpe_vocab: &BPEMapTokenVocab<T>) -> Self {
-        let decoder = ExpansionDecoder::from_pair_map(&bpe_vocab.pairs);
+    pub fn from_bpe(pair_vocab: &PairMapTokenVocab<T>) -> Self {
+        let decoder = ExpansionDecoder::from_pair_map(&pair_vocab.pairs);
         let mut words = WordToTokenMap::default();
-        for token in bpe_vocab.compound_tokens_iter() {
+        for token in pair_vocab.compound_tokens_iter() {
             let chunk = decoder.decode_to_bytes([token]);
             words.insert(chunk, token);
         }

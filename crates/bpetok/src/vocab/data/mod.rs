@@ -1,13 +1,13 @@
 //! # Vocabulary Data
 
-pub mod bpe_map;
-pub mod unified;
-pub mod word_map;
+pub mod pair_vocab;
+pub mod unified_vocab;
+pub mod word_vocab;
 
 use crate::types::TokenType;
-pub use bpe_map::*;
-pub use unified::*;
-pub use word_map::*;
+pub use pair_vocab::*;
+pub use unified_vocab::*;
+pub use word_vocab::*;
 
 /// Returns an iterator over all byte tokens (0-255).
 pub fn byte_tokens_iter<T: TokenType>() -> impl Iterator<Item = T> {

@@ -6,7 +6,7 @@ use bpetok::decoder::expansion_decoder::ExpansionDecoder;
 use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
 use bpetok::types::TokenType;
 use bpetok::vocab::data::TokenVocab;
-use bpetok::vocab::data::unified::UnifiedTokenVocab;
+use bpetok::vocab::data::unified_vocab::UnifiedTokenVocab;
 use bpetok::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
@@ -121,17 +121,17 @@ fn main() -> anyhow::Result<()> {
     // TODO: `indicatif` for optional progress bar for users waiting on this.
     let TrainResults::<T> {
         word_pattern,
-        bpe_vocab,
+        pair_vocab,
     } = BPETokenVocabTrainer::new_with_vocab_size(args.vocab_size)
         .train_vocab_from_sample_iter::<T, K, C, _>(samples)
         .expect("training failed");
 
     let training_duration = std::time::Instant::now().duration_since(t0);
     println!("- training_duration: {:#?}", training_duration);
-    println!("- vocab_size: {:#?}", bpe_vocab.max_token());
+    println!("- vocab_size: {:#?}", pair_vocab.max_token());
 
     let encoder_data: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-        .with_bpe_vocab(bpe_vocab)
+        .with_pair_vocab(pair_vocab)
         .expand_words_from_bpe()
         .into();
 
@@ -212,7 +212,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         println!();
-        let expansion_decoder = ExpansionDecoder::from_bpe(&encoder_data.bpe_vocab);
+        let expansion_decoder = ExpansionDecoder::from_bpe(&encoder_data.pair_vocab);
         time_decoder(
             "ExpansionDecoder",
             &expansion_decoder,
@@ -222,7 +222,7 @@ fn main() -> anyhow::Result<()> {
         );
 
         println!();
-        let dict_decoder = DictionaryDecoder::from_bpe(&encoder_data.bpe_vocab);
+        let dict_decoder = DictionaryDecoder::from_bpe(&encoder_data.pair_vocab);
         time_decoder(
             "DictionaryDecoder",
             &dict_decoder,
@@ -232,7 +232,7 @@ fn main() -> anyhow::Result<()> {
         );
 
         println!();
-        let corpus_decoder = CorpusDecoder::from_bpe(&encoder_data.bpe_vocab);
+        let corpus_decoder = CorpusDecoder::from_bpe(&encoder_data.pair_vocab);
         time_decoder(
             "CorpusDecoder",
             &corpus_decoder,

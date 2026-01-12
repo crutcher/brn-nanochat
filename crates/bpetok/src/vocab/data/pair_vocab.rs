@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 /// Token vocabulary as a binary-pair encoding map of ``{ (T, T) -> T }``.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
-pub struct BPEMapTokenVocab<T: TokenType> {
+pub struct PairMapTokenVocab<T: TokenType> {
     /// Map of ``{ (T, T) -> T }``.
     pub pairs: BinaryPairMap<T>,
 }
 
-impl<T: TokenType> TokenVocab<T> for BPEMapTokenVocab<T> {
+impl<T: TokenType> TokenVocab<T> for PairMapTokenVocab<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.pairs.values().copied()
     }
@@ -37,7 +37,7 @@ mod tests {
         type T = u32;
         let byte_tokens: Vec<T> = (0..256).map(|b| T::from_usize(b).unwrap()).collect();
 
-        let mut vocab = BPEMapTokenVocab::<T> {
+        let mut vocab = PairMapTokenVocab::<T> {
             pairs: BinaryPairMap::default(),
         };
 

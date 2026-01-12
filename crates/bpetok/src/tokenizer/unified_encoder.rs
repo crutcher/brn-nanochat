@@ -8,7 +8,7 @@ use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
 use crate::vocab::data::TokenVocab;
-use crate::vocab::data::unified::UnifiedTokenVocab;
+use crate::vocab::data::unified_vocab::UnifiedTokenVocab;
 use std::sync::Arc;
 
 /// Config options for the [`ScanningEncoder`].
@@ -101,7 +101,7 @@ impl<T: TokenType> ScanningEncoder<T> {
             for idx in start..buf.len() - 1 {
                 let pair = (buf[idx], buf[idx + 1]);
 
-                if let Some(&merge_token) = self.data.bpe_vocab.pairs.get(&pair)
+                if let Some(&merge_token) = self.data.pair_vocab.pairs.get(&pair)
                     && (best_match.is_none() || (merge_token < best_match.unwrap().1))
                 {
                     best_match = Some((idx, merge_token));
@@ -121,7 +121,7 @@ impl<T: TokenType> ScanningEncoder<T> {
 
     /// Build a [`TokenDecoder`] from this [`ScanningEncoder`].
     pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        CorpusDecoder::from_bpe(&self.data.bpe_vocab)
+        CorpusDecoder::from_bpe(&self.data.pair_vocab)
     }
 }
 
@@ -170,7 +170,7 @@ mod tests {
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::ScanningEncoder;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::unified::UnifiedTokenVocab;
+    use crate::vocab::data::unified_vocab::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
     use std::sync::Arc;
@@ -201,13 +201,13 @@ mod tests {
 
         let TrainResults {
             word_pattern,
-            bpe_vocab,
+            pair_vocab,
         } = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
         let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-            .with_bpe_vocab(bpe_vocab)
+            .with_pair_vocab(pair_vocab)
             .expand_words_from_bpe()
             .into();
 

@@ -2,7 +2,7 @@
 
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapperPattern;
-use crate::vocab::data::{BPEMapTokenVocab, TokenVocab, WordMapTokenVocab};
+use crate::vocab::data::{PairMapTokenVocab, TokenVocab, WordMapTokenVocab};
 use ahash::AHashSet;
 
 /// Unified token vocabulary.
@@ -18,7 +18,7 @@ pub struct UnifiedTokenVocab<T: TokenType> {
     pub word_vocab: WordMapTokenVocab<T>,
 
     /// ``{ (T, T) -> T }`` vocabulary.
-    pub bpe_vocab: BPEMapTokenVocab<T>,
+    pub pair_vocab: PairMapTokenVocab<T>,
 }
 
 impl<T: TokenType> UnifiedTokenVocab<T> {
@@ -31,7 +31,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
             word_pattern,
             specials: None,
             word_vocab: Default::default(),
-            bpe_vocab: Default::default(),
+            pair_vocab: Default::default(),
         }
     }
 
@@ -46,7 +46,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         }
     }
 
-    /// Materialize the tokens in the `bpe_vocab` into the `word_vocab`.
+    /// Materialize the tokens in the `pair_vocab` into the `word_vocab`.
     ///
     /// Leaves tokens which already exist in the `word_vocab`.
     pub fn expand_words_from_bpe(self) -> Self {
@@ -54,7 +54,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
         let tokens: AHashSet<T> = word_vocab.compound_tokens_iter().collect();
 
-        for (w, t) in WordMapTokenVocab::from_bpe(&self.bpe_vocab).words {
+        for (w, t) in WordMapTokenVocab::from_bpe(&self.pair_vocab).words {
             if !tokens.contains(&t) {
                 word_vocab.words.insert(w, t);
             }
@@ -72,11 +72,11 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Replace the binary-pair vocabulary.
-    pub fn with_bpe_vocab(
+    pub fn with_pair_vocab(
         self,
-        bpe_vocab: BPEMapTokenVocab<T>,
+        pair_vocab: PairMapTokenVocab<T>,
     ) -> Self {
-        Self { bpe_vocab, ..self }
+        Self { pair_vocab, ..self }
     }
 
     /// Replace the word vocabulary.
@@ -90,7 +90,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
 impl<T: TokenType> TokenVocab<T> for UnifiedTokenVocab<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        let mut tokens = self.bpe_vocab.compound_tokens_iter().collect::<Vec<_>>();
+        let mut tokens = self.pair_vocab.compound_tokens_iter().collect::<Vec<_>>();
 
         tokens.extend(self.word_vocab.compound_tokens_iter());
 
@@ -98,6 +98,6 @@ impl<T: TokenType> TokenVocab<T> for UnifiedTokenVocab<T> {
     }
 
     fn max_token(&self) -> T {
-        self.bpe_vocab.max_token().max(self.word_vocab.max_token())
+        self.pair_vocab.max_token().max(self.word_vocab.max_token())
     }
 }

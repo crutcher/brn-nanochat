@@ -3,7 +3,7 @@
 
 use crate::decoder::TokenDecoder;
 use crate::types::{BinaryPairMap, ExpansionMap, TokenType, is_byte_token};
-use crate::vocab::data::BPEMapTokenVocab;
+use crate::vocab::data::PairMapTokenVocab;
 use ahash::AHashMap;
 use std::collections::hash_map;
 use std::ops::Range;
@@ -33,7 +33,7 @@ impl<T: TokenType> CorpusDecoder<T> {
 
     /// Creates a new corpus decoder.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
-    pub fn from_bpe(data: &BPEMapTokenVocab<T>) -> Self {
+    pub fn from_bpe(data: &PairMapTokenVocab<T>) -> Self {
         Self::from_pairs(&data.pairs)
     }
 
@@ -233,7 +233,7 @@ mod tests {
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::ScanningEncoder;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::unified::UnifiedTokenVocab;
+    use crate::vocab::data::unified_vocab::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
     use std::sync::Arc;
@@ -254,19 +254,19 @@ mod tests {
 
         let TrainResults {
             word_pattern,
-            bpe_vocab,
+            pair_vocab,
         } = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
         let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-            .with_bpe_vocab(bpe_vocab)
+            .with_pair_vocab(pair_vocab)
             .expand_words_from_bpe()
             .into();
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = CorpusDecoder::from_bpe(&vocab.bpe_vocab);
+        let decoder = CorpusDecoder::from_bpe(&vocab.pair_vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

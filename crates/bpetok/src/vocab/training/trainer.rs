@@ -3,7 +3,7 @@
 use crate::types::{BinaryPairMap, CountType, Pair, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
-use crate::vocab::data::BPEMapTokenVocab;
+use crate::vocab::data::PairMapTokenVocab;
 use crate::vocab::training::pair_index::{PairIndex, PairIndexOptions};
 use crate::vocab::training::word::Word;
 use crate::vocab::training::word_count::{WordCounter, WordCounterOptions};
@@ -46,7 +46,7 @@ pub struct TrainResults<T: TokenType> {
     pub word_pattern: String,
 
     /// The trained BPE vocab.
-    pub bpe_vocab: BPEMapTokenVocab<T>,
+    pub pair_vocab: PairMapTokenVocab<T>,
 }
 
 impl BPETokenVocabTrainer {
@@ -273,7 +273,7 @@ impl BPETokenVocabTrainer {
 
         Ok(TrainResults {
             word_pattern: self.pattern,
-            bpe_vocab: BPEMapTokenVocab { pairs },
+            pair_vocab: PairMapTokenVocab { pairs },
         })
     }
 }
@@ -333,7 +333,7 @@ mod tests {
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::ScanningEncoder;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::unified::UnifiedTokenVocab;
+    use crate::vocab::data::unified_vocab::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
     use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use compact_str::CompactString;
@@ -389,13 +389,13 @@ mod tests {
 
         let TrainResults {
             word_pattern,
-            bpe_vocab,
+            pair_vocab,
         } = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
         let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-            .with_bpe_vocab(bpe_vocab)
+            .with_pair_vocab(pair_vocab)
             .expand_words_from_bpe()
             .into();
 
