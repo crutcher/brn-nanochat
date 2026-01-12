@@ -64,21 +64,8 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
     ) {
         let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
         stack.extend(tokens.iter().rev());
+
         self.decode_append_stack(buf, &mut stack);
-    }
-
-    /// Decodes tokens into bytes.
-    fn decode_to_bytes<S: AsRef<[T]>>(
-        &self,
-        tokens: S,
-    ) -> Vec<u8> {
-        let mut stack = tokens.as_ref().to_vec();
-        stack.reverse();
-
-        let mut buf = Vec::with_capacity(stack.len() * 4);
-
-        self.decode_append_stack(&mut buf, &mut stack);
-        buf
     }
 }
 
