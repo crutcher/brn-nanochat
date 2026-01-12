@@ -86,9 +86,18 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     ) -> Self {
         Self { word_vocab, ..self }
     }
+}
 
-    /// Maximum token ID in the vocabulary.
-    pub fn max_token(&self) -> T {
+impl<T: TokenType> TokenVocab<T> for UnifiedTokenVocab<T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+        let mut tokens = self.bpe_vocab.compound_tokens_iter().collect::<Vec<_>>();
+
+        tokens.extend(self.word_vocab.compound_tokens_iter());
+
+        tokens.into_iter()
+    }
+
+    fn max_token(&self) -> T {
         self.bpe_vocab.max_token().max(self.word_vocab.max_token())
     }
 }
