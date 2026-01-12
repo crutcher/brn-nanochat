@@ -2,10 +2,9 @@
 
 use crate::DEFAULT_PARALLEL;
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
-use crate::encoders::TokenEncoder;
+use crate::encoders::text_segmentor::{TextSegmentor, WordRef};
+use crate::encoders::token_encoder::TokenEncoder;
 use crate::types::TokenType;
-use crate::util::regex::regex_pool::RegexWrapperPool;
-use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
@@ -47,7 +46,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
     /// Tokenizer options.
     pub options: UnifiedVocabEncoderOptions,
 
-    regex_pool: RegexWrapperPool,
+    segmentor: TextSegmentor,
 }
 
 impl<T: TokenType> UnifiedVocabEncoder<T> {
@@ -61,33 +60,28 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
         }
 
-        let word_regex: RegexWrapper = data.word_pattern.compile().unwrap();
-        let regex_pool = RegexWrapperPool::new(word_regex.into());
+        let specials = match &data.specials {
+            Some(specials) => specials
+                .words
+                .keys()
+                .map(|word| String::from_utf8(word.clone()).unwrap())
+                .collect::<Vec<String>>()
+                .into(),
+            None => None,
+        };
+
+        let segmentor = TextSegmentor::new(data.word_pattern.clone(), specials);
+
         Self {
             data,
             options,
-            regex_pool,
+            segmentor,
         }
     }
 
     /// Build a [`TokenDecoder`] from this [`UnifiedVocabEncoder`].
     pub fn to_decoder(&self) -> DictionaryDecoder<T> {
         self.data.to_decoder()
-    }
-
-    /// Split a text into word references.
-    ///
-    /// TODO: model as ``Vec<WordRef<'a>>``
-    /// With ``WordRef := Special(&'a str) | Normal(&'a str)``
-    pub fn split_words<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<&'a str> {
-        self.regex_pool
-            .get()
-            .find_iter(text)
-            .map(|m| m.as_str())
-            .collect()
     }
 }
 
@@ -142,15 +136,33 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         }
     }
 
+    fn split_text<'a>(
+        &self,
+        text: &'a str,
+    ) -> Vec<WordRef<'a>> {
+        self.segmentor.split_words(text)
+    }
+
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
     fn encode_append(
         &self,
         text: &str,
         tokens: &mut Vec<T>,
     ) {
-        self.split_words(text)
-            .into_iter()
-            .for_each(|w| self.encode_append_word(w, tokens))
+        self.split_text(text).into_iter().for_each(|wr| match wr {
+            WordRef::Normal(w) => self.encode_append_word(w, tokens),
+            WordRef::Special(s) => {
+                let token = self
+                    .data
+                    .specials
+                    .as_ref()
+                    .unwrap()
+                    .lookup_token(s.as_bytes())
+                    .unwrap();
+
+                tokens.push(token);
+            }
+        });
     }
 
     /// Encode a batch of text into tokens.
@@ -185,7 +197,7 @@ impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
 #[cfg(test)]
 mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
-    use crate::encoders::TokenEncoder;
+    use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
@@ -225,12 +237,20 @@ mod tests {
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-            .with_pair_vocab(pair_vocab)
-            .expand_words_from_bpe()
-            .into();
+        let mut vocab: UnifiedTokenVocab<T> =
+            UnifiedTokenVocab::new(word_pattern.into()).with_pair_vocab(pair_vocab);
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone(), Default::default());
+        vocab.specials = Some(Default::default());
+        vocab
+            .specials
+            .as_mut()
+            .unwrap()
+            .words
+            .insert("<|HI|>".into(), 3000);
+
+        let special_sample = "hello <|HI|> world";
+
+        let encoder = UnifiedVocabEncoder::<T>::new(Arc::new(vocab), Default::default());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
@@ -239,6 +259,13 @@ mod tests {
         let decoder = encoder.to_decoder();
         check_is_send(&decoder);
         check_is_sync(&decoder);
+
+        // Special handling.
+        let tokens = encoder.encode(special_sample);
+        assert_eq!(
+            decoder.try_decode_to_string(tokens).unwrap(),
+            special_sample
+        );
 
         for sample in samples {
             let tokens = encoder.encode(sample);

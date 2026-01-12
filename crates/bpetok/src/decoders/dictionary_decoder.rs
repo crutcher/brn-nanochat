@@ -51,7 +51,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoders::TokenEncoder;
+    use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};

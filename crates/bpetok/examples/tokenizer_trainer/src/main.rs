@@ -1,7 +1,8 @@
 use arrow::array::StringArray;
 use bpetok::decoders::parallel_decoder::ParallelDecoder;
 use bpetok::decoders::token_decoder::TokenDecoder;
-use bpetok::encoders::{TokenEncoder, UnifiedVocabEncoder};
+use bpetok::encoders::UnifiedVocabEncoder;
+use bpetok::encoders::token_encoder::TokenEncoder;
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
 use bpetok::vocab::vocab_index::TokenVocabIndex;

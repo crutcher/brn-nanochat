@@ -72,7 +72,8 @@ where
 mod tests {
     use super::*;
     use crate::decoders::DictionaryDecoder;
-    use crate::encoders::{TokenEncoder, UnifiedVocabEncoder};
+    use crate::encoders::UnifiedVocabEncoder;
+    use crate::encoders::token_encoder::TokenEncoder;
     use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
