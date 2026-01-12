@@ -1,7 +1,7 @@
 //! Pair Count / Word Indexing
 
+use crate::training::word::Word;
 use crate::types::{CountType, Pair, TokenType};
-use crate::vocab::training::word::Word;
 use ahash::{AHashMap, AHashSet};
 
 /// A map from [`Pair`] to its occurrence count.
@@ -178,7 +178,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vocab::training::word::Word;
+    use crate::training::word::Word;
 
     #[test]
     fn test_pair_index_serial_token_u32_count_usize() {

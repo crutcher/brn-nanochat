@@ -1,7 +1,7 @@
 //! # Binary-Pair Encoding Vocabulary Data
 
 use crate::types::{PairToTokenMap, TokenType};
-use crate::vocab::data::TokenVocab;
+use crate::vocab::TokenVocab;
 use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a binary-pair encoding map of ``{ (T, T) -> T }``.

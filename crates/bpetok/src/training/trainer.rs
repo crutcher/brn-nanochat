@@ -1,12 +1,12 @@
 //! # Vocab Trainer
 
+use crate::training::pair_index::{PairIndex, PairIndexOptions};
+use crate::training::word::Word;
+use crate::training::word_count::{WordCounter, WordCounterOptions};
 use crate::types::{CountType, Pair, PairToTokenMap, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
-use crate::vocab::data::PairMapTokenVocab;
-use crate::vocab::training::pair_index::{PairIndex, PairIndexOptions};
-use crate::vocab::training::word::Word;
-use crate::vocab::training::word_count::{WordCounter, WordCounterOptions};
+use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
 use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
@@ -332,9 +332,9 @@ mod tests {
     use crate::decoder::TokenDecoder;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::ScanningEncoder;
+    use crate::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::unified_vocab::UnifiedTokenVocab;
-    use crate::vocab::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
+    use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use compact_str::CompactString;
     use std::cmp::Ordering;

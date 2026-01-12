@@ -51,9 +51,9 @@ mod tests {
     use super::*;
     use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::unified_encoder::ScanningEncoder;
+    use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::unified_vocab::UnifiedTokenVocab;
-    use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
+    use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use compact_str::CompactString;
     use std::sync::Arc;
 

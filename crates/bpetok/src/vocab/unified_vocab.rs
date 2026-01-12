@@ -3,7 +3,9 @@
 use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapperPattern;
-use crate::vocab::data::{PairMapTokenVocab, TokenVocab, WordMapTokenVocab};
+use crate::vocab::TokenVocab;
+use crate::vocab::pair_vocab::PairMapTokenVocab;
+use crate::vocab::word_vocab::WordMapTokenVocab;
 use ahash::{AHashMap, AHashSet};
 
 /// Unified token vocabulary.

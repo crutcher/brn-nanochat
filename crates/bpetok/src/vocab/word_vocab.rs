@@ -3,7 +3,8 @@
 use crate::decoder::TokenDecoder;
 use crate::decoder::expansion_decoder::ExpansionDecoder;
 use crate::types::{TokenType, WordToTokenMap};
-use crate::vocab::data::{PairMapTokenVocab, TokenVocab};
+use crate::vocab::TokenVocab;
+use crate::vocab::pair_vocab::PairMapTokenVocab;
 use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.

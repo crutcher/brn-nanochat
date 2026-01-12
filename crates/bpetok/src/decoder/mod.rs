@@ -24,7 +24,7 @@
 //! ```
 
 use crate::types::TokenType;
-use crate::vocab::data::byte_tokens_iter;
+use crate::vocab::byte_tokens_iter;
 
 pub mod dictionary_decoder;
 pub mod expansion_decoder;

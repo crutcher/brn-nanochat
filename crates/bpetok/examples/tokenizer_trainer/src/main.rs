@@ -1,10 +1,10 @@
 use arrow::array::StringArray;
 use bpetok::decoder::TokenDecoder;
 use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
+use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::types::TokenType;
-use bpetok::vocab::data::TokenVocab;
-use bpetok::vocab::data::unified_vocab::UnifiedTokenVocab;
-use bpetok::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
+use bpetok::vocab::TokenVocab;
+use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
