@@ -1,6 +1,6 @@
 //! # Vocab Trainer
 
-use crate::types::{BinaryPairMap, CountType, Pair, StringChunkType, TokenType};
+use crate::types::{CountType, Pair, PairToTokenMap, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
 use crate::vocab::data::PairMapTokenVocab;
@@ -153,7 +153,7 @@ impl BPETokenVocabTrainer {
         // Prefer to fail before we do all the work below.
         let _ = validators::expect_regex(&self.pattern);
 
-        let mut pairs: BinaryPairMap<T> = AHashMap::with_capacity(num_merges);
+        let mut pairs: PairToTokenMap<T> = AHashMap::with_capacity(num_merges);
 
         log::info!("Building pair index...");
         let PairIndex {

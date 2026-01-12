@@ -1,6 +1,6 @@
 //! # Binary-Pair Encoding Vocabulary Data
 
-use crate::types::{BinaryPairMap, TokenType};
+use crate::types::{PairToTokenMap, TokenType};
 use crate::vocab::data::TokenVocab;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
 pub struct PairMapTokenVocab<T: TokenType> {
     /// Map of ``{ (T, T) -> T }``.
-    pub pairs: BinaryPairMap<T>,
+    pub pairs: PairToTokenMap<T>,
 }
 
 impl<T: TokenType> TokenVocab<T> for PairMapTokenVocab<T> {
@@ -38,7 +38,7 @@ mod tests {
         let byte_tokens: Vec<T> = (0..256).map(|b| T::from_usize(b).unwrap()).collect();
 
         let mut vocab = PairMapTokenVocab::<T> {
-            pairs: BinaryPairMap::default(),
+            pairs: PairToTokenMap::default(),
         };
 
         assert_eq!(vocab.max_token(), 255);

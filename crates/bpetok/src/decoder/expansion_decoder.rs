@@ -1,9 +1,7 @@
 //! # Expansion Decoder
 
 use crate::decoder::TokenDecoder;
-use crate::types::{BinaryPairMap, ExpansionMap, TokenType};
-use crate::vocab::data::PairMapTokenVocab;
-use ahash::AHashMap;
+use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
 
 /// An [`ExpansionMap`] [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -11,27 +9,23 @@ pub struct ExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
     ///
     /// Does not include byte-tokens.
-    pub expansion_map: ExpansionMap<T>,
+    pub expansion_map: TokenToPairMap<T>,
 }
 
 impl<T: TokenType> ExpansionDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut expansion_map: ExpansionMap<T>) -> Self {
+    pub fn new(mut expansion_map: TokenToPairMap<T>) -> Self {
         expansion_map.shrink_to_fit();
         Self { expansion_map }
     }
 
-    /// Build a [`ExpansionDecoder`] from this [`PairMapTokenVocab`].
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
-    pub fn from_bpe(data: &PairMapTokenVocab<T>) -> Self {
-        Self::from_pair_map(&data.pairs)
-    }
-
     /// Build a [`ExpansionDecoder`] from this [`Tokenizer`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
-    pub fn from_pair_map(merge_map: &BinaryPairMap<T>) -> Self {
-        let expansion_map =
-            AHashMap::from_iter(merge_map.iter().map(|(&pair, &token)| (token, pair)));
+    pub fn from_pair_map(merge_map: &PairToTokenMap<T>) -> Self {
+        let expansion_map = merge_map
+            .iter()
+            .map(|(&pair, &token)| (token, pair))
+            .collect();
         Self::new(expansion_map)
     }
 }
@@ -103,7 +97,7 @@ mod tests {
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = ExpansionDecoder::from_bpe(&vocab.pair_vocab);
+        let decoder = ExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

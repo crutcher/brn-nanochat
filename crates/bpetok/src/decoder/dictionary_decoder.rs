@@ -1,10 +1,7 @@
 //! # Dictionary Decoder
 
 use crate::decoder::TokenDecoder;
-use crate::decoder::expansion_decoder::ExpansionDecoder;
-use crate::types::{BinaryPairMap, TokenType};
-use crate::vocab::data::PairMapTokenVocab;
-use ahash::AHashMap;
+use crate::types::{TokenToWordMap, TokenType};
 
 /// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -12,38 +9,14 @@ pub struct DictionaryDecoder<T: TokenType> {
     /// Token to bytes mapping.
     ///
     /// Does not include byte-tokens.
-    pub dictionary: AHashMap<T, Vec<u8>>,
+    pub dictionary: TokenToWordMap<T>,
 }
 
 impl<T: TokenType> DictionaryDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut dictionary: AHashMap<T, Vec<u8>>) -> Self {
+    pub fn new(mut dictionary: TokenToWordMap<T>) -> Self {
         dictionary.shrink_to_fit();
-
         Self { dictionary }
-    }
-
-    /// Build a [`DictionaryDecoder`] from a [`TokenDecoder`].
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(decoder)))]
-    pub fn from_tokenizer<D: TokenDecoder<T>>(decoder: &D) -> Self {
-        let mut dictionary = AHashMap::with_capacity(decoder.max_token().to_usize().unwrap());
-        for token in decoder.compound_tokens_iter() {
-            dictionary.insert(token, decoder.decode_to_bytes([token]));
-        }
-        Self::new(dictionary)
-    }
-
-    /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
-    pub fn from_pair_vocab(data: &PairMapTokenVocab<T>) -> DictionaryDecoder<T> {
-        Self::from_merge_map(&data.pairs)
-    }
-
-    /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(merges)))]
-    pub fn from_merge_map(merges: &BinaryPairMap<T>) -> DictionaryDecoder<T> {
-        let gd = ExpansionDecoder::from_pair_map(merges);
-        Self::from_tokenizer(&gd)
     }
 }
 
@@ -112,7 +85,7 @@ mod tests {
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = DictionaryDecoder::from_pair_vocab(&vocab.pair_vocab);
+        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
