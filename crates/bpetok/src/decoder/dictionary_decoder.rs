@@ -114,7 +114,7 @@ mod tests {
 
         let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
             .with_bpe_vocab(bpe_vocab)
-            .derive_words()
+            .expand_words_from_bpe()
             .into();
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());

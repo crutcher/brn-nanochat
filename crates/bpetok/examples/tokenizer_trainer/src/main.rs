@@ -132,7 +132,7 @@ fn main() -> anyhow::Result<()> {
 
     let encoder_data: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
         .with_bpe_vocab(bpe_vocab)
-        .derive_words()
+        .expand_words_from_bpe()
         .into();
 
     let encoder: ScanningEncoder<T> =

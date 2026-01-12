@@ -3,6 +3,7 @@
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexPatternLabel;
 use crate::vocab::data::{BPEMapTokenVocab, TokenVocab, WordMapTokenVocab};
+use ahash::AHashSet;
 
 /// Unified token vocabulary.
 #[derive(Clone)]
@@ -45,10 +46,21 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         }
     }
 
-    /// Derive words vocabulary from the BPE vocabulary.
-    pub fn derive_words(self) -> Self {
-        let word_vocab = WordMapTokenVocab::from_bpe(&self.bpe_vocab);
-        self.with_word_vocab(word_vocab)
+    /// Materialize the tokens in the `bpe_vocab` into the `word_vocab`.
+    ///
+    /// Leaves tokens which already exist in the `word_vocab`.
+    pub fn expand_words_from_bpe(self) -> Self {
+        let mut word_vocab = self.word_vocab;
+
+        let tokens: AHashSet<T> = word_vocab.compound_tokens_iter().collect();
+
+        for (w, t) in WordMapTokenVocab::from_bpe(&self.bpe_vocab).words {
+            if !tokens.contains(&t) {
+                word_vocab.words.insert(w, t);
+            }
+        }
+
+        Self { word_vocab, ..self }
     }
 
     /// Replace special tokens vocabulary.
