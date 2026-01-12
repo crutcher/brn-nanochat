@@ -19,6 +19,24 @@ pub struct WordMapTokenVocab<T: TokenType> {
 }
 
 impl<T: TokenType> WordMapTokenVocab<T> {
+    /// Add a word to the vocab.
+    pub fn add_str_word(
+        &mut self,
+        word: &str,
+        token: T,
+    ) {
+        self.add_bytes_word(word.as_bytes(), token);
+    }
+
+    /// Add a word to the vocab.
+    pub fn add_bytes_word(
+        &mut self,
+        word: &[u8],
+        token: T,
+    ) {
+        self.words.insert(word.to_vec(), token);
+    }
+
     /// Build word vocabulary from a BPE map vocabulary.
     pub fn from_pair_vocab(pair_vocab: &PairMapTokenVocab<T>) -> Self {
         let decoder = PairExpansionDecoder::from_pair_map(&pair_vocab.pairs);
@@ -83,9 +101,9 @@ mod tests {
 
         assert_eq!(&vocab.all_tokens_iter().collect::<Vec<T>>(), &byte_tokens);
 
-        vocab.words.insert("apple".as_bytes().to_vec(), 300);
-        vocab.words.insert("banana".as_bytes().to_vec(), 301);
-        vocab.words.insert("pear".as_bytes().to_vec(), 302);
+        vocab.add_str_word("apple", 300);
+        vocab.add_str_word("banana", 301);
+        vocab.add_str_word("pear", 302);
 
         assert_eq!(vocab.max_token(), 302);
 
