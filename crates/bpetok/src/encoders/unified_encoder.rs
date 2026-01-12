@@ -1,42 +1,13 @@
-//! # Chunk Pair Scan Tokenizer
+//! # Encoder for [`UnifiedTokenVocab`].
 
-use crate::DEFAULT_PARALLEL;
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::encoders::text_segmentor::{TextSegmentor, WordRef};
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::types::TokenType;
-use crate::util::validators;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use crate::vocab::word_vocab::WordMapTokenVocab;
 use std::sync::Arc;
-
-/// Config options for the [`UnifiedVocabEncoder`].
-#[derive(Debug, Clone)]
-pub struct UnifiedVocabEncoderOptions {
-    /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
-    pub parallel: bool,
-}
-
-impl UnifiedVocabEncoderOptions {
-    /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
-    pub fn with_parallel(
-        self,
-        parallel: bool,
-    ) -> Self {
-        Self {
-            parallel: validators::expect_parallel(parallel),
-        }
-    }
-}
-
-impl Default for UnifiedVocabEncoderOptions {
-    fn default() -> Self {
-        Self {
-            parallel: DEFAULT_PARALLEL,
-        }
-    }
-}
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
@@ -44,23 +15,12 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
     /// Data for the encoders.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
-    /// Tokenizer options.
-    pub options: UnifiedVocabEncoderOptions,
-
     segmentor: TextSegmentor,
 }
 
 impl<T: TokenType> UnifiedVocabEncoder<T> {
     /// Construct a new encoders..
-    pub fn new(
-        data: Arc<UnifiedTokenVocab<T>>,
-        options: UnifiedVocabEncoderOptions,
-    ) -> Self {
-        #[cfg(not(feature = "rayon"))]
-        if options.parallel {
-            panic!("Parallel processing requires the `rayon` feature to be enabled.");
-        }
-
+    pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         let specials = match &data.specials {
             Some(specials) => specials
                 .words
@@ -73,11 +33,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 
         let segmentor = TextSegmentor::new(data.word_pattern.clone(), specials);
 
-        Self {
-            data,
-            options,
-            segmentor,
-        }
+        Self { data, segmentor }
     }
 
     /// Build a [`TokenDecoder`] from this [`UnifiedVocabEncoder`].
@@ -151,25 +107,6 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
             }
         }
     }
-
-    /// Encode a batch of text into tokens.
-    fn encode_batch(
-        &self,
-        batch: &[String],
-    ) -> Vec<Vec<T>> {
-        if self.options.parallel {
-            #[cfg(not(feature = "rayon"))]
-            panic!("Parallel processing requires the `rayon` feature to be enabled.");
-
-            #[cfg(feature = "rayon")]
-            {
-                use rayon::prelude::*;
-                batch.par_iter().map(|text| self.encode(text)).collect()
-            }
-        } else {
-            batch.iter().map(|text| self.encode(text)).collect()
-        }
-    }
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
@@ -194,22 +131,12 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    #[cfg(feature = "rayon")]
-    fn test_tokenizer_parallel() {
-        test_tokenizer(true);
-    }
-
-    #[test]
-    fn test_tokenizer_serial() {
-        test_tokenizer(false);
-    }
-
-    fn test_tokenizer(parallel: bool) {
+    fn test_encoder() {
         type T = u16;
         type C = u32;
         type K = CompactString;
 
-        let options = BPETokenVocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
+        let options = BPETokenVocabTrainer::new_with_vocab_size(1000);
 
         let samples = vec![
             "hello world",
@@ -231,7 +158,7 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(Arc::new(vocab), Default::default());
+        let encoder = UnifiedVocabEncoder::<T>::new(Arc::new(vocab));
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

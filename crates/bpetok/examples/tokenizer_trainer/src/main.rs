@@ -1,8 +1,8 @@
 use arrow::array::{Array, StringArray};
 use bpetok::decoders::parallel_decoder::ParallelDecoder;
 use bpetok::decoders::token_decoder::TokenDecoder;
-use bpetok::encoders::UnifiedVocabEncoder;
 use bpetok::encoders::token_encoder::TokenEncoder;
+use bpetok::encoders::{ParallelEncoder, UnifiedVocabEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
 use bpetok::vocab::vocab_index::TokenVocabIndex;
@@ -133,8 +133,11 @@ fn main() -> anyhow::Result<()> {
         .expand_words_from_bpe()
         .into();
 
-    let encoder: UnifiedVocabEncoder<T> =
-        UnifiedVocabEncoder::<T>::new(encoder_data.clone(), Default::default());
+    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(encoder_data.clone());
+
+    let par_decoder = ParallelDecoder::new(encoder.to_decoder());
+
+    let par_encoder = ParallelEncoder::new(encoder);
 
     if let Some(path) = args.tiktoken_save_path {
         encoder_data.word_vocab.save_to_tiktoken_vocab(&path)?;
@@ -184,7 +187,7 @@ fn main() -> anyhow::Result<()> {
         let mut total_token_count = 0;
         let batch_times_ns = sample_batches.iter().map(|batch| {
             let t0 = std::time::Instant::now();
-            let token_batch: Vec<Vec<T>> = encoder.encode_batch(batch);
+            let token_batch: Vec<Vec<T>> = par_encoder.encode_batch(batch);
             let t1 = std::time::Instant::now();
 
             total_token_count += token_batch.iter().map(|tokens| tokens.len()).sum::<usize>();
@@ -221,7 +224,6 @@ fn main() -> anyhow::Result<()> {
         );
 
         println!();
-        let decoder = ParallelDecoder::new(encoder.to_decoder());
         let batch_size = args.batch_size;
         let num_batches1 = token_batches.len();
         println!("Timing Decode:");
@@ -232,7 +234,7 @@ fn main() -> anyhow::Result<()> {
                 .zip(token_batches.iter())
                 .map(|(sample, batch)| {
                     let t0 = std::time::Instant::now();
-                    let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
+                    let decoded_sample = par_decoder.try_decode_batch_to_strings(batch).unwrap();
                     let t1 = std::time::Instant::now();
 
                     assert_eq!(sample, &decoded_sample);
