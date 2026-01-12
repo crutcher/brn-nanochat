@@ -33,7 +33,7 @@ impl<T: TokenType> CorpusDecoder<T> {
 
     /// Creates a new corpus decoder.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
-    pub fn from_bpe(data: &PairMapTokenVocab<T>) -> Self {
+    pub fn from_pair_vocab(data: &PairMapTokenVocab<T>) -> Self {
         Self::from_pairs(&data.pairs)
     }
 
@@ -266,7 +266,7 @@ mod tests {
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = CorpusDecoder::from_bpe(&vocab.pair_vocab);
+        let decoder = CorpusDecoder::from_pair_vocab(&vocab.pair_vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

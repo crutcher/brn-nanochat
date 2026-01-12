@@ -19,7 +19,7 @@ pub struct WordMapTokenVocab<T: TokenType> {
 
 impl<T: TokenType> WordMapTokenVocab<T> {
     /// Build word vocabulary from a BPE map vocabulary.
-    pub fn from_bpe(pair_vocab: &PairMapTokenVocab<T>) -> Self {
+    pub fn from_pair_vocab(pair_vocab: &PairMapTokenVocab<T>) -> Self {
         let decoder = ExpansionDecoder::from_pair_map(&pair_vocab.pairs);
         let mut words = WordToTokenMap::default();
         for token in pair_vocab.compound_tokens_iter() {

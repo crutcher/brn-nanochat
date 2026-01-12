@@ -36,7 +36,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
 
     /// Build a [`DictionaryDecoder`] from this [`Tokenizer`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(data)))]
-    pub fn from_bpe(data: &PairMapTokenVocab<T>) -> DictionaryDecoder<T> {
+    pub fn from_pair_vocab(data: &PairMapTokenVocab<T>) -> DictionaryDecoder<T> {
         Self::from_merge_map(&data.pairs)
     }
 
@@ -119,7 +119,7 @@ mod tests {
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = DictionaryDecoder::from_bpe(&vocab.pair_vocab);
+        let decoder = DictionaryDecoder::from_pair_vocab(&vocab.pair_vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

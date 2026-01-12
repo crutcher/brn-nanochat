@@ -54,7 +54,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
         let tokens: AHashSet<T> = word_vocab.compound_tokens_iter().collect();
 
-        for (w, t) in WordMapTokenVocab::from_bpe(&self.pair_vocab).words {
+        for (w, t) in WordMapTokenVocab::from_pair_vocab(&self.pair_vocab).words {
             if !tokens.contains(&t) {
                 word_vocab.words.insert(w, t);
             }

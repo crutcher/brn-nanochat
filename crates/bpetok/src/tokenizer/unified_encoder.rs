@@ -121,7 +121,7 @@ impl<T: TokenType> ScanningEncoder<T> {
 
     /// Build a [`TokenDecoder`] from this [`ScanningEncoder`].
     pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        CorpusDecoder::from_bpe(&self.data.pair_vocab)
+        CorpusDecoder::from_pair_vocab(&self.data.pair_vocab)
     }
 }
 

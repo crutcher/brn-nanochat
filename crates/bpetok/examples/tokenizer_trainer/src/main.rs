@@ -222,7 +222,7 @@ fn main() -> anyhow::Result<()> {
         );
 
         println!();
-        let dict_decoder = DictionaryDecoder::from_bpe(&encoder_data.pair_vocab);
+        let dict_decoder = DictionaryDecoder::from_pair_vocab(&encoder_data.pair_vocab);
         time_decoder(
             "DictionaryDecoder",
             &dict_decoder,
@@ -232,7 +232,7 @@ fn main() -> anyhow::Result<()> {
         );
 
         println!();
-        let corpus_decoder = CorpusDecoder::from_bpe(&encoder_data.pair_vocab);
+        let corpus_decoder = CorpusDecoder::from_pair_vocab(&encoder_data.pair_vocab);
         time_decoder(
             "CorpusDecoder",
             &corpus_decoder,
