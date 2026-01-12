@@ -86,6 +86,14 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 }
 
 impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
+    fn pattern(&self) -> String {
+        self.data.word_pattern.as_str().to_string()
+    }
+
+    fn special_vocab(&self) -> Option<crate::vocab::word_vocab::WordMapTokenVocab<T>> {
+        self.data.specials.clone()
+    }
+
     /// Encode a word chunk into token IDs.
     fn encode_append_word(
         &self,
