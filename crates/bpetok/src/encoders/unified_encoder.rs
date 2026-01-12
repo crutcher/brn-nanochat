@@ -8,6 +8,7 @@ use crate::types::TokenType;
 use crate::util::validators;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
+use crate::vocab::word_vocab::WordMapTokenVocab;
 use std::sync::Arc;
 
 /// Config options for the [`UnifiedVocabEncoder`].
@@ -90,8 +91,15 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         self.data.word_pattern.as_str().to_string()
     }
 
-    fn special_vocab(&self) -> Option<crate::vocab::word_vocab::WordMapTokenVocab<T>> {
-        self.data.specials.clone()
+    fn special_vocab(&self) -> Option<&WordMapTokenVocab<T>> {
+        self.data.specials.as_ref()
+    }
+
+    fn split_text<'a>(
+        &self,
+        text: &'a str,
+    ) -> Vec<WordRef<'a>> {
+        self.segmentor.split_words(text)
     }
 
     /// Encode a word chunk into token IDs.
@@ -142,35 +150,6 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
                 break;
             }
         }
-    }
-
-    fn split_text<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<WordRef<'a>> {
-        self.segmentor.split_words(text)
-    }
-
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
-    fn encode_append(
-        &self,
-        text: &str,
-        tokens: &mut Vec<T>,
-    ) {
-        self.split_text(text).into_iter().for_each(|wr| match wr {
-            WordRef::Normal(w) => self.encode_append_word(w, tokens),
-            WordRef::Special(s) => {
-                let token = self
-                    .data
-                    .specials
-                    .as_ref()
-                    .unwrap()
-                    .lookup_token(s.as_bytes())
-                    .unwrap();
-
-                tokens.push(token);
-            }
-        });
     }
 
     /// Encode a batch of text into tokens.
