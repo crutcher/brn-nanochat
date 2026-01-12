@@ -1,4 +1,5 @@
 use arrow::array::StringArray;
+use bpetok::decoder::parallel_decoder::ParallelDecoder;
 use bpetok::decoder::token_decoder::TokenDecoder;
 use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
@@ -209,7 +210,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         println!();
-        let decoder = encoder.to_decoder();
+        let decoder = ParallelDecoder::new(encoder.to_decoder());
         time_decoder(
             "UnifiedDecoder",
             &decoder,

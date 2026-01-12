@@ -71,50 +71,13 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decoder::byte_decoder::ByteDecoder;
     use num_traits::FromPrimitive;
-
-    /// A decoder that only decodes byte tokens.
-    #[derive(Clone)]
-    struct ByteDecoder<T: TokenType> {
-        _marker: std::marker::PhantomData<T>,
-    }
-
-    impl<T: TokenType> ByteDecoder<T> {
-        fn new() -> Self {
-            Self {
-                _marker: std::marker::PhantomData,
-            }
-        }
-    }
-
-    impl<T: TokenType> TokenVocabIndex<T> for ByteDecoder<T> {
-        fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-            vec![].into_iter()
-        }
-    }
-
-    impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
-        #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-        fn incremental_decode(
-            &self,
-            ctx: &mut DecodeContext<T>,
-        ) -> bool {
-            while let Some(t) = ctx.stack.pop() {
-                if let Some(b) = t.to_u8() {
-                    ctx.buf.push(b);
-                } else {
-                    ctx.stack.push(t);
-                    break;
-                }
-            }
-            ctx.stack.is_empty()
-        }
-    }
 
     #[test]
     fn test_byte_decoder() {
         type T = u32;
-        let decoder: ByteDecoder<T> = ByteDecoder::new();
+        let decoder: ByteDecoder<T> = ByteDecoder::default();
 
         assert_eq!(decoder.max_token(), 255);
     }
@@ -122,7 +85,7 @@ mod tests {
     #[test]
     fn test_decode_context() {
         type T = u32;
-        let decoder: ByteDecoder<T> = ByteDecoder::new();
+        let decoder: ByteDecoder<T> = ByteDecoder::default();
 
         let mut tokens = vec![];
         tokens.extend(
@@ -143,7 +106,7 @@ mod tests {
     #[test]
     fn test_decode_to_strings() {
         type T = u32;
-        let decoder: ByteDecoder<T> = ByteDecoder::new();
+        let decoder: ByteDecoder<T> = ByteDecoder::default();
 
         let str_samples = vec![
             "hello world",

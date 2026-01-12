@@ -46,24 +46,6 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         }
         ctx.stack.is_empty()
     }
-
-    fn try_decode_batch_to_bytes(
-        &self,
-        batch: &[Vec<T>],
-    ) -> anyhow::Result<Vec<Vec<u8>>> {
-        #[cfg(feature = "rayon")]
-        {
-            use rayon::prelude::*;
-
-            batch
-                .into_par_iter()
-                .map(|tokens| self.try_decode_to_bytes(tokens))
-                .collect()
-        }
-
-        #[cfg(not(feature = "rayon"))]
-        batch.iter().map(|t| self.try_decode_to_bytes(t)).collect()
-    }
 }
 
 #[cfg(test)]
