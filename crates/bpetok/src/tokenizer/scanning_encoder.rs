@@ -5,20 +5,39 @@ use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::TokenType;
-use crate::util::regex::regex_pool::RegexWrapperPool;
 use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
 use crate::util::validators;
 use crate::vocab::data::{BPEMapTokenVocab, TokenVocab, WordMapTokenVocab};
 use std::sync::Arc;
 
-/// Config options for the [`CPSEncoder`].
+/// A Chunk/Pair Scanning [`TokenEncoder`].
+#[derive(Clone)]
+pub struct EncoderData<T: TokenType> {
+    /// Regex pattern for word splitting.
+    pub word_pattern: RegexPatternLabel,
+
+    /// ``{ Vec<u8> -> T }`` vocabulary.
+    pub word_vocab: WordMapTokenVocab<T>,
+
+    /// ``{ (T, T) -> T }`` vocabulary.
+    pub bpe_vocab: BPEMapTokenVocab<T>,
+}
+
+impl<T: TokenType> EncoderData<T> {
+    /// Maximum token ID in the vocabulary.
+    pub fn max_token(&self) -> T {
+        self.bpe_vocab.max_token().max(self.word_vocab.max_token())
+    }
+}
+
+/// Config options for the [`ScanningEncoder`].
 #[derive(Debug, Clone)]
-pub struct CPSEncoderOptions {
+pub struct ScanningEncoderOptions {
     /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub parallel: bool,
 }
 
-impl CPSEncoderOptions {
+impl ScanningEncoderOptions {
     /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
     pub fn with_parallel(
         self,
@@ -30,7 +49,7 @@ impl CPSEncoderOptions {
     }
 }
 
-impl Default for CPSEncoderOptions {
+impl Default for ScanningEncoderOptions {
     fn default() -> Self {
         Self {
             parallel: DEFAULT_PARALLEL,
@@ -40,40 +59,33 @@ impl Default for CPSEncoderOptions {
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
-pub struct CPSEncoder<T: TokenType> {
-    /// ``{ Vec<u8> -> T }`` vocabulary.
-    pub word_vocab: Arc<WordMapTokenVocab<T>>,
-
-    /// ``{ (T, T) -> T }`` vocabulary.
-    pub bpe_vocab: Arc<BPEMapTokenVocab<T>>,
+pub struct ScanningEncoder<T: TokenType> {
+    /// Data for the encoder.
+    pub data: Arc<EncoderData<T>>,
 
     /// Tokenizer options.
-    pub options: CPSEncoderOptions,
+    pub options: ScanningEncoderOptions,
 
-    regex_pool: RegexWrapperPool,
+    /// Regex for word splitting.
+    pub word_regex: RegexWrapper,
 }
 
-impl<T: TokenType> CPSEncoder<T> {
-    /// Construct a new Tokenizer.
+impl<T: TokenType> ScanningEncoder<T> {
+    /// Construct a new encoder..
     pub fn new(
-        pattern: RegexPatternLabel,
-        word_vocab: Arc<WordMapTokenVocab<T>>,
-        bpe_vocab: Arc<BPEMapTokenVocab<T>>,
-        options: CPSEncoderOptions,
+        data: Arc<EncoderData<T>>,
+        options: ScanningEncoderOptions,
     ) -> Self {
         #[cfg(not(feature = "rayon"))]
         if options.parallel {
             panic!("Parallel processing requires the `rayon` feature to be enabled.");
         }
 
-        let regex: Arc<RegexWrapper> = pattern.compile().unwrap().into();
-        let regex_pool = RegexWrapperPool::from(regex);
-
+        let word_regex: RegexWrapper = data.word_pattern.compile().unwrap();
         Self {
-            word_vocab,
-            bpe_vocab,
+            data,
             options,
-            regex_pool,
+            word_regex,
         }
     }
 
@@ -88,7 +100,7 @@ impl<T: TokenType> CPSEncoder<T> {
             return;
         }
 
-        if let Some(token) = self.word_vocab.get(chunk) {
+        if let Some(token) = self.data.word_vocab.get(chunk) {
             buf.push(token);
             return;
         }
@@ -108,7 +120,7 @@ impl<T: TokenType> CPSEncoder<T> {
             for idx in start..buf.len() - 1 {
                 let pair = (buf[idx], buf[idx + 1]);
 
-                if let Some(&merge_token) = self.bpe_vocab.pairs.get(&pair)
+                if let Some(&merge_token) = self.data.bpe_vocab.pairs.get(&pair)
                     && (best_match.is_none() || (merge_token < best_match.unwrap().1))
                 {
                     best_match = Some((idx, merge_token));
@@ -126,15 +138,15 @@ impl<T: TokenType> CPSEncoder<T> {
         }
     }
 
-    /// Build a [`TokenDecoder`] from this [`CPSEncoder`].
+    /// Build a [`TokenDecoder`] from this [`ScanningEncoder`].
     pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        CorpusDecoder::from_bpe(&self.bpe_vocab)
+        CorpusDecoder::from_bpe(&self.data.bpe_vocab)
     }
 }
 
-impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
+impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
     fn max_token(&self) -> T {
-        self.bpe_vocab.max_token()
+        self.data.max_token()
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, text)))]
@@ -145,7 +157,7 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
         let text = text.as_ref();
         let mut tokens = Vec::with_capacity(text.len());
 
-        for chunk in self.regex_pool.get().find_iter(text).map(|m| m.as_str()) {
+        for chunk in self.word_regex.find_iter(text).map(|m| m.as_str()) {
             self.append_encode_chunk(&mut tokens, chunk.as_bytes());
         }
         tokens
@@ -174,10 +186,9 @@ impl<T: TokenType> TokenEncoder<T> for CPSEncoder<T> {
 #[cfg(test)]
 mod tests {
     use crate::decoder::TokenDecoder;
-    use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::cps_encoder::CPSEncoder;
+    use crate::tokenizer::scanning_encoder::ScanningEncoder;
+    use crate::tokenizer::{EncoderData, TokenEncoder};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::util::regex::regex_wrapper::RegexPatternLabel;
     use crate::vocab::data::WordMapTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
@@ -208,22 +219,22 @@ mod tests {
         ];
 
         let TrainResults {
-            pattern,
-            vocab: bpe_vocab,
+            word_pattern,
+            bpe_vocab,
         } = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let pattern = RegexPatternLabel::Adaptive(pattern);
-        let bpe_vocab = Arc::new(bpe_vocab);
-        let word_vocab = Arc::new(WordMapTokenVocab::from_bpe(&bpe_vocab));
+        let bpe_vocab = bpe_vocab;
+        let word_vocab = WordMapTokenVocab::from_bpe(&bpe_vocab);
 
-        let encoder = CPSEncoder::new(
-            pattern,
-            word_vocab.clone(),
-            bpe_vocab.clone(),
-            Default::default(),
-        );
+        let encoder_data = Arc::new(EncoderData {
+            word_pattern: word_pattern.into(),
+            word_vocab,
+            bpe_vocab,
+        });
+
+        let encoder = ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

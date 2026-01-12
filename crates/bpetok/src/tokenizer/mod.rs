@@ -1,9 +1,9 @@
 //! # Tokenizer Structures
 
-pub mod cps_encoder;
+pub mod scanning_encoder;
 
 use crate::types::TokenType;
-pub use cps_encoder::*;
+pub use scanning_encoder::*;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType> {

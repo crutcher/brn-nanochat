@@ -73,10 +73,9 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tokenizer::TokenEncoder;
-    use crate::tokenizer::cps_encoder::CPSEncoder;
+    use crate::tokenizer::scanning_encoder::ScanningEncoder;
+    use crate::tokenizer::{EncoderData, TokenEncoder};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::util::regex::regex_wrapper::RegexPatternLabel;
     use crate::vocab::data::WordMapTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
@@ -97,22 +96,21 @@ mod tests {
         ];
 
         let TrainResults {
-            pattern,
-            vocab: bpe_vocab,
+            word_pattern,
+            bpe_vocab,
         } = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let pattern = RegexPatternLabel::Adaptive(pattern);
-        let bpe_vocab = Arc::new(bpe_vocab);
-        let word_vocab = Arc::new(WordMapTokenVocab::from_bpe(&bpe_vocab));
+        let word_vocab = WordMapTokenVocab::from_bpe(&bpe_vocab);
 
-        let encoder = CPSEncoder::new(
-            pattern,
-            word_vocab.clone(),
-            bpe_vocab.clone(),
-            Default::default(),
-        );
+        let encoder_data = Arc::new(EncoderData {
+            word_pattern: word_pattern.into(),
+            word_vocab,
+            bpe_vocab: bpe_vocab.clone(),
+        });
+
+        let encoder = ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
 
         let decoder = ExpansionDecoder::from_bpe(&bpe_vocab);
         check_is_send(&decoder);
