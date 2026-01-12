@@ -1,6 +1,7 @@
 //! # Dictionary Decoder
 
-use crate::decoder::{DecodeContext, TokenDecoder};
+use crate::decoder::context::DecodeContext;
+use crate::decoder::token_decoder::TokenDecoder;
 use crate::types::{TokenToWordMap, TokenType};
 
 /// A token dictionary [`TokenDecoder<T>`].

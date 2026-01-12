@@ -1,6 +1,7 @@
 //! # Expansion Decoder
 
-use crate::decoder::{DecodeContext, TokenDecoder};
+use crate::decoder::context::DecodeContext;
+use crate::decoder::token_decoder::TokenDecoder;
 use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
 
 /// An [`ExpansionMap`] [`TokenDecoder<T>`].

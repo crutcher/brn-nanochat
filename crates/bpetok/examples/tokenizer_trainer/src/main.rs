@@ -1,5 +1,5 @@
 use arrow::array::StringArray;
-use bpetok::decoder::TokenDecoder;
+use bpetok::decoder::token_decoder::TokenDecoder;
 use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
 use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use bpetok::types::TokenType;
