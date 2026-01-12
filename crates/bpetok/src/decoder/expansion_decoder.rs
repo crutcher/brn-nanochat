@@ -42,7 +42,7 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
         tokens: &[T],
     ) {
         let mut tokens = tokens.iter();
-        let mut stack: Vec<T> = Vec::with_capacity(16);
+        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
         while let Some(t) = stack.pop().or_else(|| tokens.next().copied()) {
             if let Some(b) = t.to_u8() {
                 buf.push(b);
