@@ -4,8 +4,6 @@ use crate::decoder::TokenDecoder;
 use crate::types::{BinaryPairMap, ExpansionMap, TokenType};
 use crate::vocab::data::PairMapTokenVocab;
 use ahash::AHashMap;
-use std::collections::hash_map;
-use std::ops::Range;
 
 /// An [`ExpansionMap`] [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -39,7 +37,7 @@ impl<T: TokenType> ExpansionDecoder<T> {
 }
 
 impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
-    fn pair_tokens(&self) -> impl Iterator<Item = T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.expansion_map.keys().copied()
     }
 
@@ -63,10 +61,6 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
             stack.push(*b);
             stack.push(*a);
         }
-    }
-
-    fn size_estimate(&self) -> usize {
-        size_of::<hash_map::Entry<T, Range<usize>>>() * self.expansion_map.len()
     }
 }
 

@@ -24,19 +24,24 @@
 //! ```
 
 use crate::types::TokenType;
+use crate::vocab::data::byte_tokens_iter;
 
-pub mod corpus_decoder;
 pub mod dictionary_decoder;
 pub mod expansion_decoder;
 
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType>: Send + Sync {
-    /// Returns an iterator over the non-byte tokens in this map.
-    fn pair_tokens(&self) -> impl Iterator<Item = T>;
+    /// Returns an iterator over all tokens.
+    fn all_tokens_iter(&self) -> impl Iterator<Item = T> {
+        byte_tokens_iter().chain(self.compound_tokens_iter())
+    }
+
+    /// Returns an iterator over the non-byte tokens.
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T>;
 
     /// Returns the maximum token id in this decoder.
     fn max_token(&self) -> T {
-        self.pair_tokens().max().unwrap()
+        self.compound_tokens_iter().max().unwrap()
     }
 
     /// Decode tokens into a byte vector.
@@ -103,9 +108,4 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         #[cfg(not(feature = "rayon"))]
         batch.iter().map(|t| self.decode_to_string(t)).collect()
     }
-
-    /// Estimates the memory usage of this decoder.
-    ///
-    /// Returns a (metadata, buffers) pair.
-    fn size_estimate(&self) -> usize;
 }

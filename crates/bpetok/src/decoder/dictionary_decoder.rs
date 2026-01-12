@@ -5,7 +5,6 @@ use crate::decoder::expansion_decoder::ExpansionDecoder;
 use crate::types::{BinaryPairMap, TokenType};
 use crate::vocab::data::PairMapTokenVocab;
 use ahash::AHashMap;
-use std::collections::hash_map;
 
 /// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -28,7 +27,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(decoder)))]
     pub fn from_tokenizer<D: TokenDecoder<T>>(decoder: &D) -> Self {
         let mut dictionary = AHashMap::with_capacity(decoder.max_token().to_usize().unwrap());
-        for token in decoder.pair_tokens() {
+        for token in decoder.compound_tokens_iter() {
             dictionary.insert(token, decoder.decode_to_bytes([token]));
         }
         Self::new(dictionary)
@@ -49,7 +48,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
 }
 
 impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
-    fn pair_tokens(&self) -> impl Iterator<Item = T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.dictionary.keys().copied()
     }
 
@@ -71,12 +70,6 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
                 buf.extend_from_slice(slice);
             }
         }
-    }
-
-    /// Estimates the memory usage of this decoder.
-    fn size_estimate(&self) -> usize {
-        size_of::<hash_map::Entry<T, Vec<u8>>>() * self.dictionary.len()
-            + self.dictionary.values().map(|v| v.len()).sum::<usize>()
     }
 }
 

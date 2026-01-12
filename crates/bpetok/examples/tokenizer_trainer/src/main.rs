@@ -1,8 +1,5 @@
 use arrow::array::StringArray;
 use bpetok::decoder::TokenDecoder;
-use bpetok::decoder::corpus_decoder::CorpusDecoder;
-use bpetok::decoder::dictionary_decoder::DictionaryDecoder;
-use bpetok::decoder::expansion_decoder::ExpansionDecoder;
 use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
 use bpetok::types::TokenType;
 use bpetok::vocab::data::TokenVocab;
@@ -212,30 +209,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         println!();
-        let expansion_decoder = ExpansionDecoder::from_bpe(&encoder_data.pair_vocab);
+        let decoder = encoder.to_decoder();
         time_decoder(
-            "ExpansionDecoder",
-            &expansion_decoder,
-            &sample_batches,
-            &token_batches,
-            args.batch_size,
-        );
-
-        println!();
-        let dict_decoder = DictionaryDecoder::from_pair_vocab(&encoder_data.pair_vocab);
-        time_decoder(
-            "DictionaryDecoder",
-            &dict_decoder,
-            &sample_batches,
-            &token_batches,
-            args.batch_size,
-        );
-
-        println!();
-        let corpus_decoder = CorpusDecoder::from_pair_vocab(&encoder_data.pair_vocab);
-        time_decoder(
-            "CorpusDecoder",
-            &corpus_decoder,
+            "UnifiedDecoder",
+            &decoder,
             &sample_batches,
             &token_batches,
             args.batch_size,
@@ -254,7 +231,6 @@ fn time_decoder<T: TokenType, D: TokenDecoder<T>>(
 ) {
     let num_batches = token_batches.len();
     println!("Timing Decode: {name}");
-    println!("- decoder est bytes: {}", decoder.size_estimate());
 
     let batch_times_ns = sample_batches
         .iter()

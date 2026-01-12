@@ -1,9 +1,10 @@
 //! # Unified Vocabulary Data
 
+use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapperPattern;
 use crate::vocab::data::{PairMapTokenVocab, TokenVocab, WordMapTokenVocab};
-use ahash::AHashSet;
+use ahash::{AHashMap, AHashSet};
 
 /// Unified token vocabulary.
 #[derive(Clone)]
@@ -85,6 +86,31 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         word_vocab: WordMapTokenVocab<T>,
     ) -> Self {
         Self { word_vocab, ..self }
+    }
+
+    /// Compiled expansion dictionary.
+    pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
+        let mut dictionary: AHashMap<T, Vec<u8>> = self
+            .clone()
+            .expand_words_from_bpe()
+            .word_vocab
+            .words
+            .into_iter()
+            .map(|(chunk, token)| (token, chunk))
+            .collect();
+
+        if let Some(specials) = &self.specials {
+            for (chunk, &t) in &specials.words {
+                dictionary.insert(t, chunk.clone());
+            }
+        }
+
+        dictionary
+    }
+
+    /// Compile the unified vocabulary into a dictionary decoder.
+    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
+        DictionaryDecoder::new(self.compiled_dictionary())
     }
 }
 

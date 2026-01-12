@@ -30,7 +30,7 @@ impl<T: TokenType> WordMapTokenVocab<T> {
     }
 
     /// Return the associated token for the word, if any.
-    pub fn get(
+    pub fn lookup_token(
         &self,
         chunk: &[u8],
     ) -> Option<T> {

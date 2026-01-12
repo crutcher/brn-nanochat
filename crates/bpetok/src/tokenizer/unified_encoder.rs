@@ -1,8 +1,7 @@
 //! # Chunk Pair Scan Tokenizer
 
 use crate::DEFAULT_PARALLEL;
-use crate::decoder::TokenDecoder;
-use crate::decoder::corpus_decoder::CorpusDecoder;
+use crate::decoder::dictionary_decoder::DictionaryDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::TokenType;
 use crate::util::regex::regex_wrapper::RegexWrapper;
@@ -81,7 +80,7 @@ impl<T: TokenType> ScanningEncoder<T> {
             return;
         }
 
-        if let Some(token) = self.data.word_vocab.get(chunk) {
+        if let Some(token) = self.data.word_vocab.lookup_token(chunk) {
             buf.push(token);
             return;
         }
@@ -120,8 +119,8 @@ impl<T: TokenType> ScanningEncoder<T> {
     }
 
     /// Build a [`TokenDecoder`] from this [`ScanningEncoder`].
-    pub fn to_decoder(&self) -> impl TokenDecoder<T> {
-        CorpusDecoder::from_pair_vocab(&self.data.pair_vocab)
+    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
+        self.data.to_decoder()
     }
 }
 
