@@ -3,9 +3,10 @@ use bpetok::decoder::TokenDecoder;
 use bpetok::decoder::corpus_decoder::CorpusDecoder;
 use bpetok::decoder::dictionary_decoder::DictionaryDecoder;
 use bpetok::decoder::expansion_decoder::ExpansionDecoder;
-use bpetok::tokenizer::{EncoderData, ScanningEncoder, TokenEncoder};
+use bpetok::tokenizer::{ScanningEncoder, TokenEncoder};
 use bpetok::types::TokenType;
-use bpetok::vocab::data::{TokenVocab, WordMapTokenVocab};
+use bpetok::vocab::data::TokenVocab;
+use bpetok::vocab::data::unified::UnifiedTokenVocab;
 use bpetok::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
@@ -129,13 +130,10 @@ fn main() -> anyhow::Result<()> {
     println!("- training_duration: {:#?}", training_duration);
     println!("- vocab_size: {:#?}", bpe_vocab.max_token());
 
-    let word_vocab = WordMapTokenVocab::from_bpe(&bpe_vocab);
-
-    let encoder_data = Arc::new(EncoderData {
-        word_pattern: word_pattern.into(),
-        word_vocab,
-        bpe_vocab,
-    });
+    let encoder_data: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+        .with_bpe_vocab(bpe_vocab)
+        .derive_words()
+        .into();
 
     let encoder: ScanningEncoder<T> =
         ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());

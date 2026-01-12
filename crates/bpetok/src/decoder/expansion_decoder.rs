@@ -73,10 +73,10 @@ impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::scanning_encoder::ScanningEncoder;
-    use crate::tokenizer::{EncoderData, TokenEncoder};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::WordMapTokenVocab;
+    use crate::vocab::data::unified::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
     use std::sync::Arc;
@@ -102,17 +102,14 @@ mod tests {
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let word_vocab = WordMapTokenVocab::from_bpe(&bpe_vocab);
+        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+            .with_bpe_vocab(bpe_vocab)
+            .derive_words()
+            .into();
 
-        let encoder_data = Arc::new(EncoderData {
-            word_pattern: word_pattern.into(),
-            word_vocab,
-            bpe_vocab: bpe_vocab.clone(),
-        });
+        let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let encoder = ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
-
-        let decoder = ExpansionDecoder::from_bpe(&bpe_vocab);
+        let decoder = ExpansionDecoder::from_bpe(&vocab.bpe_vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

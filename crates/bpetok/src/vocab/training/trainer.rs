@@ -330,10 +330,10 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 #[cfg(test)]
 mod tests {
     use crate::decoder::TokenDecoder;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::scanning_encoder::ScanningEncoder;
-    use crate::tokenizer::{EncoderData, TokenEncoder};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::WordMapTokenVocab;
+    use crate::vocab::data::unified::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, MergeJob, TrainResults};
     use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use compact_str::CompactString;
@@ -394,15 +394,12 @@ mod tests {
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let word_vocab = WordMapTokenVocab::from_bpe(&bpe_vocab);
+        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+            .with_bpe_vocab(bpe_vocab)
+            .derive_words()
+            .into();
 
-        let encoder_data = Arc::new(EncoderData {
-            word_pattern: word_pattern.into(),
-            word_vocab,
-            bpe_vocab: bpe_vocab.clone(),
-        });
-
-        let encoder = ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
+        let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

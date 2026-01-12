@@ -1,10 +1,12 @@
 //! # Vocabulary Data
 
 pub mod bpe_map;
+pub mod unified;
 pub mod word_map;
 
 use crate::types::TokenType;
 pub use bpe_map::*;
+pub use unified::*;
 pub use word_map::*;
 
 /// Returns an iterator over all byte tokens (0-255).

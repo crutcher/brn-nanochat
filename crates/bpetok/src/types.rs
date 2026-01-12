@@ -7,6 +7,7 @@ use std::ops::{AddAssign, SubAssign};
 /// A type that can be used as a token in a BPE-based tokenizer.
 pub trait TokenType:
     'static
+    + Default
     + Debug
     + Clone
     + Copy
@@ -24,6 +25,7 @@ pub trait TokenType:
 
 impl<T> TokenType for T where
     T: 'static
+        + Default
         + Debug
         + Clone
         + Copy

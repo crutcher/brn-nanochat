@@ -5,30 +5,10 @@ use crate::decoder::TokenDecoder;
 use crate::decoder::corpus_decoder::CorpusDecoder;
 use crate::tokenizer::TokenEncoder;
 use crate::types::TokenType;
-use crate::util::regex::regex_wrapper::{RegexPatternLabel, RegexWrapper};
+use crate::util::regex::regex_wrapper::RegexWrapper;
 use crate::util::validators;
-use crate::vocab::data::{BPEMapTokenVocab, TokenVocab, WordMapTokenVocab};
+use crate::vocab::data::unified::UnifiedTokenVocab;
 use std::sync::Arc;
-
-/// A Chunk/Pair Scanning [`TokenEncoder`].
-#[derive(Clone)]
-pub struct EncoderData<T: TokenType> {
-    /// Regex pattern for word splitting.
-    pub word_pattern: RegexPatternLabel,
-
-    /// ``{ Vec<u8> -> T }`` vocabulary.
-    pub word_vocab: WordMapTokenVocab<T>,
-
-    /// ``{ (T, T) -> T }`` vocabulary.
-    pub bpe_vocab: BPEMapTokenVocab<T>,
-}
-
-impl<T: TokenType> EncoderData<T> {
-    /// Maximum token ID in the vocabulary.
-    pub fn max_token(&self) -> T {
-        self.bpe_vocab.max_token().max(self.word_vocab.max_token())
-    }
-}
 
 /// Config options for the [`ScanningEncoder`].
 #[derive(Debug, Clone)]
@@ -61,7 +41,7 @@ impl Default for ScanningEncoderOptions {
 #[derive(Clone)]
 pub struct ScanningEncoder<T: TokenType> {
     /// Data for the encoder.
-    pub data: Arc<EncoderData<T>>,
+    pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Tokenizer options.
     pub options: ScanningEncoderOptions,
@@ -73,7 +53,7 @@ pub struct ScanningEncoder<T: TokenType> {
 impl<T: TokenType> ScanningEncoder<T> {
     /// Construct a new encoder..
     pub fn new(
-        data: Arc<EncoderData<T>>,
+        data: Arc<UnifiedTokenVocab<T>>,
         options: ScanningEncoderOptions,
     ) -> Self {
         #[cfg(not(feature = "rayon"))]
@@ -186,10 +166,10 @@ impl<T: TokenType> TokenEncoder<T> for ScanningEncoder<T> {
 #[cfg(test)]
 mod tests {
     use crate::decoder::TokenDecoder;
+    use crate::tokenizer::TokenEncoder;
     use crate::tokenizer::scanning_encoder::ScanningEncoder;
-    use crate::tokenizer::{EncoderData, TokenEncoder};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::data::WordMapTokenVocab;
+    use crate::vocab::data::unified::UnifiedTokenVocab;
     use crate::vocab::training::trainer::{BPETokenVocabTrainer, TrainResults};
     use compact_str::CompactString;
     use std::sync::Arc;
@@ -225,16 +205,12 @@ mod tests {
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let bpe_vocab = bpe_vocab;
-        let word_vocab = WordMapTokenVocab::from_bpe(&bpe_vocab);
+        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+            .with_bpe_vocab(bpe_vocab)
+            .derive_words()
+            .into();
 
-        let encoder_data = Arc::new(EncoderData {
-            word_pattern: word_pattern.into(),
-            word_vocab,
-            bpe_vocab,
-        });
-
-        let encoder = ScanningEncoder::<T>::new(encoder_data.clone(), Default::default());
+        let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
