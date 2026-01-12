@@ -1,7 +1,7 @@
 //! # Word Map Vocabulary Data
 
 use crate::decoder::TokenDecoder;
-use crate::decoder::expansion_decoder::ExpansionDecoder;
+use crate::decoder::pair_decoder::PairExpansionDecoder;
 use crate::types::{TokenType, WordToTokenMap};
 use crate::vocab::TokenVocab;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
@@ -21,7 +21,7 @@ pub struct WordMapTokenVocab<T: TokenType> {
 impl<T: TokenType> WordMapTokenVocab<T> {
     /// Build word vocabulary from a BPE map vocabulary.
     pub fn from_pair_vocab(pair_vocab: &PairMapTokenVocab<T>) -> Self {
-        let decoder = ExpansionDecoder::from_pair_map(&pair_vocab.pairs);
+        let decoder = PairExpansionDecoder::from_pair_map(&pair_vocab.pairs);
         let mut words = WordToTokenMap::default();
         for token in pair_vocab.compound_tokens_iter() {
             let chunk = decoder.decode_to_bytes([token]);

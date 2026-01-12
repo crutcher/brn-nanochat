@@ -26,21 +26,18 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append(
+    fn decode_append_stack(
         &self,
         buf: &mut Vec<u8>,
-        tokens: &[T],
+        stack: &mut Vec<T>,
     ) {
-        for t in tokens {
+        while let Some(t) = stack.pop() {
             if let Some(b) = t.to_u8() {
                 buf.push(b);
+            } else if let Some(w) = self.token_to_word.get(&t) {
+                buf.extend_from_slice(w.as_slice());
             } else {
-                let slice = self
-                    .token_to_word
-                    .get(t)
-                    .expect("Token not found in slice map")
-                    .as_slice();
-                buf.extend_from_slice(slice);
+                break;
             }
         }
     }

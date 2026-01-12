@@ -5,21 +5,21 @@ use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
 
 /// An [`ExpansionMap`] [`TokenDecoder<T>`].
 #[derive(Clone)]
-pub struct ExpansionDecoder<T: TokenType> {
+pub struct PairExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
     ///
     /// Does not include byte-tokens.
     pub token_to_pair: TokenToPairMap<T>,
 }
 
-impl<T: TokenType> ExpansionDecoder<T> {
+impl<T: TokenType> PairExpansionDecoder<T> {
     /// Creates a new Decoder.
     pub fn new(mut token_to_pair: TokenToPairMap<T>) -> Self {
         token_to_pair.shrink_to_fit();
         Self { token_to_pair }
     }
 
-    /// Build a [`ExpansionDecoder`] from this [`Tokenizer`].
+    /// Build a [`PairExpansionDecoder`] from this [`Tokenizer`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
     pub fn from_pair_map(merge_map: &PairToTokenMap<T>) -> Self {
         let expansion_map = merge_map
@@ -27,6 +27,12 @@ impl<T: TokenType> ExpansionDecoder<T> {
             .map(|(&pair, &token)| (token, pair))
             .collect();
         Self::new(expansion_map)
+    }
+}
+
+impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
+    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.token_to_pair.keys().copied()
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
@@ -38,34 +44,13 @@ impl<T: TokenType> ExpansionDecoder<T> {
         while let Some(t) = stack.pop() {
             if let Some(b) = t.to_u8() {
                 buf.push(b);
-                continue;
+            } else if let Some((a, b)) = self.token_to_pair.get(&t) {
+                stack.push(*b);
+                stack.push(*a);
+            } else {
+                break;
             }
-            let (a, b) = self
-                .token_to_pair
-                .get(&t)
-                .expect("Token not found in slice map");
-            stack.push(*b);
-            stack.push(*a);
         }
-    }
-}
-
-impl<T: TokenType> TokenDecoder<T> for ExpansionDecoder<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.token_to_pair.keys().copied()
-    }
-
-    /// Decode tokens into a byte vector.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
-    fn decode_append(
-        &self,
-        buf: &mut Vec<u8>,
-        tokens: &[T],
-    ) {
-        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
-        stack.extend(tokens.iter().rev());
-
-        self.decode_append_stack(buf, &mut stack);
     }
 }
 
@@ -108,7 +93,7 @@ mod tests {
 
         let encoder = ScanningEncoder::<T>::new(vocab.clone(), Default::default());
 
-        let decoder = ExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs);
+        let decoder = PairExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

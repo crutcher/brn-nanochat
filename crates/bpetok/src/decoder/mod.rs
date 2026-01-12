@@ -27,7 +27,7 @@ use crate::types::TokenType;
 use crate::vocab::byte_tokens_iter;
 
 pub mod dictionary_decoder;
-pub mod expansion_decoder;
+pub mod pair_decoder;
 
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType>: Send + Sync {
@@ -44,13 +44,33 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
         self.compound_tokens_iter().max().unwrap()
     }
 
+    /// Decodes tokens from the (mutable) stack into bytes.
+    ///
+    /// Returns when no more tokens can be decoded.
+    /// - If there are remaining tokens, they will be on the stack.
+    fn decode_append_stack(
+        &self,
+        buf: &mut Vec<u8>,
+        stack: &mut Vec<T>,
+    );
+
     /// Decode tokens into a byte vector.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
     fn decode_append(
         &self,
         buf: &mut Vec<u8>,
         tokens: &[T],
-    );
+    ) {
+        let mut stack: Vec<T> = Vec::with_capacity(tokens.len() * 2);
+        stack.extend(tokens.iter().rev());
+
+        self.decode_append_stack(buf, &mut stack);
+
+        if !stack.is_empty() {
+            let tok = stack[stack.len()];
+            panic!("Token ({tok:?}) not defined for decoder");
+        }
+    }
 
     /// Decodes tokens into bytes.
     fn decode_to_bytes<S: AsRef<[T]>>(
