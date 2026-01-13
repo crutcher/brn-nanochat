@@ -12,7 +12,7 @@ workspace = true
 [dependencies]
 burn = { workspace = true, features = ["network"] }
 nanochat-data = { path = "../../../nanochat-data" }
-textok = { path = "../..", features = ["rayon"] }
+wordchuck = { path = "../..", features = ["rayon"] }
 
 compact_str = { workspace = true }
 
