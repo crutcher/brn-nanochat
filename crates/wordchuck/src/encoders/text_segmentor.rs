@@ -1,5 +1,6 @@
 //! # Text Segmentor
 
+use crate::BYTES_PER_TOKEN_HINT;
 use crate::util::regex::{RegexWrapperPattern, RegexWrapperPool, fixed_alternative_list_regex};
 use std::ops::Range;
 
@@ -44,17 +45,24 @@ impl TextSegmentor {
         }
     }
 
-    /// Find the first special word in the given text.
-    pub fn find_special(
+    /// Find the next special span in the text.
+    ///
+    /// # Returns
+    /// * `Some(Range<usize>)` if a special span is found,
+    /// * `None` otherwise.
+    pub fn next_special_span<S: AsRef<str>>(
         &self,
-        text: &str,
+        text: S,
     ) -> Option<Range<usize>> {
         self.special_pool
             .as_ref()
-            .and_then(|p| p.get().find_iter(text).next())
+            .and_then(|p| p.get().find_iter(text.as_ref()).next())
             .map(|m| m.range())
     }
 
+    /// Split a chunk of text into [`WordRef::Normal`].
+    ///
+    /// Append to the `words` buffer.
     fn split_append_normal_words<'a>(
         &self,
         text: &'a str,
@@ -68,28 +76,42 @@ impl TextSegmentor {
         )
     }
 
-    /// Split a text into word references.
+    /// Split a chunk of text into `Vec<WordRef>`.
+    ///
+    /// Append to the `words` buffer.
+    pub fn split_append_words<'a>(
+        &self,
+        text: &'a str,
+        words: &mut Vec<WordRef<'a>>,
+    ) {
+        let mut current = text;
+
+        while let Some(range) = self.next_special_span(current) {
+            let pre = &current[..range.start];
+            self.split_append_normal_words(pre, words);
+
+            words.push(WordRef::Special(&current[range.clone()]));
+
+            current = &current[range.end..];
+        }
+
+        if !current.is_empty() {
+            self.split_append_normal_words(current, words);
+        }
+    }
+
+    /// Split a chunk of text into `Vec<WordRef>`.
+    ///
+    /// # Returns
+    /// A `Vec<WordRef>` containing the `WordRef`s to `text`..
     pub fn split_words<'a>(
         &self,
         text: &'a str,
     ) -> Vec<WordRef<'a>> {
-        let size_hint = 4;
-        let mut words = Vec::with_capacity(text.len() / size_hint);
+        let capacity = text.len() as f64 / (BYTES_PER_TOKEN_HINT * 0.5);
+        let mut words = Vec::with_capacity(capacity as usize);
 
-        let mut current = text;
-
-        while let Some(range) = self.find_special(current) {
-            let pre = &current[..range.start];
-            let end = range.end;
-            self.split_append_normal_words(pre, &mut words);
-            words.push(WordRef::Special(&current[range]));
-            current = &current[end..];
-        }
-
-        if !current.is_empty() {
-            self.split_append_normal_words(current, &mut words);
-        }
-
+        self.split_append_words(text, &mut words);
         words
     }
 }
