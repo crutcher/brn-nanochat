@@ -11,7 +11,9 @@ use crate::vocab::word_vocab::WordMapTokenVocab;
 /// Enables ``rayon`` encoding of batches when available.
 #[derive(Clone)]
 pub struct ParallelEncoder<T: TokenType, D: TokenEncoder<T>> {
-    inner: D,
+    /// Inner encoder.
+    pub inner: D,
+
     _marker: std::marker::PhantomData<T>,
 }
 
