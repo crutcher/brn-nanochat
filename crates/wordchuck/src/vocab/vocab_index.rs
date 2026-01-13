@@ -14,10 +14,10 @@ pub trait TokenVocabIndex<T: TokenType>: Clone + Send + Sync {
     /// All returned tokens will have rank >= 256.
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T>;
 
-    /// Returns an iterator over all tokens.
+    /// Returns an iterator over all tokens in the vocabulary.
     ///
     /// This will include all byte tokens (0-255),
-    /// as well as the tokens returned by [`non_byte_tokens_iter`].
+    /// as well as the tokens returned by [`Self::compound_tokens_iter`].
     fn all_tokens_iter(&self) -> impl Iterator<Item = T> {
         byte_tokens_iter().chain(self.compound_tokens_iter())
     }

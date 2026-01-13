@@ -36,7 +36,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
         Self { data, segmentor }
     }
 
-    /// Build a [`TokenDecoder`] from this [`UnifiedVocabEncoder`].
+    /// Build a [`DictionaryDecoder`] from this [`UnifiedVocabEncoder`].
     pub fn to_decoder(&self) -> DictionaryDecoder<T> {
         self.data.to_decoder()
     }

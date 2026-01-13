@@ -20,7 +20,7 @@ warnings = "deny"
 
 [workspace.lints.clippy]
 double_must_use = "allow"
-doc_markdown = "warn"
+doc_markdown = "deny"
 
 [workspace.dependencies]
 burn = "0.20.0-pre.6"
