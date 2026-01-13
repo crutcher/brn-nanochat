@@ -64,7 +64,7 @@ mod tests {
     use super::*;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::{BPETokenVocabTrainer, TrainResults};
+    use crate::training::trainer::{BinaryPairVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use compact_str::CompactString;
@@ -76,7 +76,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BPETokenVocabTrainer::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainer::new_with_vocab_size(1000);
 
         let samples = vec![
             "hello world",

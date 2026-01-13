@@ -9,4 +9,5 @@ pub mod token_decoder;
 
 pub use decode_context::*;
 pub use dictionary_decoder::*;
+pub use parallel_decoder::*;
 pub use token_decoder::*;

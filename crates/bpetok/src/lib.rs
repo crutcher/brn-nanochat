@@ -1,4 +1,28 @@
-//! # BPE Tokenizer
+//! # LLM Tokenizer
+//!
+//! Work in Progress.
+//!
+//! # Training Example
+//!
+//! Consider the following, to train a tokenizer and export it a "*.tiktoken" file.
+//!
+//! - the iterator stream for samples may be quite large.
+//! - training a `nanochat` equivalent tokenizer takes ~150 CPU minutes.
+//!
+//! ```rust,ignore
+//! let TrainResults::<T> {
+//!     word_pattern,
+//!     pair_vocab,
+//! } = BinaryPairVocabTrainer::new_with_vocab_size(args.vocab_size)
+//!     .train_vocab_from_sample_iter::<T, K, C, _>(samples)
+//!     .expect("training failed");
+//!
+//! let vocab: = UnifiedTokenVocab::new(word_pattern.into())
+//!     .with_pair_vocab(pair_vocab)
+//!     .expand_words_from_bpe();
+//!
+//! encoder_data.word_vocab.save_to_tiktoken_path(&path)?;
+//! ```
 #![warn(missing_docs, unused)]
 
 pub mod decoders;

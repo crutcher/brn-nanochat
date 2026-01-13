@@ -5,7 +5,12 @@ use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenType, WordToTokenMap};
 use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
+use anyhow::Context;
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use serde::{Deserialize, Serialize};
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::path::Path;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +24,57 @@ pub struct WordMapTokenVocab<T: TokenType> {
 }
 
 impl<T: TokenType> WordMapTokenVocab<T> {
+    /// Load a tiktoken vocab file into a [`WordToTokenMap`].
+    pub fn load_from_tiktoken_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let mut vocab = WordMapTokenVocab::default();
+
+        let file = std::fs::File::open(path)?;
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let line: String = line?;
+            let s = line.as_str();
+
+            let parts = s.splitn(2, ' ').collect::<Vec<&str>>();
+            assert_eq!(parts.len(), 2);
+
+            let chunk = parts[0];
+            let chunk = BASE64_STANDARD.decode(chunk)?;
+
+            let token: u64 = parts[1].parse()?;
+            let token = T::from_u64(token).context("token out of range")?;
+
+            vocab.add_bytes_word(&chunk, token);
+        }
+        Ok(vocab)
+    }
+
+    /// Save this vocab to a tiktoken vocab file.
+    pub fn save_to_tiktoken_path<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> anyhow::Result<()> {
+        let file = std::fs::File::create(path)?;
+        let mut writer = BufWriter::new(file);
+
+        let mut items: Vec<(T, &Vec<u8>)> = self
+            .words
+            .iter()
+            .map(|(chunk, &token)| (token, chunk))
+            .collect();
+        items.sort_by_key(|(t, _)| *t);
+
+        for (token, chunk) in items {
+            writeln!(
+                writer,
+                "{} {}",
+                BASE64_STANDARD.encode(chunk),
+                token.to_u64().unwrap()
+            )?;
+        }
+
+        Ok(())
+    }
+
     /// Add a word to the vocab.
     pub fn add_str_word(
         &mut self,
@@ -55,14 +111,6 @@ impl<T: TokenType> WordMapTokenVocab<T> {
         chunk: &[u8],
     ) -> Option<T> {
         self.words.get(chunk).copied()
-    }
-
-    /// Save the token vocabulary to a tiktoken vocab file.
-    pub fn save_to_tiktoken_vocab(
-        &self,
-        path: &str,
-    ) -> anyhow::Result<()> {
-        crate::vocab::tiktoken_io::save_tiktoken_vocab(&self.words, path)
     }
 }
 

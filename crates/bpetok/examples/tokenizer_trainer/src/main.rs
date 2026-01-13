@@ -1,11 +1,8 @@
 use arrow::array::{Array, StringArray};
-use bpetok::decoders::parallel_decoder::ParallelDecoder;
-use bpetok::decoders::token_decoder::TokenDecoder;
-use bpetok::encoders::token_encoder::TokenEncoder;
-use bpetok::encoders::{ParallelEncoder, UnifiedVocabEncoder};
-use bpetok::training::trainer::{BPETokenVocabTrainer, TrainResults};
-use bpetok::vocab::unified_vocab::UnifiedTokenVocab;
-use bpetok::vocab::vocab_index::TokenVocabIndex;
+use bpetok::decoders::{ParallelDecoder, TokenDecoder};
+use bpetok::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
+use bpetok::training::{BinaryPairVocabTrainer, TrainResults};
+use bpetok::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -120,7 +117,7 @@ fn main() -> anyhow::Result<()> {
     let TrainResults::<T> {
         word_pattern,
         pair_vocab,
-    } = BPETokenVocabTrainer::new_with_vocab_size(args.vocab_size)
+    } = BinaryPairVocabTrainer::new_with_vocab_size(args.vocab_size)
         .train_vocab_from_sample_iter::<T, K, C, _>(samples)
         .expect("training failed");
 
@@ -140,7 +137,7 @@ fn main() -> anyhow::Result<()> {
     let par_encoder = ParallelEncoder::new(encoder);
 
     if let Some(path) = args.tiktoken_save_path {
-        encoder_data.word_vocab.save_to_tiktoken_vocab(&path)?;
+        encoder_data.word_vocab.save_to_tiktoken_path(&path)?;
         println!("- tiktoken vocab: {path:?}");
     }
 
