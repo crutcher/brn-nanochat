@@ -8622,6 +8622,7 @@ dependencies = [
  "rayon",
  "regex",
  "serde",
+ "tempdir",
  "tracing",
 ]
 
