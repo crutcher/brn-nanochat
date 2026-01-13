@@ -1,5 +1,7 @@
 [package]
 name = "textok"
+description = "LLM Tokenizer Library"
+repository.workspace = true
 version.workspace = true
 license.workspace = true
 
