@@ -1,5 +1,5 @@
 use arrow::array::{Array, StringArray};
-use bpetok::decoders::{ParallelDecoder, TokenDecoder};
+use bpetok::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
 use bpetok::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
 use bpetok::training::{BinaryPairVocabTrainer, TrainResults};
 use bpetok::vocab::{TokenVocabIndex, UnifiedTokenVocab};
@@ -132,9 +132,7 @@ fn main() -> anyhow::Result<()> {
 
     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(encoder_data.clone());
 
-    let par_decoder = ParallelDecoder::new(encoder.to_decoder());
-
-    let par_encoder = ParallelEncoder::new(encoder);
+    let encoder = ParallelEncoder::new(encoder);
 
     if let Some(path) = args.tiktoken_save_path {
         encoder_data.word_vocab.save_to_tiktoken_path(&path)?;
@@ -184,7 +182,7 @@ fn main() -> anyhow::Result<()> {
         let mut total_token_count = 0;
         let batch_times_ns = sample_batches.iter().map(|batch| {
             let t0 = std::time::Instant::now();
-            let token_batch: Vec<Vec<T>> = par_encoder.encode_batch(batch);
+            let token_batch: Vec<Vec<T>> = encoder.encode_batch(batch);
             let t1 = std::time::Instant::now();
 
             total_token_count += token_batch.iter().map(|tokens| tokens.len()).sum::<usize>();
@@ -220,6 +218,9 @@ fn main() -> anyhow::Result<()> {
             total_sample_bytes as f64 / total_token_count as f64
         );
 
+        let decoder =
+            ParallelDecoder::new(DictionaryDecoder::new(encoder_data.compiled_dictionary()));
+
         println!();
         let batch_size = args.batch_size;
         let num_batches1 = token_batches.len();
@@ -231,7 +232,7 @@ fn main() -> anyhow::Result<()> {
                 .zip(token_batches.iter())
                 .map(|(sample, batch)| {
                     let t0 = std::time::Instant::now();
-                    let decoded_sample = par_decoder.try_decode_batch_to_strings(batch).unwrap();
+                    let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
                     let t1 = std::time::Instant::now();
 
                     assert_eq!(sample, &decoded_sample);

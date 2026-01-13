@@ -9,7 +9,9 @@ use crate::vocab::TokenVocabIndex;
 /// Enables ``rayon`` decoding of batches when available.
 #[derive(Clone)]
 pub struct ParallelDecoder<T: TokenType, D: TokenDecoder<T>> {
-    inner: D,
+    /// Wrapped decoder.
+    pub inner: D,
+
     _marker: std::marker::PhantomData<T>,
 }
 
