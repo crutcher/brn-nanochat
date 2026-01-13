@@ -1,5 +1,5 @@
 [package]
-name = "textok"
+name = "wordchuck"
 description = "LLM Tokenizer Library"
 repository.workspace = true
 version.workspace = true

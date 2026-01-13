@@ -6,10 +6,10 @@ use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
-use textok::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
-use textok::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
-use textok::training::{BinaryPairVocabTrainer, TrainResults};
-use textok::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+use wordchuck::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
+use wordchuck::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
+use wordchuck::training::{BinaryPairVocabTrainer, TrainResults};
+use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]

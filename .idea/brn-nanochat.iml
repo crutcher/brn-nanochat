@@ -7,12 +7,12 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/poke/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/examples/pull/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/textok/examples" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/textok/examples/tokenizer_trainer/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/textok/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck/examples/tokenizer_trainer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/crates/nanochat/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
-      <excludeFolder url="file://$MODULE_DIR$/crates/textok/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/wordchuck/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
