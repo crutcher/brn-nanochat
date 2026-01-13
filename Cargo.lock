@@ -691,24 +691,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bpetok"
-version = "0.0.1"
-dependencies = [
- "ahash",
- "anyhow",
- "base64",
- "compact_str 0.9.0",
- "dary_heap",
- "fancy-regex",
- "log",
- "num-traits",
- "rayon",
- "regex",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "brotli"
 version = "8.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7190,6 +7172,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa672c55ab69f787dbc9126cc387dbe57fdd595f585e4524cf89018fa44ab819"
 
 [[package]]
+name = "textok"
+version = "0.0.1"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "base64",
+ "compact_str 0.9.0",
+ "dary_heap",
+ "fancy-regex",
+ "log",
+ "num-traits",
+ "rayon",
+ "regex",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7345,12 +7345,12 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arrow",
- "bpetok",
  "burn 0.20.0-pre.6",
  "clap",
  "compact_str 0.9.0",
  "nanochat-data",
  "parquet",
+ "textok",
 ]
 
 [[package]]

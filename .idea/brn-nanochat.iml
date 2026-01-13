@@ -5,14 +5,14 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/poke/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/bpetok/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/bpetok/examples" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/crates/bpetok/examples/tokenizer_trainer/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/examples/pull/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/textok/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/textok/examples/tokenizer_trainer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/textok/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/crates/nanochat/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
-      <excludeFolder url="file://$MODULE_DIR$/crates/bpetok/target" />
+      <excludeFolder url="file://$MODULE_DIR$/crates/textok/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,8 +1,4 @@
 use arrow::array::{Array, StringArray};
-use bpetok::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
-use bpetok::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
-use bpetok::training::{BinaryPairVocabTrainer, TrainResults};
-use bpetok::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use compact_str::CompactString;
@@ -10,6 +6,10 @@ use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
+use textok::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
+use textok::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
+use textok::training::{BinaryPairVocabTrainer, TrainResults};
+use textok::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]
