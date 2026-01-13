@@ -5,7 +5,7 @@ use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
 use crate::vocab::TokenVocabIndex;
 
-/// An [`ExpansionMap`] [`TokenDecoder<T>`].
+/// An ``{ (T, T) -> T }``  [`TokenDecoder`].
 #[derive(Clone)]
 pub struct PairExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
@@ -21,7 +21,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
         Self { token_to_pair }
     }
 
-    /// Build a [`PairExpansionDecoder`] from this [`Tokenizer`].
+    /// Build a [`PairExpansionDecoder`] from this [`TokenDecoder`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
     pub fn from_pair_map(merge_map: &PairToTokenMap<T>) -> Self {
         let expansion_map = merge_map

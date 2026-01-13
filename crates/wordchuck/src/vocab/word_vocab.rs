@@ -13,7 +13,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
 pub struct WordMapTokenVocab<T: TokenType> {
     /// The regex pattern used for text spl
@@ -139,9 +139,7 @@ mod tests {
         type T = u32;
         let byte_tokens: Vec<T> = (0..256).map(|b| T::from_usize(b).unwrap()).collect();
 
-        let mut vocab = WordMapTokenVocab::<T> {
-            words: WordToTokenMap::default(),
-        };
+        let mut vocab = WordMapTokenVocab::<T>::default();
 
         assert_eq!(vocab.max_token(), 255);
 
@@ -166,5 +164,32 @@ mod tests {
         );
 
         assert_eq!(&vocab.all_tokens_iter().collect::<HashSet<T>>(), &combined);
+    }
+
+    #[test]
+    fn test_save_load_tiktoken() {
+        type T = u32;
+
+        let mut vocab = WordMapTokenVocab::<T>::default();
+        vocab.add_str_word("apple", 300);
+        vocab.add_str_word("banana", 301);
+        vocab.add_str_word("pear", 302);
+
+        tempdir::TempDir::new("vocab_test")
+            .and_then(|dir| {
+                let path = dir.path().join("vocab.tiktoken");
+
+                vocab
+                    .save_to_tiktoken_path(&path)
+                    .expect("Failed to save vocab");
+
+                let loaded_vocab = WordMapTokenVocab::<T>::load_from_tiktoken_path(&path)
+                    .expect("Failed to load vocab");
+
+                assert_eq!(&vocab, &loaded_vocab);
+
+                Ok(())
+            })
+            .unwrap();
     }
 }

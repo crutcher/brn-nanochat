@@ -12,7 +12,7 @@ use ahash::{AHashMap, AHashSet};
 use dary_heap::OctonaryHeap;
 use std::cmp::Ordering;
 
-/// A training for [`Tokenizer`]s.
+/// Trainer for learning binary pair encodings.
 #[derive(Debug)]
 pub struct BinaryPairVocabTrainer {
     /// The regex pattern used for text splitting.
@@ -89,7 +89,7 @@ impl BinaryPairVocabTrainer {
         Ok(())
     }
 
-    /// Trains a [`Tokenizer`] over a sample iterator.
+    /// Trains a binary pair encoder vocab over a sample iterator.
     pub fn train_vocab_from_sample_iter<T, K, C, I>(
         self,
         samples: I,
@@ -111,7 +111,7 @@ impl BinaryPairVocabTrainer {
         self.train_vocab_from_word_count_map(word_counts)
     }
 
-    /// Trains a [`Tokenizer`] over [`Word`]s.
+    /// Trains a binary pair encoder vocab over words.
     ///
     /// # Arguments
     /// * `word_counts` - a ``{word: count}`` map.
@@ -127,7 +127,7 @@ impl BinaryPairVocabTrainer {
         self.train_vocab_from_word_count_table(ws, &cs)
     }
 
-    /// Trains a [`Tokenizer`] over [`Word`]s.
+    /// Trains a binary pair encoder vocab over words.
     ///
     /// # Arguments
     /// * `words` - the words, takes ownership.

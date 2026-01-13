@@ -36,3 +36,4 @@ dary_heap = { workspace = true }
 
 [dev-dependencies]
 compact_str = { workspace = true }
+tempdir = { workspace = true }
