@@ -85,3 +85,69 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::decoders::TokenDecoder;
+    use crate::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
+    use crate::training::{BinaryPairVocabTrainer, TrainResults};
+    use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+    use compact_str::CompactString;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_encoder() {
+        type T = u16;
+        type C = u32;
+        type K = CompactString;
+
+        let options = BinaryPairVocabTrainer::new_with_vocab_size(1000);
+
+        let samples = vec![
+            "hello world",
+            "hello san francisco",
+            "it's not the heat, it's the salt",
+        ];
+
+        let TrainResults {
+            word_pattern,
+            pair_vocab,
+        } = options
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
+            .unwrap();
+
+        let mut vocab: UnifiedTokenVocab<T> =
+            UnifiedTokenVocab::new(word_pattern.into()).with_pair_vocab(pair_vocab);
+
+        vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
+
+        let special_sample = "hello <|HI|> world";
+
+        let encoder = UnifiedVocabEncoder::<T>::new(Arc::new(vocab));
+        check_is_send(&encoder);
+        check_is_sync(&encoder);
+
+        let encoder = ParallelEncoder::new(encoder);
+        check_is_send(&encoder);
+        check_is_sync(&encoder);
+
+        assert_eq!(encoder.max_token(), 292);
+
+        let decoder = encoder.inner.to_decoder();
+        check_is_send(&decoder);
+        check_is_sync(&decoder);
+
+        // Special handling.
+        let tokens = encoder.encode(special_sample);
+        assert_eq!(
+            decoder.try_decode_to_string(tokens).unwrap(),
+            special_sample
+        );
+
+        for sample in samples {
+            let tokens = encoder.encode(sample);
+            assert_eq!(decoder.try_decode_to_string(tokens).unwrap(), sample);
+        }
+    }
+}
