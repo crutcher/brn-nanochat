@@ -1,8 +1,12 @@
 //! # Text Segmentor
 
 use crate::BYTES_PER_TOKEN_HINT;
-use crate::util::regex::{RegexWrapperPattern, RegexWrapperPool, fixed_alternative_list_regex};
+use crate::util::regex::{
+    RegexSupplier, RegexSupplierHandle, fixed_alternative_list_regex_wrapper,
+};
+use crate::util::regex::{RegexWrapperPattern, parallel_regex_supplier};
 use std::ops::Range;
+use std::sync::Arc;
 
 /// Word Reference for [`TextSegmentor`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -17,31 +21,36 @@ pub enum WordRef<'a> {
 /// Word Split + Special Words Segmentor
 #[derive(Clone)]
 pub struct TextSegmentor {
-    normal_pool: RegexWrapperPool,
-    special_pool: Option<RegexWrapperPool>,
+    word_re_supplier: Arc<dyn RegexSupplier>,
+    special_re_supplier: Option<Arc<dyn RegexSupplier>>,
 }
 
 impl TextSegmentor {
     /// Create a new text segmentor with the given regex pattern and special words.
-    pub fn new<S: AsRef<str>>(
-        pattern: RegexWrapperPattern,
-        specials: Option<Vec<S>>,
+    pub fn create<S: AsRef<str>>(
+        word_pattern: RegexWrapperPattern,
+        specials: Option<&[S]>,
     ) -> Self {
-        let normal_pool = RegexWrapperPool::new(pattern.compile().unwrap().into());
+        let word_re_supplier = parallel_regex_supplier(word_pattern);
 
-        let special_pool: Option<RegexWrapperPool> = match specials.as_ref() {
-            Some(specials) if !specials.is_empty() => Some(RegexWrapperPool::new(
-                fixed_alternative_list_regex(specials)
-                    .compile()
-                    .unwrap()
-                    .into(),
+        let special_re_supplier: Option<RegexSupplierHandle> = match specials.as_ref() {
+            Some(specials) if !specials.is_empty() => Some(parallel_regex_supplier(
+                fixed_alternative_list_regex_wrapper(specials),
             )),
             _ => None,
         };
 
+        Self::new(word_re_supplier, special_re_supplier)
+    }
+
+    /// Create a new text segmentor with the given regex suppliers.
+    pub fn new(
+        word_re_supplier: Arc<dyn RegexSupplier>,
+        special_re_supplier: Option<Arc<dyn RegexSupplier>>,
+    ) -> Self {
         Self {
-            normal_pool,
-            special_pool,
+            word_re_supplier,
+            special_re_supplier,
         }
     }
 
@@ -54,9 +63,9 @@ impl TextSegmentor {
         &self,
         text: S,
     ) -> Option<Range<usize>> {
-        self.special_pool
+        self.special_re_supplier
             .as_ref()
-            .and_then(|p| p.get().find_iter(text.as_ref()).next())
+            .and_then(|p| p.get_regex().find_iter(text.as_ref()).next())
             .map(|m| m.range())
     }
 
@@ -69,8 +78,8 @@ impl TextSegmentor {
         words: &mut Vec<WordRef<'a>>,
     ) {
         words.extend(
-            self.normal_pool
-                .get()
+            self.word_re_supplier
+                .get_regex()
                 .find_iter(text)
                 .map(|m| WordRef::Normal(m.as_str())),
         )
@@ -123,9 +132,9 @@ mod tests {
 
     #[test]
     fn test_split_words() {
-        let segmentor = TextSegmentor::new(
+        let segmentor = TextSegmentor::create(
             RegexWrapperPattern::Adaptive(GPT4_PATTERN.to_string()),
-            Some(vec!["<|FNORD|>", "<|NORP|>"]),
+            Some(&["<|FNORD|>", "<|NORP|>"]),
         );
 
         let buf = "hello<|FNORD|> wor<|NORP|>ld!";

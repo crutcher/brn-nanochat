@@ -1,0 +1,51 @@
+//! Regex Supplier Trait
+
+use crate::util::regex::re_wrapper::RegexWrapper;
+use std::fmt::Debug;
+use std::sync::Arc;
+
+/// Common Regex Supplier Handle Type
+pub type RegexSupplierHandle = Arc<dyn RegexSupplier>;
+
+/// Regex Supplier Trait
+pub trait RegexSupplier: Sync + Send {
+    /// Get the regex.
+    fn get_regex(&self) -> Arc<RegexWrapper>;
+
+    /// Get the regex pattern.
+    fn get_pattern(&self) -> String {
+        self.get_regex().as_str().to_string()
+    }
+}
+
+impl Debug for dyn RegexSupplier {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        write!(f, "RegexSupplier({})", self.get_pattern())
+    }
+}
+
+/// Simple Regex Supplier
+#[derive(Debug, Clone)]
+pub struct SimpleRegexSupplier {
+    regex: Arc<RegexWrapper>,
+}
+
+impl SimpleRegexSupplier {
+    /// Create a new simple regex supplier.
+    pub fn new(regex: Arc<RegexWrapper>) -> Self {
+        Self { regex }
+    }
+}
+
+impl RegexSupplier for SimpleRegexSupplier {
+    fn get_pattern(&self) -> String {
+        self.regex.as_str().to_string()
+    }
+
+    fn get_regex(&self) -> Arc<RegexWrapper> {
+        self.regex.clone()
+    }
+}

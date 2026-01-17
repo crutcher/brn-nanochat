@@ -1,6 +1,9 @@
 //! # Regex Wrapper
 //! This modules provides mechanisms to mix `regex` and `fancy_regex` types.
 
+use core::fmt::Debug;
+use std::sync::Arc;
+
 /// Error wrapper for regex patterns.
 #[non_exhaustive]
 #[derive(Clone, Debug)]
@@ -30,13 +33,13 @@ impl core::fmt::Display for ErrorWrapper {
         f: &mut core::fmt::Formatter<'_>,
     ) -> core::fmt::Result {
         match self {
-            Self::Basic(err) => err.fmt(f),
-            Self::Fancy(err) => err.fmt(f),
+            Self::Basic(err) => core::fmt::Display::fmt(err, f),
+            Self::Fancy(err) => core::fmt::Display::fmt(err, f),
         }
     }
 }
 
-impl std::error::Error for ErrorWrapper {}
+impl core::error::Error for ErrorWrapper {}
 
 /// Label for regex patterns.
 #[derive(Debug, Clone)]
@@ -88,6 +91,15 @@ impl RegexWrapperPattern {
                     })
             }
         }
+    }
+}
+
+/// Common Regex Wrapper Handle Type
+pub type RegexWrapperHandle = Arc<RegexWrapper>;
+
+impl From<RegexWrapperPattern> for RegexWrapperHandle {
+    fn from(val: RegexWrapperPattern) -> Self {
+        Arc::new(val.compile().unwrap())
     }
 }
 

@@ -1,9 +1,11 @@
 //! # Thread Regex Pool
-
-use crate::util::regex::regex_wrapper::RegexWrapper;
+#![allow(unused)]
+use crate::util::regex::re_supplier::RegexSupplier;
+use crate::util::regex::re_wrapper::RegexWrapper;
 use ahash::AHashMap;
+use parking_lot::RwLock;
 use std::num::NonZero;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread::ThreadId;
 
 fn unsafe_threadid_to_u64(thread_id: &ThreadId) -> u64 {
@@ -11,6 +13,9 @@ fn unsafe_threadid_to_u64(thread_id: &ThreadId) -> u64 {
 }
 
 /// Interior-Mutable Thread-Local Regex Pool
+///
+/// In HPC applications, under some loads, interior buffers in compiled regex
+/// can block. This pool exists to mitigate that, by cloning regex-per-thread.
 #[derive(Clone)]
 pub struct RegexWrapperPool {
     regex: Arc<RegexWrapper>,
@@ -41,19 +46,24 @@ impl RegexWrapperPool {
 
     /// Clear the regex pool.
     pub fn clear(&self) {
-        self.pool.write().unwrap().clear();
+        self.pool.write().clear();
+    }
+}
+
+impl RegexSupplier for RegexWrapperPool {
+    fn get_pattern(&self) -> String {
+        self.regex.as_str().to_string()
     }
 
-    /// Get a Regex from the pool for the current thread.
-    pub fn get(&self) -> Arc<RegexWrapper> {
+    fn get_regex(&self) -> Arc<RegexWrapper> {
         let thread_id = std::thread::current().id();
         let slot = unsafe_threadid_to_u64(&thread_id) % self.max_pool;
 
-        if let Some(regex) = self.pool.read().unwrap().get(&slot) {
+        if let Some(regex) = self.pool.read().get(&slot) {
             return regex.clone();
         }
 
-        let mut writer = self.pool.write().unwrap();
+        let mut writer = self.pool.write();
         let re = Arc::new((*self.regex).clone());
         writer.insert(slot, re.clone());
         re
@@ -63,7 +73,7 @@ impl RegexWrapperPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::regex::regex_wrapper::RegexWrapperPattern;
+    use crate::util::regex::re_wrapper::RegexWrapperPattern;
 
     #[test]
     fn test_regex_pool() {
@@ -72,9 +82,9 @@ mod tests {
 
         let pool = RegexWrapperPool::new(regex);
 
-        let r0 = pool.get();
+        let r0 = pool.get_regex();
         assert_eq!(r0.as_str(), r"foo");
 
-        assert!(Arc::ptr_eq(&r0, &pool.get()));
+        assert!(Arc::ptr_eq(&r0, &pool.get_regex()));
     }
 }

@@ -19,7 +19,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
 }
 
 impl<T: TokenType> UnifiedVocabEncoder<T> {
-    /// Construct a new encoders..
+    /// Construct an encoder from data.
     pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         let specials = match &data.specials {
             Some(specials) => specials
@@ -31,7 +31,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             None => None,
         };
 
-        let segmentor = TextSegmentor::new(data.word_pattern.clone(), specials);
+        let segmentor = TextSegmentor::create(data.word_pattern.clone(), specials.as_deref());
 
         Self { data, segmentor }
     }

@@ -8619,6 +8619,7 @@ dependencies = [
  "fancy-regex",
  "log",
  "num-traits",
+ "parking_lot",
  "rayon",
  "regex",
  "serde",
