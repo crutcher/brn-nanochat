@@ -5,8 +5,8 @@ use crate::util::regex::{
     RegexSupplier, RegexSupplierHandle, fixed_alternative_list_regex_wrapper,
 };
 use crate::util::regex::{RegexWrapperPattern, parallel_regex_supplier};
-use std::ops::Range;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use core::ops::Range;
 
 /// Word Reference for [`TextSegmentor`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

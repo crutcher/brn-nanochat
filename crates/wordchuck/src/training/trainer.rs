@@ -9,8 +9,8 @@ use crate::util::validators::U8_SIZE;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
 use ahash::{AHashMap, AHashSet};
+use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
-use std::cmp::Ordering;
 
 /// Trainer for learning binary pair encodings.
 #[derive(Debug)]
@@ -337,9 +337,9 @@ mod tests {
     use crate::vocab::TokenVocabIndex;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
+    use alloc::sync::Arc;
     use compact_str::CompactString;
-    use std::cmp::Ordering;
-    use std::sync::Arc;
+    use core::cmp::Ordering;
 
     #[test]
     fn test_tokenizer_options() {

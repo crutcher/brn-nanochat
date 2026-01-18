@@ -25,6 +25,8 @@
 //! ```
 #![warn(missing_docs, unused)]
 
+extern crate alloc;
+
 pub mod decoders;
 pub mod encoders;
 pub mod training;

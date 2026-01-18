@@ -79,9 +79,9 @@ mod tests {
     use crate::training::trainer::{BinaryPairVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
+    use alloc::sync::Arc;
     use compact_str::CompactString;
     use num_traits::FromPrimitive;
-    use std::sync::Arc;
 
     #[test]
     fn test_decoder() {
@@ -104,7 +104,7 @@ mod tests {
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
+        let vocab: Arc<_> = UnifiedTokenVocab::new(word_pattern.into())
             .with_pair_vocab(pair_vocab)
             .into();
 

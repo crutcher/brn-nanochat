@@ -67,8 +67,8 @@ mod tests {
     use crate::training::trainer::{BinaryPairVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
+    use alloc::sync::Arc;
     use compact_str::CompactString;
-    use std::sync::Arc;
 
     #[test]
     fn test_pair_decoder() {

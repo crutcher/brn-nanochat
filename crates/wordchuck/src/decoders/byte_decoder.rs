@@ -63,7 +63,7 @@ mod tests {
         );
         tokens.extend_from_slice(&[256, 3000]);
 
-        let mut ctx = TokenDecodeContext::for_tokens(tokens);
+        let mut ctx: TokenDecodeContext<T> = tokens.into();
         assert!(!decoder.incremental_decode(&mut ctx));
 
         assert_eq!(ctx.buf, "hello world".as_bytes().to_vec());
