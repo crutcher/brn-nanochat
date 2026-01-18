@@ -7,7 +7,7 @@ use crate::types::TokenType;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use crate::vocab::word_vocab::WordMapTokenVocab;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
@@ -127,8 +127,8 @@ mod tests {
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
+    use alloc::sync::Arc;
     use compact_str::CompactString;
-    use std::sync::Arc;
 
     #[test]
     fn test_encoder() {

@@ -93,8 +93,8 @@ mod tests {
     use crate::training::{BinaryPairVocabTrainer, TrainResults};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+    use alloc::sync::Arc;
     use compact_str::CompactString;
-    use std::sync::Arc;
 
     #[test]
     fn test_encoder() {

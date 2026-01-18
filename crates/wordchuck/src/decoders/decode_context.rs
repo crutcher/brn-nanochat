@@ -1,4 +1,4 @@
-//! # Decoder Context
+//! Token Decoder Context
 
 use crate::BYTES_PER_TOKEN_HINT;
 use crate::types::TokenType;
@@ -13,13 +13,19 @@ pub struct TokenDecodeContext<T: TokenType> {
     pub stack: Vec<T>,
 }
 
-impl<T: TokenType> TokenDecodeContext<T> {
-    /// Creates a new decoding context.
-    pub fn for_tokens(tokens: Vec<T>) -> Self {
+impl<T: TokenType> From<Vec<T>> for TokenDecodeContext<T> {
+    fn from(tokens: Vec<T>) -> Self {
         Self::for_tokens_with_hint(tokens, BYTES_PER_TOKEN_HINT)
     }
+}
 
+impl<T: TokenType> TokenDecodeContext<T> {
     /// Creates a new decoding context.
+    ///
+    /// # Arguments
+    /// * `tokens` - the tokens to decode.
+    /// * `bytes_per_token_hint` - a hint for the average number of bytes per token,
+    ///   used when allocating output buffer space.
     pub fn for_tokens_with_hint(
         tokens: Vec<T>,
         bytes_per_token_hint: f64,
@@ -31,13 +37,13 @@ impl<T: TokenType> TokenDecodeContext<T> {
         Self { buf, stack }
     }
 
-    /// Is complete?
+    /// The context is complete when the token stack is empty.
     pub fn is_complete(&self) -> bool {
         self.stack.is_empty()
     }
 
     /// Returns the decoded buffer, or an error if the stack is not empty.
-    pub fn try_complete(self) -> anyhow::Result<Vec<u8>> {
+    pub fn try_result(self) -> anyhow::Result<Vec<u8>> {
         if self.is_complete() {
             Ok(self.buf)
         } else {
@@ -49,7 +55,7 @@ impl<T: TokenType> TokenDecodeContext<T> {
     }
 
     /// Returns the decoded buffer, panics if the stack is not empty.
-    pub fn expect_complete(self) -> Vec<u8> {
-        self.try_complete().unwrap()
+    pub fn unwrap(self) -> Vec<u8> {
+        self.try_result().unwrap()
     }
 }

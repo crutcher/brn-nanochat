@@ -47,8 +47,6 @@ pub use alt_list::{fixed_alternative_list_regex_pattern, fixed_alternative_list_
 pub use re_supplier::{RegexSupplier, RegexSupplierHandle, SimpleRegexSupplier};
 pub use re_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};
 
-use std::sync::Arc;
-
 #[cfg(feature = "std")]
 mod re_pool;
 #[cfg(feature = "std")]
@@ -66,7 +64,7 @@ where
     let regex = regex.into();
 
     #[cfg(feature = "std")]
-    return Arc::new(RegexWrapperPool::new(regex));
+    return alloc::sync::Arc::new(RegexWrapperPool::new(regex));
 
     #[cfg(not(feature = "std"))]
     return regex.into();

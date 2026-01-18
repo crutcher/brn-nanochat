@@ -3,9 +3,9 @@
 use crate::util::regex::re_supplier::RegexSupplier;
 use crate::util::regex::re_wrapper::RegexWrapper;
 use ahash::AHashMap;
+use alloc::sync::Arc;
+use core::num::NonZero;
 use parking_lot::RwLock;
-use std::num::NonZero;
-use std::sync::Arc;
 use std::thread::ThreadId;
 
 fn unsafe_threadid_to_u64(thread_id: &ThreadId) -> u64 {

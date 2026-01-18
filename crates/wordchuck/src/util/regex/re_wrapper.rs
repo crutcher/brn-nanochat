@@ -1,8 +1,8 @@
 //! # Regex Wrapper
 //! This modules provides mechanisms to mix `regex` and `fancy_regex` types.
 
+use alloc::sync::Arc;
 use core::fmt::Debug;
-use std::sync::Arc;
 
 /// Error wrapper for regex patterns.
 #[non_exhaustive]

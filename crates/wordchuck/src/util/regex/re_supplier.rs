@@ -1,8 +1,7 @@
 //! Regex Supplier Trait
 
 use crate::util::regex::re_wrapper::RegexWrapper;
-use std::fmt::Debug;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 /// Common Regex Supplier Handle Type
 pub type RegexSupplierHandle = Arc<dyn RegexSupplier>;
@@ -18,7 +17,7 @@ pub trait RegexSupplier: Sync + Send {
     }
 }
 
-impl Debug for dyn RegexSupplier {
+impl core::fmt::Debug for dyn RegexSupplier {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,

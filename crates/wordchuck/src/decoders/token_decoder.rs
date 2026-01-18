@@ -26,7 +26,7 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         &self,
         tokens: S,
     ) -> TokenDecodeContext<T> {
-        let mut context = TokenDecodeContext::for_tokens(tokens.as_ref().to_vec());
+        let mut context = tokens.as_ref().to_vec().into();
         self.incremental_decode(&mut context);
         context
     }
@@ -36,7 +36,7 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         &self,
         tokens: S,
     ) -> anyhow::Result<Vec<u8>> {
-        self.decode_to_context(tokens).try_complete()
+        self.decode_to_context(tokens).try_result()
     }
 
     /// Decodes a batch of tokens into a vector of byte vectors, returning an error if the decoding fails.
@@ -96,7 +96,7 @@ mod tests {
         );
         tokens.extend_from_slice(&[256, 3000]);
 
-        let mut ctx = TokenDecodeContext::for_tokens(tokens);
+        let mut ctx: TokenDecodeContext<T> = tokens.into();
         assert!(!decoder.incremental_decode(&mut ctx));
 
         assert_eq!(ctx.buf, "hello world".as_bytes().to_vec());
