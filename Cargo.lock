@@ -5179,7 +5179,7 @@ dependencies = [
 
 [[package]]
 name = "nanochat"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "bimm-contracts",
@@ -5188,7 +5188,7 @@ dependencies = [
 
 [[package]]
 name = "nanochat-data"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "burn 0.20.0-pre.6",
@@ -8609,7 +8609,7 @@ checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
 
 [[package]]
 name = "wordchuck"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "ahash",
  "anyhow",
