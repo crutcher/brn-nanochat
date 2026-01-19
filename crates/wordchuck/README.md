@@ -30,6 +30,32 @@ See:
 
 - [examples/tokenizer_trainer](examples/tokenizer_trainer)
 
+# training example
+
+```rust,ignore
+    let vocab: Arc<UnifiedTokenVocab<T>> =
+        BinaryPairVocabTrainer::new_with_vocab_size(args.vocab_size)
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples)
+            .expect("training failed")
+            .extend_word_vocab_from_pair_vocab()
+            .into();
+
+    let training_duration = std::time::Instant::now().duration_since(t0);
+    println!("- training_duration: {:#?}", training_duration);
+    println!("- vocab_size: {:#?}", vocab.max_token());
+    
+    if let Some(path) = args.tiktoken_save_path {
+        vocab.word_vocab.save_to_tiktoken_path(&path)?;
+        println!("- tiktoken vocab: {path:?}");
+    }
+
+    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
+    let encoder = ParallelEncoder::new(encoder);
+
+    let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+    let decoder = ParallelDecoder::new(decoder);
+```
+
 # training and timing
 
 - Note: my machine is a beast (64-core Threadripper; NVME data disk).

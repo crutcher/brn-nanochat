@@ -5,4 +5,4 @@ pub mod trainer;
 pub mod word;
 pub mod word_count;
 
-pub use trainer::{BinaryPairVocabTrainer, TrainResults};
+pub use trainer::BinaryPairVocabTrainer;

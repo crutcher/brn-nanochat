@@ -59,10 +59,16 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         }
     }
 
+    /// Shrinks the capacity of the underlying data structures to fit its current size.
+    pub fn shrink_to_fit(&mut self) {
+        self.pair_vocab.shrink_to_fit();
+        self.word_vocab.shrink_to_fit();
+    }
+
     /// Materialize the tokens in the `pair_vocab` into the `word_vocab`.
     ///
     /// Leaves tokens which already exist in the `word_vocab`.
-    pub fn expand_words_from_bpe(self) -> Self {
+    pub fn extend_word_vocab_from_pair_vocab(self) -> Self {
         let mut word_vocab = self.word_vocab;
 
         let tokens: AHashSet<T> = word_vocab.compound_tokens_iter().collect();
@@ -104,7 +110,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
         let mut dictionary: AHashMap<T, Vec<u8>> = self
             .clone()
-            .expand_words_from_bpe()
+            .extend_word_vocab_from_pair_vocab()
             .word_vocab
             .words
             .into_iter()

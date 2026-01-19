@@ -3,10 +3,10 @@
 use crate::training::pair_index::{PairIndex, PairIndexOptions};
 use crate::training::word::Word;
 use crate::training::word_count::{WordCounter, WordCounterOptions};
-use crate::types::{CountType, Pair, PairToTokenMap, StringChunkType, TokenType};
+use crate::types::{CountType, Pair, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
-use crate::vocab::pair_vocab::PairMapTokenVocab;
+use crate::vocab::UnifiedTokenVocab;
 use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
 use ahash::{AHashMap, AHashSet};
 use core::cmp::Ordering;
@@ -37,16 +37,6 @@ impl BinaryPairVocabTrainer {
             parallel: DEFAULT_PARALLEL,
         }
     }
-}
-
-/// Training results.
-#[derive(Debug, Clone)]
-pub struct TrainResults<T: TokenType> {
-    /// The regex pattern used for text splitting.
-    pub word_pattern: String,
-
-    /// The trained BPE vocab.
-    pub pair_vocab: PairMapTokenVocab<T>,
 }
 
 impl BinaryPairVocabTrainer {
@@ -93,7 +83,7 @@ impl BinaryPairVocabTrainer {
     pub fn train_vocab_from_sample_iter<T, K, C, I>(
         self,
         samples: I,
-    ) -> anyhow::Result<TrainResults<T>>
+    ) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         K: StringChunkType,
@@ -118,7 +108,7 @@ impl BinaryPairVocabTrainer {
     pub fn train_vocab_from_word_count_map<T, C>(
         self,
         words: AHashMap<Word<T>, C>,
-    ) -> anyhow::Result<TrainResults<T>>
+    ) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         C: CountType,
@@ -140,7 +130,7 @@ impl BinaryPairVocabTrainer {
         self,
         mut words: Vec<Word<T>>,
         word_counts: &[C],
-    ) -> anyhow::Result<TrainResults<T>>
+    ) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         C: CountType,
@@ -153,7 +143,7 @@ impl BinaryPairVocabTrainer {
         // Prefer to fail before we do all the work below.
         let _ = validators::expect_regex(&self.pattern);
 
-        let mut pairs: PairToTokenMap<T> = AHashMap::with_capacity(num_merges);
+        let mut vocab = UnifiedTokenVocab::new(self.pattern.into());
 
         log::info!("Building pair index...");
         let PairIndex {
@@ -218,7 +208,7 @@ impl BinaryPairVocabTrainer {
             next_token_index += 1;
 
             // Record merge
-            pairs.insert(job.pair, new_token);
+            vocab.pair_vocab.add_pair(job.pair, new_token);
 
             // Merge this pair in all words where it occurs
             let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> =
@@ -267,14 +257,11 @@ impl BinaryPairVocabTrainer {
             }
         }
 
-        pairs.shrink_to_fit();
+        vocab.shrink_to_fit();
 
         log::info!("Finished training: {} merges completed", merges_done);
 
-        Ok(TrainResults {
-            word_pattern: self.pattern,
-            pair_vocab: PairMapTokenVocab { pairs },
-        })
+        Ok(vocab)
     }
 }
 
@@ -332,7 +319,7 @@ mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::{BinaryPairVocabTrainer, MergeJob, TrainResults};
+    use crate::training::trainer::{BinaryPairVocabTrainer, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -388,16 +375,10 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let TrainResults {
-            word_pattern,
-            pair_vocab,
-        } = options
+        let vocab: Arc<UnifiedTokenVocab<T>> = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
-            .unwrap();
-
-        let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-            .with_pair_vocab(pair_vocab)
-            .expand_words_from_bpe()
+            .unwrap()
+            .extend_word_vocab_from_pair_vocab()
             .into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());

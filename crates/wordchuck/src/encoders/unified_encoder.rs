@@ -123,10 +123,9 @@ mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::{BinaryPairVocabTrainer, TrainResults};
+    use crate::training::trainer::BinaryPairVocabTrainer;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
-    use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
     use compact_str::CompactString;
 
@@ -144,15 +143,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let TrainResults {
-            word_pattern,
-            pair_vocab,
-        } = options
+        let mut vocab = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
-
-        let mut vocab: UnifiedTokenVocab<T> =
-            UnifiedTokenVocab::new(word_pattern.into()).with_pair_vocab(pair_vocab);
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 

@@ -25,6 +25,11 @@ pub struct WordMapTokenVocab<T: TokenType> {
 }
 
 impl<T: TokenType> WordMapTokenVocab<T> {
+    /// Shrinks the capacity of the underlying data structures to fit its current size.
+    pub fn shrink_to_fit(&mut self) {
+        self.words.shrink_to_fit();
+    }
+
     /// Load a tiktoken vocab file into a [`WordToTokenMap`].
     pub fn load_from_tiktoken_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let mut vocab = WordMapTokenVocab::default();
