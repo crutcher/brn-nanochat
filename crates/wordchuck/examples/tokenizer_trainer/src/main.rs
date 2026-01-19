@@ -125,10 +125,20 @@ fn main() -> anyhow::Result<()> {
     println!("- training_duration: {:#?}", training_duration);
     println!("- vocab_size: {:#?}", pair_vocab.max_token());
 
-    let encoder_data: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(word_pattern.into())
-        .with_pair_vocab(pair_vocab)
-        .expand_words_from_bpe()
-        .into();
+    let encoder_data: Arc<UnifiedTokenVocab<T>> =
+        UnifiedTokenVocab::new(word_pattern.clone().into())
+            .with_pair_vocab(pair_vocab)
+            .expand_words_from_bpe()
+            .into();
+
+    /*
+    let rebuilt_pair_vocab = encoder_data.word_vocab.build_pair_vocab();
+    let encoder_data: Arc<UnifiedTokenVocab<T>> =
+        UnifiedTokenVocab::new(word_pattern.clone().into())
+            .with_pair_vocab(rebuilt_pair_vocab)
+            .expand_words_from_bpe()
+            .into();
+     */
 
     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(encoder_data.clone());
 
