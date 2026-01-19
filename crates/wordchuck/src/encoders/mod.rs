@@ -1,5 +1,6 @@
 //! # Tokenizer Structures
 
+pub mod bp_merge;
 pub mod parallel_encoder;
 pub mod text_segmentor;
 pub mod token_encoder;

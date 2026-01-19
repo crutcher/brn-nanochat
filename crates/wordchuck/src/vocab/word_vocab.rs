@@ -5,6 +5,7 @@ use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenType, WordToTokenMap};
 use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
+use ahash::AHashMap;
 use anyhow::Context;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
@@ -110,7 +111,44 @@ impl<T: TokenType> WordMapTokenVocab<T> {
         &self,
         chunk: &[u8],
     ) -> Option<T> {
-        self.words.get(chunk).copied()
+        match self.words.get(chunk) {
+            Some(token) => Some(*token),
+            None => {
+                if chunk.len() == 1 {
+                    Some(T::from_u8(chunk[0]).unwrap())
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Build a binary pair map from the word vocabulary.
+    pub fn build_pair_vocab(&self) -> PairMapTokenVocab<T> {
+        let mut pair_vocab = PairMapTokenVocab::<T>::default();
+
+        let token_to_words: AHashMap<T, &[u8]> = self
+            .words
+            .iter()
+            .map(|(chunk, &token)| (token, chunk.as_ref()))
+            .collect();
+
+        for token in self.compound_tokens_iter() {
+            let word = token_to_words[&token];
+
+            let k = word.len();
+            for p in 1..k {
+                if let Some(a) = self.lookup_token(&word[..p])
+                    && let Some(b) = self.lookup_token(&word[p..])
+                    && a < token
+                    && b < token
+                {
+                    pair_vocab.add_pair((a, b), token);
+                }
+            }
+        }
+
+        pair_vocab
     }
 }
 
@@ -191,5 +229,39 @@ mod tests {
                 Ok(())
             })
             .unwrap();
+    }
+
+    #[test]
+    fn test_lookup_token() {
+        type T = u32;
+        let mut vocab = WordMapTokenVocab::<T>::default();
+        vocab.add_str_word("apple", 300);
+        vocab.add_str_word("a", 301);
+
+        assert_eq!(vocab.lookup_token(b"apple"), Some(300));
+        assert_eq!(vocab.lookup_token(b"a"), Some(301));
+        assert_eq!(vocab.lookup_token(b"b"), Some('b' as u32));
+    }
+
+    #[test]
+    fn test_build_pair_vocab() {
+        type T = u32;
+        let mut vocab = WordMapTokenVocab::<T>::default();
+        vocab.add_str_word("at", 300);
+        vocab.add_str_word("ate", 301);
+        vocab.add_str_word("cat", 302);
+
+        let pair_vocab = vocab.build_pair_vocab();
+        assert_eq!(
+            &pair_vocab.pairs,
+            &[
+                (('a' as u32, 't' as u32), 300),
+                ((300, 'e' as u32), 301),
+                (('c' as u32, 300), 302)
+            ]
+            .iter()
+            .map(|&(a, b)| (a, b))
+            .collect::<AHashMap<_, _>>()
+        );
     }
 }

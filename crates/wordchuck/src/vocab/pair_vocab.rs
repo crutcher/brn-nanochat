@@ -12,6 +12,17 @@ pub struct PairMapTokenVocab<T: TokenType> {
     pub pairs: PairToTokenMap<T>,
 }
 
+impl<T: TokenType> PairMapTokenVocab<T> {
+    /// Add a pair to the vocab.
+    pub fn add_pair(
+        &mut self,
+        pair: (T, T),
+        token: T,
+    ) {
+        self.pairs.insert(pair, token);
+    }
+}
+
 impl<T: TokenType> TokenVocabIndex<T> for PairMapTokenVocab<T> {
     fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.pairs.values().copied()

@@ -1,5 +1,6 @@
 //! # Common Types and Traits
 use core::hash::Hash;
+use num_traits::bounds::UpperBounded;
 use num_traits::{FromPrimitive, Num, ToPrimitive, Unsigned};
 use std::fmt::{Debug, Display};
 use std::ops::{AddAssign, SubAssign};
@@ -17,6 +18,7 @@ pub trait TokenType:
     + Unsigned
     + FromPrimitive
     + ToPrimitive
+    + UpperBounded
     + Ord
     + serde::Serialize
     + for<'de> serde::Deserialize<'de>
@@ -35,6 +37,7 @@ impl<T> TokenType for T where
         + Unsigned
         + FromPrimitive
         + ToPrimitive
+        + UpperBounded
         + Ord
         + serde::Serialize
         + for<'de> serde::Deserialize<'de>
