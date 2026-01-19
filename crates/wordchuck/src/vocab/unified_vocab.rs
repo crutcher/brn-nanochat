@@ -112,9 +112,8 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
             .clone()
             .extend_word_vocab_from_pair_vocab()
             .word_vocab
-            .words
-            .into_iter()
-            .map(|(chunk, token)| (token, chunk))
+            .iter()
+            .map(|(chunk, &token)| (token, chunk.to_vec()))
             .collect();
 
         if let Some(specials) = &self.specials {
