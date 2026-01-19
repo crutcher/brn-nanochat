@@ -90,10 +90,9 @@ where
 mod tests {
     use crate::decoders::TokenDecoder;
     use crate::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
-    use crate::training::{BinaryPairVocabTrainer, TrainResults};
+    use crate::training::BinaryPairVocabTrainer;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
-    use alloc::sync::Arc;
+    use crate::vocab::TokenVocabIndex;
     use compact_str::CompactString;
 
     #[test]
@@ -110,21 +109,15 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let TrainResults {
-            word_pattern,
-            pair_vocab,
-        } = options
+        let mut vocab = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
             .unwrap();
-
-        let mut vocab: UnifiedTokenVocab<T> =
-            UnifiedTokenVocab::new(word_pattern.into()).with_pair_vocab(pair_vocab);
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(Arc::new(vocab));
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.into());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

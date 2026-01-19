@@ -21,6 +21,11 @@ impl<T: TokenType> PairMapTokenVocab<T> {
     ) {
         self.pairs.insert(pair, token);
     }
+
+    /// Shrinks the capacity of the underlying data structures to fit its current size.
+    pub fn shrink_to_fit(&mut self) {
+        self.pairs.shrink_to_fit();
+    }
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for PairMapTokenVocab<T> {

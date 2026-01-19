@@ -76,7 +76,7 @@ mod tests {
     use crate::decoders::DictionaryDecoder;
     use crate::encoders::UnifiedVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::training::trainer::{BinaryPairVocabTrainer, TrainResults};
+    use crate::training::trainer::BinaryPairVocabTrainer;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -97,15 +97,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let TrainResults {
-            word_pattern,
-            pair_vocab,
-        } = options
+        let vocab: Arc<UnifiedTokenVocab<T>> = options
             .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
-            .unwrap();
-
-        let vocab: Arc<_> = UnifiedTokenVocab::new(word_pattern.into())
-            .with_pair_vocab(pair_vocab)
+            .unwrap()
             .into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());

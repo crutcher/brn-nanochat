@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
 use wordchuck::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
-use wordchuck::training::{BinaryPairVocabTrainer, TrainResults};
+use wordchuck::training::BinaryPairVocabTrainer;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
@@ -114,42 +114,28 @@ fn main() -> anyhow::Result<()> {
     });
 
     // TODO: `indicatif` for optional progress bar for users waiting on this.
-    let TrainResults::<T> {
-        word_pattern,
-        pair_vocab,
-    } = BinaryPairVocabTrainer::new_with_vocab_size(args.vocab_size)
-        .train_vocab_from_sample_iter::<T, K, C, _>(samples)
-        .expect("training failed");
+    let vocab: Arc<UnifiedTokenVocab<T>> =
+        BinaryPairVocabTrainer::new_with_vocab_size(args.vocab_size)
+            .train_vocab_from_sample_iter::<T, K, C, _>(samples)
+            .expect("training failed")
+            .extend_word_vocab_from_pair_vocab()
+            .into();
 
     let training_duration = std::time::Instant::now().duration_since(t0);
     println!("- training_duration: {:#?}", training_duration);
-    println!("- vocab_size: {:#?}", pair_vocab.max_token());
-
-    let encoder_data: Arc<UnifiedTokenVocab<T>> =
-        UnifiedTokenVocab::new(word_pattern.clone().into())
-            .with_pair_vocab(pair_vocab)
-            .expand_words_from_bpe()
-            .into();
-
-    /*
-    let rebuilt_pair_vocab = encoder_data.word_vocab.build_pair_vocab();
-    let encoder_data: Arc<UnifiedTokenVocab<T>> =
-        UnifiedTokenVocab::new(word_pattern.clone().into())
-            .with_pair_vocab(rebuilt_pair_vocab)
-            .expand_words_from_bpe()
-            .into();
-     */
-
-    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(encoder_data.clone());
-
-    let encoder = ParallelEncoder::new(encoder);
+    println!("- vocab_size: {:#?}", vocab.max_token());
 
     if let Some(path) = args.tiktoken_save_path {
-        encoder_data.word_vocab.save_to_tiktoken_path(&path)?;
+        vocab.word_vocab.save_to_tiktoken_path(&path)?;
         println!("- tiktoken vocab: {path:?}");
     }
-
     if args.time_encode_decode {
+        let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder = ParallelEncoder::new(encoder);
+
+        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+        let decoder = ParallelDecoder::new(decoder);
+
         let mut samples = Vec::new();
         {
             for batch in cache
@@ -227,9 +213,6 @@ fn main() -> anyhow::Result<()> {
             "- sample byte/token: {:.2}",
             total_sample_bytes as f64 / total_token_count as f64
         );
-
-        let decoder =
-            ParallelDecoder::new(DictionaryDecoder::new(encoder_data.compiled_dictionary()));
 
         println!();
         let batch_size = args.batch_size;
