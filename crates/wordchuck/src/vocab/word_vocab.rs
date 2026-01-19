@@ -24,10 +24,35 @@ pub struct WordMapTokenVocab<T: TokenType> {
     pub words: WordToTokenMap<T>,
 }
 
+impl<'a, T: TokenType> IntoIterator for &'a WordMapTokenVocab<T> {
+    type Item = (&'a Vec<u8>, &'a T);
+
+    type IntoIter = std::collections::hash_map::Iter<'a, Vec<u8>, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.words.iter()
+    }
+}
+
 impl<T: TokenType> WordMapTokenVocab<T> {
     /// Shrinks the capacity of the underlying data structures to fit its current size.
     pub fn shrink_to_fit(&mut self) {
         self.words.shrink_to_fit();
+    }
+
+    /// The number of words in the vocabulary.
+    pub fn len(&self) -> usize {
+        self.words.len()
+    }
+
+    /// Returns `true` if the vocabulary contains no words.
+    pub fn is_empty(&self) -> bool {
+        self.words.is_empty()
+    }
+
+    /// Iterate over the words in the vocabulary.
+    pub fn iter<'a>(&'a self) -> impl Iterator<Item = (&'a Vec<u8>, &'a T)> + 'a {
+        self.words.iter()
     }
 
     /// Load a tiktoken vocab file into a [`WordToTokenMap`].
