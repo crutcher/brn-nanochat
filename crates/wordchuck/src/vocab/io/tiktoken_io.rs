@@ -12,14 +12,49 @@ use std::path::Path;
 ///
 /// # Arguments
 /// * `path` - the path to the vocabulary file.
-pub fn load_word_map_from_tiktoken_path<T: TokenType, P: AsRef<Path>>(
-    path: P
-) -> anyhow::Result<WordMapTokenVocab<T>> {
+pub fn load_word_map_from_tiktoken_path<T, P>(path: P) -> anyhow::Result<WordMapTokenVocab<T>>
+where
+    T: TokenType,
+    P: AsRef<Path>,
+{
     let file = std::fs::File::open(path)?;
     let reader = BufReader::new(file);
-    let mut vocab = WordMapTokenVocab::default();
 
-    for line in reader.lines() {
+    let mut vocab = WordMapTokenVocab::default();
+    update_word_map_from_tiktoken_reader(&mut vocab, reader)?;
+
+    Ok(vocab)
+}
+
+/// Update a [`WordMapTokenVocab`] from a tiktoken vocab [`BufRead`] stream.
+///
+/// # Arguments
+/// * `vocab` - the vocabulary to extend.
+/// * `reader` - the line reader.
+pub fn update_word_map_from_tiktoken_reader<T, R>(
+    vocab: &mut WordMapTokenVocab<T>,
+    reader: R,
+) -> anyhow::Result<()>
+where
+    T: TokenType,
+    R: BufRead,
+{
+    update_word_map_from_tiktoken_iter(vocab, reader.lines())
+}
+
+/// Update a [`WordMapTokenVocab`] from a tiktoken vocab file.
+///
+/// # Arguments
+/// * `vocab` - the vocabulary to extend.
+/// * `stream` - the line iterator.
+pub fn update_word_map_from_tiktoken_iter<T>(
+    vocab: &mut WordMapTokenVocab<T>,
+    stream: impl Iterator<Item = std::io::Result<String>>,
+) -> anyhow::Result<()>
+where
+    T: TokenType,
+{
+    for line in stream {
         let line = line?;
         let s: &str = line.as_ref();
 
@@ -34,7 +69,7 @@ pub fn load_word_map_from_tiktoken_path<T: TokenType, P: AsRef<Path>>(
 
         vocab.add_bytes_word(chunk, token);
     }
-    Ok(vocab)
+    Ok(())
 }
 
 /// Save a [`WordMapTokenVocab`] to a tiktoken vocab file.
@@ -49,6 +84,18 @@ pub fn save_word_map_to_tiktoken_path<T: TokenType, P: AsRef<Path>>(
     let file = std::fs::File::create(path)?;
     let mut writer = BufWriter::new(file);
 
+    save_word_map_to_tiktoken_writer(vocab, &mut writer)
+}
+
+/// Save a [`WordMapTokenVocab`] to a [`Write`] writer.
+pub fn save_word_map_to_tiktoken_writer<T, W>(
+    vocab: &WordMapTokenVocab<T>,
+    writer: &mut W,
+) -> anyhow::Result<()>
+where
+    T: TokenType,
+    W: Write,
+{
     let mut items: Vec<(T, &Vec<u8>)> =
         vocab.iter().map(|(chunk, &token)| (token, chunk)).collect();
     items.sort_by_key(|(t, _)| *t);

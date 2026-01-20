@@ -9,7 +9,7 @@ use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
 use wordchuck::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::training::BinaryPairVocabTrainer;
-use wordchuck::vocab::io::tiktoken::save_word_map_to_tiktoken_path;
+use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
