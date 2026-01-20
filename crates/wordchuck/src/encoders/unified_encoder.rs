@@ -123,7 +123,7 @@ mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::BinaryPairVocabTrainer;
+    use crate::training::trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
     use alloc::sync::Arc;
@@ -135,7 +135,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainer::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
 
         let samples = vec![
             "hello world",
@@ -143,9 +143,10 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let mut vocab = options
-            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
-            .unwrap();
+        let mut trainer = options.init::<K, C>();
+        trainer.update_from_samples(samples.iter());
+
+        let mut vocab = trainer.train::<T>().unwrap();
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 

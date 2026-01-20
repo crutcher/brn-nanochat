@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
 use wordchuck::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
-use wordchuck::training::BinaryPairVocabTrainer;
+use wordchuck::training::BinaryPairVocabTrainerOptions;
 use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
@@ -91,8 +91,11 @@ fn main() -> anyhow::Result<()> {
 
     let cache_ref = &cache;
 
-    // Note: rather than repeating this, this should be a func to generate the Iterator.
-    // But I can't work out the lifetimes.
+    // TODO: `indicatif` for optional progress bar for users waiting on this.
+
+    let mut trainer =
+        BinaryPairVocabTrainerOptions::new_with_vocab_size(args.vocab_size).init::<K, C>();
+
     let samples = shards.clone().into_iter().flat_map(move |shard| {
         cache_ref
             .read_cached_batches(shard)
@@ -106,21 +109,19 @@ fn main() -> anyhow::Result<()> {
                             .as_any()
                             .downcast_ref::<StringArray>()
                             .unwrap();
-                        text.iter()
-                            .map(|s| s.unwrap().to_string())
-                            .collect::<Vec<_>>()
+                        text.iter().map(|s| s.unwrap().to_string())
                     })
                     .collect::<Vec<_>>()
             })
     });
 
-    // TODO: `indicatif` for optional progress bar for users waiting on this.
-    let vocab: Arc<UnifiedTokenVocab<T>> =
-        BinaryPairVocabTrainer::new_with_vocab_size(args.vocab_size)
-            .train_vocab_from_sample_iter::<T, K, C, _>(samples)
-            .expect("training failed")
-            .extend_word_vocab_from_pair_vocab()
-            .into();
+    trainer.update_from_samples(samples);
+
+    let vocab: Arc<UnifiedTokenVocab<T>> = trainer
+        .train()
+        .expect("training failed")
+        .extend_word_vocab_from_pair_vocab()
+        .into();
 
     let training_duration = std::time::Instant::now().duration_since(t0);
     println!("- training_duration: {:#?}", training_duration);

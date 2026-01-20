@@ -1,6 +1,5 @@
 //! Validators for various configuration options.
 use crate::types::TokenType;
-use fancy_regex::Regex;
 
 /// The size of the u8 space.
 pub const U8_SIZE: usize = u8::MAX as usize + 1;
@@ -25,17 +24,6 @@ pub fn try_vocab_size<T: TokenType>(vocab_size: usize) -> anyhow::Result<usize> 
 /// Validates and returns the vocab size, panicking if it's too small.
 pub fn expect_vocab_size<T: TokenType>(vocab_size: usize) -> usize {
     try_vocab_size::<T>(vocab_size).unwrap()
-}
-
-/// Validates and returns a regex pattern, panicking if it fails to compile.
-pub fn try_regex(pattern: &str) -> anyhow::Result<Regex> {
-    Regex::new(pattern)
-        .map_err(|_| anyhow::anyhow!("regex pattern compilation failed: {}", pattern))
-}
-
-/// Validates and returns a regex pattern, panicking if it fails to compile.
-pub fn expect_regex<S: AsRef<str>>(pattern: S) -> Regex {
-    try_regex(pattern.as_ref()).unwrap()
 }
 
 /// Validates and returns parallel processing options.
