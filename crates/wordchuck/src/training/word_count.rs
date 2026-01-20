@@ -173,8 +173,9 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator + Send,
+        I: IntoIterator,
         I::Item: AsRef<str> + Send,
+        I::IntoIter: Send,
     {
         if self.parallel {
             #[cfg(not(feature = "rayon"))]
@@ -194,8 +195,8 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator,
-        I::Item: AsRef<str> + Send,
+        I: IntoIterator,
+        I::Item: AsRef<str>,
     {
         for sample in samples {
             self.update_from_text(sample);
@@ -210,13 +211,15 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator + Send,
+        I: IntoIterator,
         I::Item: AsRef<str> + Send,
+        I::IntoIter: Send,
     {
         use rayon::iter::ParallelBridge;
         use rayon::prelude::*;
 
         let updates: AHashMap<K, C> = samples
+            .into_iter()
             .par_bridge()
             .map(|sample| word_counts_from_text(&self.regex_supplier.get_regex(), &sample).unwrap())
             .reduce(

@@ -172,8 +172,9 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator + Send,
+        I: IntoIterator,
         I::Item: AsRef<str> + Send,
+        I::IntoIter: Send,
     {
         self.word_counter.update_from_samples(samples);
     }
