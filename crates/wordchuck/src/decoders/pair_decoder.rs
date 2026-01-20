@@ -64,7 +64,7 @@ mod tests {
     use super::*;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::BinaryPairVocabTrainer;
+    use crate::training::trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -76,7 +76,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainer::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
 
         let samples = vec![
             "hello world",
@@ -84,9 +84,13 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = options
-            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
-            .unwrap()
+        let mut trainer = options.init::<K, C>();
+
+        trainer.update_from_samples(samples.iter());
+
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer
+            .train::<T>()
+            .expect("training vocab should succeed")
             .into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());

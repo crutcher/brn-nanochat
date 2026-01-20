@@ -2,6 +2,9 @@
 
 use crate::training::word::Word;
 use crate::types::{CountType, StringChunkType, TokenType};
+use crate::util::regex::{
+    RegexSupplierHandle, RegexWrapper, RegexWrapperPattern, parallel_regex_supplier,
+};
 use ahash::AHashMap;
 use std::fmt::Debug;
 
@@ -10,7 +13,7 @@ pub const EXPECTED_AVG_WORD_LEN: usize = 5;
 
 /// Split text into words and count occurrences using a regular expression.
 pub fn word_counts_from_text<S, K, C>(
-    regex: &fancy_regex::Regex,
+    regex: &RegexWrapper,
     text: S,
 ) -> anyhow::Result<AHashMap<K, C>>
 where
@@ -27,7 +30,7 @@ where
 /// Update word counts in-place from text using a regular expression.
 pub fn update_word_counts_from_text<S, K, C>(
     word_counts: &mut AHashMap<K, C>,
-    regex: &fancy_regex::Regex,
+    regex: &RegexWrapper,
     text: S,
 ) -> anyhow::Result<()>
 where
@@ -36,7 +39,7 @@ where
     C: CountType,
 {
     for mat in regex.find_iter(text.as_ref()) {
-        let piece = mat?.as_str();
+        let piece = mat.as_str();
         let k: K = piece.into();
         *word_counts.entry(k).or_default() += C::one();
     }
@@ -60,7 +63,7 @@ pub fn update_word_counts<K, C>(
 #[derive(Debug, Clone)]
 pub struct WordCounterOptions {
     /// The regex pattern used for text splitting.
-    pub pattern: String,
+    pub pattern: RegexWrapperPattern,
 
     /// Whether to use parallel processing for word counting.
     ///
@@ -71,7 +74,7 @@ pub struct WordCounterOptions {
 impl Default for WordCounterOptions {
     fn default() -> Self {
         Self {
-            pattern: String::from(crate::GPT4_PATTERN),
+            pattern: crate::GPT4_PATTERN.into(),
             parallel: crate::DEFAULT_PARALLEL,
         }
     }
@@ -87,9 +90,9 @@ impl WordCounterOptions {
     }
 
     /// Set the regex pattern used for text splitting.
-    pub fn with_pattern(
+    pub fn with_pattern<P: Into<RegexWrapperPattern>>(
         self,
-        pattern: impl Into<String>,
+        pattern: P,
     ) -> Self {
         Self {
             pattern: pattern.into(),
@@ -108,10 +111,10 @@ where
     pub parallel: bool,
 
     /// The regex pattern used for text splitting.
-    pub pattern: String,
+    pub pattern: RegexWrapperPattern,
 
     /// The compiled regex pattern.
-    pub regex: fancy_regex::Regex,
+    pub regex_supplier: RegexSupplierHandle,
 
     /// The word counts.
     pub word_counts: AHashMap<K, C>,
@@ -125,7 +128,11 @@ where
     /// Create a new word counter.
     pub fn new(options: WordCounterOptions) -> Self {
         let pattern = options.pattern;
-        let regex = fancy_regex::Regex::new(&pattern).unwrap();
+
+        let regex = pattern
+            .compile()
+            .expect("regex pattern compilation succeeded");
+        let regex_supplier = parallel_regex_supplier(regex);
 
         let parallel = options.parallel;
 
@@ -137,7 +144,7 @@ where
         Self {
             parallel,
             pattern,
-            regex,
+            regex_supplier,
             word_counts: AHashMap::with_capacity(100_000),
         }
     }
@@ -152,7 +159,12 @@ where
         &mut self,
         text: S,
     ) {
-        update_word_counts_from_text(&mut self.word_counts, &self.regex, text).unwrap();
+        update_word_counts_from_text(
+            &mut self.word_counts,
+            &self.regex_supplier.get_regex(),
+            text,
+        )
+        .unwrap();
     }
 
     /// Update word counts inplace from a sample iterator.
@@ -161,8 +173,9 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator + Send,
+        I: IntoIterator,
         I::Item: AsRef<str> + Send,
+        I::IntoIter: Send,
     {
         if self.parallel {
             #[cfg(not(feature = "rayon"))]
@@ -182,8 +195,8 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator,
-        I::Item: AsRef<str> + Send,
+        I: IntoIterator,
+        I::Item: AsRef<str>,
     {
         for sample in samples {
             self.update_from_text(sample);
@@ -198,15 +211,17 @@ where
         &mut self,
         samples: I,
     ) where
-        I: Iterator + Send,
+        I: IntoIterator,
         I::Item: AsRef<str> + Send,
+        I::IntoIter: Send,
     {
         use rayon::iter::ParallelBridge;
         use rayon::prelude::*;
 
         let updates: AHashMap<K, C> = samples
+            .into_iter()
             .par_bridge()
-            .map(|sample| word_counts_from_text(&self.regex, &sample).unwrap())
+            .map(|sample| word_counts_from_text(&self.regex_supplier.get_regex(), &sample).unwrap())
             .reduce(
                 || AHashMap::with_capacity(self.word_counts.capacity()),
                 |mut a, b| {
@@ -226,24 +241,11 @@ where
         update_word_counts(&mut self.word_counts, word_counts);
     }
 
-    /// Ingests samples into the word counter; then export to a [`Word<T>`] count.
-    pub fn samples_to_word_counts<T, I>(
-        samples: I,
-        options: WordCounterOptions,
-    ) -> AHashMap<Word<T>, C>
-    where
-        T: TokenType,
-        I: Iterator + Send,
-        I::Item: AsRef<str> + Send,
-    {
-        let mut counter = Self::new(options);
-        counter.update_from_samples(samples);
-
-        counter
-            .release()
-            .into_iter()
-            .map(|(word, count)| (Word::from_string(word), count))
-            .collect()
+    /// Convert the word counter to a [`Word<T>`] count iterator.
+    pub fn to_word_counts_iter<T: TokenType>(&self) -> impl Iterator<Item = (Word<T>, C)> {
+        self.word_counts
+            .iter()
+            .map(|(k, v)| (Word::from_string(k), *v))
     }
 }
 
@@ -256,8 +258,9 @@ mod tests {
 
     const PATTERN: &str = r"\w+";
 
-    fn get_regex() -> fancy_regex::Regex {
-        fancy_regex::Regex::new(PATTERN).unwrap()
+    fn get_regex() -> RegexWrapper {
+        let pattern: RegexWrapperPattern = PATTERN.into();
+        pattern.compile().unwrap()
     }
 
     #[test]
@@ -312,17 +315,17 @@ mod tests {
     }
 
     #[test]
-    fn test_samples_to_word_counts_serial() {
-        test_samples_to_word_counts(false);
+    fn test_update_from_samples_serial() {
+        test_update_from_samples(false);
     }
 
     #[test]
     #[cfg(feature = "rayon")]
-    fn test_samples_to_word_counts_parallel() {
-        test_samples_to_word_counts(true);
+    fn test_update_from_samples_parallel() {
+        test_update_from_samples(true);
     }
 
-    fn test_samples_to_word_counts(parallel: bool) {
+    fn test_update_from_samples(parallel: bool) {
         let options = WordCounterOptions::default()
             .with_pattern(PATTERN)
             .with_parallel(parallel);
@@ -333,8 +336,10 @@ mod tests {
         type T = usize;
         type C = u64;
 
-        let counts: AHashMap<Word<T>, C> =
-            WordCounter::<K, C>::samples_to_word_counts(samples.iter(), options);
+        let mut word_counts = WordCounter::<K, C>::new(options);
+        word_counts.update_from_samples(samples.iter());
+
+        let counts: AHashMap<Word<T>, C> = word_counts.to_word_counts_iter().collect();
         let mut counts = counts.into_iter().collect::<Vec<_>>();
         counts.sort();
 

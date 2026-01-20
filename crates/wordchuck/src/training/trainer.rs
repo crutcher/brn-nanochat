@@ -4,6 +4,7 @@ use crate::training::pair_index::{PairIndex, PairIndexOptions};
 use crate::training::word::Word;
 use crate::training::word_count::{WordCounter, WordCounterOptions};
 use crate::types::{CountType, Pair, StringChunkType, TokenType};
+use crate::util::regex::RegexWrapperPattern;
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
 use crate::vocab::UnifiedTokenVocab;
@@ -12,11 +13,11 @@ use ahash::{AHashMap, AHashSet};
 use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
 
-/// Trainer for learning binary pair encodings.
-#[derive(Debug)]
-pub struct BinaryPairVocabTrainer {
+/// Options for [`BinaryPairVocabTrainer`].
+#[derive(Debug, Clone)]
+pub struct BinaryPairVocabTrainerOptions {
     /// The regex pattern used for text splitting.
-    pub pattern: String,
+    pub pattern: RegexWrapperPattern,
 
     /// The vocab size.
     pub vocab_size: usize,
@@ -25,21 +26,21 @@ pub struct BinaryPairVocabTrainer {
     pub parallel: bool,
 }
 
-impl BinaryPairVocabTrainer {
-    /// Creates a new [`BinaryPairVocabTrainer`].
+impl BinaryPairVocabTrainerOptions {
+    /// Creates a new [`BinaryPairVocabTrainerOptions`].
     ///
     /// # Arguments
     /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
     pub fn new_with_vocab_size(vocab_size: usize) -> Self {
         Self {
-            pattern: DEFAULT_PATTERN.to_string(),
+            pattern: DEFAULT_PATTERN.into(),
             vocab_size,
             parallel: DEFAULT_PARALLEL,
         }
     }
 }
 
-impl BinaryPairVocabTrainer {
+impl BinaryPairVocabTrainerOptions {
     /// Sets the vocab size.
     ///
     /// # Arguments
@@ -52,12 +53,12 @@ impl BinaryPairVocabTrainer {
     }
 
     /// Sets the regex pattern used for text splitting.
-    pub fn with_pattern<P: AsRef<str>>(
+    pub fn with_pattern<P: Into<RegexWrapperPattern>>(
         self,
         pattern: P,
     ) -> Self {
-        let pattern = pattern.as_ref().to_string();
-        validators::expect_regex(&pattern);
+        let pattern = pattern.into();
+        pattern.compile().expect("regex pattern compilation failed");
         Self { pattern, ..self }
     }
 
@@ -72,49 +73,110 @@ impl BinaryPairVocabTrainer {
         }
     }
 
-    /// Validates the options.
-    pub fn validate(&self) -> anyhow::Result<()> {
-        validators::try_regex(&self.pattern)?;
-        validators::try_parallel(self.parallel)?;
-        Ok(())
-    }
-
-    /// Trains a binary pair encoder vocab over a sample iterator.
-    pub fn train_vocab_from_sample_iter<T, K, C, I>(
-        self,
-        samples: I,
-    ) -> anyhow::Result<UnifiedTokenVocab<T>>
+    /// Initializes a [`BinaryPairVocabTrainer`] from these options.
+    pub fn init<K, C>(self) -> BinaryPairVocabTrainer<K, C>
     where
-        T: TokenType,
         K: StringChunkType,
         C: CountType,
-        I: Iterator + Send,
-        I::Item: AsRef<str> + Send,
     {
-        let word_counts = WordCounter::<K, C>::samples_to_word_counts(
-            samples,
+        let word_counter = WordCounter::<K, C>::new(
             WordCounterOptions::default()
-                .with_pattern(&self.pattern)
+                .with_pattern(self.pattern.clone())
                 .with_parallel(self.parallel),
         );
 
-        self.train_vocab_from_word_count_map(word_counts)
+        BinaryPairVocabTrainer {
+            options: self,
+            word_counter,
+        }
+    }
+}
+
+/// Info about a [`Pair`] that could be merged.
+#[derive(Debug, Eq)]
+pub struct MergeJob<T: TokenType, C: CountType> {
+    /// The number of instances of this pair in the corpus.
+    pub count: C,
+
+    /// The pair to merge.
+    pub pair: Pair<T>,
+
+    /// Word indices that may contain this pair.
+    pub word_indices: AHashSet<usize>,
+}
+
+impl<T: TokenType, C: CountType> MergeJob<T, C> {
+    /// The job key.
+    ///
+    /// Max-heap by count; tie-break to ascending pair order (deterministic)
+    pub fn heap_key(&self) -> (C, Pair<T>) {
+        (self.count, self.pair)
+    }
+}
+
+impl<T: TokenType, C: CountType> PartialEq for MergeJob<T, C> {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
+        self.heap_key() == other.heap_key()
+    }
+}
+
+impl<T: TokenType, C: CountType> PartialOrd for MergeJob<T, C> {
+    fn partial_cmp(
+        &self,
+        other: &Self,
+    ) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
+    fn cmp(
+        &self,
+        other: &Self,
+    ) -> Ordering {
+        self.heap_key().cmp(&other.heap_key())
+    }
+}
+
+/// Trainer for learning binary pair encodings.
+pub struct BinaryPairVocabTrainer<K = String, C = u32>
+where
+    K: StringChunkType,
+    C: CountType,
+{
+    /// Trainer options.
+    pub options: BinaryPairVocabTrainerOptions,
+
+    /// The word counter.
+    pub word_counter: WordCounter<K, C>,
+}
+
+impl<K, C> BinaryPairVocabTrainer<K, C>
+where
+    K: StringChunkType,
+    C: CountType,
+{
+    /// Update the word counts inplace from a text string.
+    pub fn update_from_text<S: AsRef<str>>(
+        &mut self,
+        text: S,
+    ) {
+        self.word_counter.update_from_text(text);
     }
 
-    /// Trains a binary pair encoder vocab over words.
-    ///
-    /// # Arguments
-    /// * `word_counts` - a ``{word: count}`` map.
-    pub fn train_vocab_from_word_count_map<T, C>(
-        self,
-        words: AHashMap<Word<T>, C>,
-    ) -> anyhow::Result<UnifiedTokenVocab<T>>
-    where
-        T: TokenType,
-        C: CountType,
+    /// Update word counts inplace from a sample iterator.
+    pub fn update_from_samples<I>(
+        &mut self,
+        samples: I,
+    ) where
+        I: IntoIterator,
+        I::Item: AsRef<str> + Send,
+        I::IntoIter: Send,
     {
-        let (ws, cs): (Vec<Word<T>>, Vec<C>) = words.into_iter().unzip();
-        self.train_vocab_from_word_count_table(ws, &cs)
+        self.word_counter.update_from_samples(samples);
     }
 
     /// Trains a binary pair encoder vocab over words.
@@ -126,24 +188,22 @@ impl BinaryPairVocabTrainer {
         feature = "tracing",
         tracing::instrument(skip(self, words, word_counts))
     )]
-    pub fn train_vocab_from_word_count_table<T, C>(
-        self,
-        mut words: Vec<Word<T>>,
-        word_counts: &[C],
-    ) -> anyhow::Result<UnifiedTokenVocab<T>>
+    pub fn train<T>(self) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         C: CountType,
     {
-        validators::expect_vocab_size::<T>(self.vocab_size);
+        validators::expect_vocab_size::<T>(self.options.vocab_size);
 
-        let num_merges = self.vocab_size - U8_SIZE;
+        let num_merges = self.options.vocab_size - U8_SIZE;
         log::info!("Starting BPE training: {} merges to compute", num_merges);
 
-        // Prefer to fail before we do all the work below.
-        let _ = validators::expect_regex(&self.pattern);
+        self.options.pattern.compile()?;
 
-        let mut vocab = UnifiedTokenVocab::new(self.pattern.into());
+        let mut vocab = UnifiedTokenVocab::new(self.options.pattern.clone());
+
+        let (mut words, word_counts): (Vec<Word<T>>, Vec<C>) =
+            self.word_counter.to_word_counts_iter().unzip();
 
         log::info!("Building pair index...");
         let PairIndex {
@@ -151,9 +211,9 @@ impl BinaryPairVocabTrainer {
             pair_to_word_index,
         } = PairIndex::index_unique_word_counts_table(
             &words,
-            word_counts,
+            &word_counts,
             PairIndexOptions {
-                parallel: self.parallel,
+                parallel: self.options.parallel,
             },
         );
 
@@ -265,61 +325,12 @@ impl BinaryPairVocabTrainer {
     }
 }
 
-/// Info about a [`Pair`] that could be merged.
-#[derive(Debug, Eq)]
-pub struct MergeJob<T: TokenType, C: CountType> {
-    /// The number of instances of this pair in the corpus.
-    pub count: C,
-
-    /// The pair to merge.
-    pub pair: Pair<T>,
-
-    /// Word indices that may contain this pair.
-    pub word_indices: AHashSet<usize>,
-}
-
-impl<T: TokenType, C: CountType> MergeJob<T, C> {
-    /// The job key.
-    ///
-    /// Max-heap by count; tie-break to ascending pair order (deterministic)
-    pub fn heap_key(&self) -> (C, Pair<T>) {
-        (self.count, self.pair)
-    }
-}
-
-impl<T: TokenType, C: CountType> PartialEq for MergeJob<T, C> {
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool {
-        self.heap_key() == other.heap_key()
-    }
-}
-
-impl<T: TokenType, C: CountType> PartialOrd for MergeJob<T, C> {
-    fn partial_cmp(
-        &self,
-        other: &Self,
-    ) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
-    fn cmp(
-        &self,
-        other: &Self,
-    ) -> Ordering {
-        self.heap_key().cmp(&other.heap_key())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::{BinaryPairVocabTrainer, MergeJob};
+    use crate::training::trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -330,9 +341,9 @@ mod tests {
 
     #[test]
     fn test_tokenizer_options() {
-        let options = BinaryPairVocabTrainer::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
         assert_eq!(options.vocab_size, 1000);
-        assert_eq!(options.pattern, DEFAULT_PATTERN);
+        assert_eq!(options.pattern, DEFAULT_PATTERN.into());
         assert_eq!(options.parallel, DEFAULT_PARALLEL);
 
         let options = options
@@ -341,14 +352,16 @@ mod tests {
             .with_parallel(true);
 
         assert_eq!(options.vocab_size, 2000);
-        assert_eq!(options.pattern, r"\S+");
+        assert_eq!(options.pattern, r"\S+".into());
         assert_eq!(options.parallel, true);
     }
 
     #[test]
     #[should_panic(expected = "regex pattern compilation failed")]
     fn test_tokenizer_options_bad_pattern() {
-        let _ = BinaryPairVocabTrainer::new_with_vocab_size(1000).with_pattern(r"(");
+        let _ = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000)
+            .with_pattern(r"(")
+            .init::<String, u32>();
     }
 
     #[test]
@@ -367,7 +380,8 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainer::new_with_vocab_size(1000).with_parallel(parallel);
+        let options =
+            BinaryPairVocabTrainerOptions::new_with_vocab_size(1000).with_parallel(parallel);
 
         let samples = vec![
             "hello world",
@@ -375,8 +389,11 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = options
-            .train_vocab_from_sample_iter::<T, K, C, _>(samples.iter())
+        let mut trainer = options.init::<K, C>();
+        trainer.update_from_samples(samples.iter());
+
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer
+            .train::<T>()
             .unwrap()
             .extend_word_vocab_from_pair_vocab()
             .into();

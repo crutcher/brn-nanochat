@@ -42,7 +42,7 @@ impl core::fmt::Display for ErrorWrapper {
 impl core::error::Error for ErrorWrapper {}
 
 /// Label for regex patterns.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum RegexWrapperPattern {
     /// This is a pattern for the `regex` crate.
