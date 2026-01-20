@@ -9,6 +9,7 @@ use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
 use wordchuck::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::training::BinaryPairVocabTrainer;
+use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
@@ -126,9 +127,10 @@ fn main() -> anyhow::Result<()> {
     println!("- vocab_size: {:#?}", vocab.max_token());
 
     if let Some(path) = args.tiktoken_save_path {
-        vocab.word_vocab.save_to_tiktoken_path(&path)?;
+        save_word_map_to_tiktoken_path(&vocab.word_vocab, &path)?;
         println!("- tiktoken vocab: {path:?}");
     }
+
     if args.time_encode_decode {
         let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
         let encoder = ParallelEncoder::new(encoder);

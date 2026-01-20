@@ -6,7 +6,7 @@ use crate::util::regex::RegexWrapperPattern;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use crate::vocab::word_vocab::WordMapTokenVocab;
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashMap;
 
 /// Unified token vocabulary.
 #[derive(Clone)]
@@ -70,14 +70,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Leaves tokens which already exist in the `word_vocab`.
     pub fn extend_word_vocab_from_pair_vocab(self) -> Self {
         let mut word_vocab = self.word_vocab;
-
-        let tokens: AHashSet<T> = word_vocab.compound_tokens_iter().collect();
-
-        for (w, t) in WordMapTokenVocab::from_pair_vocab(&self.pair_vocab).words {
-            if !tokens.contains(&t) {
-                word_vocab.words.insert(w, t);
-            }
-        }
+        word_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
 
         Self { word_vocab, ..self }
     }
