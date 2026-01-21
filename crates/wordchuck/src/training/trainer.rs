@@ -143,7 +143,7 @@ where
     K: StringChunkType,
     C: CountType,
 {
-    ///
+    /// Initializes a [`BinaryPairVocabTrainer`].
     pub fn init(options: BinaryPairVocabTrainerOptions) -> Self {
         let word_counter = WordCounter::<K, C>::new(
             Arc::new(
