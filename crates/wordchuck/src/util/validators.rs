@@ -25,19 +25,3 @@ pub fn try_vocab_size<T: TokenType>(vocab_size: usize) -> anyhow::Result<usize> 
 pub fn expect_vocab_size<T: TokenType>(vocab_size: usize) -> usize {
     try_vocab_size::<T>(vocab_size).unwrap()
 }
-
-/// Validates and returns parallel processing options.
-pub fn try_parallel(parallel: bool) -> anyhow::Result<bool> {
-    #[cfg(not(feature = "rayon"))]
-    if parallel {
-        return Err(anyhow::anyhow!(
-            "Parallel processing requires the `rayon` feature to be enabled."
-        ));
-    }
-    Ok(parallel)
-}
-
-/// Validates and returns parallel processing options, panicking if it's not enabled.
-pub fn expect_parallel(parallel: bool) -> bool {
-    try_parallel(parallel).unwrap()
-}

@@ -81,7 +81,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::decoders::TokenDecoder;
-    use crate::encoders::{ParallelRayonEncoder, TokenEncoder, UnifiedVocabEncoder};
+    use crate::encoders::{TokenEncoder, UnifiedVocabEncoder};
+    use crate::rayon::rayon_encoder::ParallelRayonEncoder;
     use crate::training::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::public::patterns::GPT4_PATTERN;
