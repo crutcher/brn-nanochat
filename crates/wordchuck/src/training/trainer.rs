@@ -179,11 +179,12 @@ where
         self.word_counter.update_from_samples(samples);
     }
 
-    /// Trains a binary pair encoder vocab over words.
+    /// Trains [`UnifiedTokenVocab<T>`].
     ///
-    /// # Arguments
-    /// * `words` - the words, takes ownership.
-    /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
+    /// The resulting vocab will contain:
+    /// * the trainer's word split pattern,
+    /// * a ``{(T, T) -> T}`` pair map vocab with the learned binary pair merges,
+    /// * a ``{Vec<u8> -> T}`` word map that is empty.
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(skip(self, words, word_counts))

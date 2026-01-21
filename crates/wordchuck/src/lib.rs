@@ -15,18 +15,17 @@
 //! let mut trainer = options.init::<K, C>();
 //!
 //! for batch in batches {
-//! trainer.update_from_sampples(batch.iter());
+//!     trainer.update_from_sampples(batch.iter());
 //! }
 //!
 //! let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-//! .train()
-//! .expect("training failed")
-//! .extend_word_vocab_from_pair_vocab()
-//! .into();
+//!     .train()
+//!     .expect("training failed")
+//!     .into();
 //!
 //! if let Some(path) = args.tiktoken_save_path {
-//! vocab.word_vocab.save_to_tiktoken_path(&path)?;
-//! println!("- tiktoken vocab: {path:?}");
+//!     vocab.word_vocab.save_to_tiktoken_path(&path)?;
+//!     println!("- tiktoken vocab: {path:?}");
 //! }
 //!
 //! let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
