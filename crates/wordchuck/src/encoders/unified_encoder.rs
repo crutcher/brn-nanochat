@@ -126,6 +126,7 @@ mod tests {
     use crate::training::trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
+    use crate::vocab::public::patterns::GPT4_PATTERN;
     use alloc::sync::Arc;
     use compact_str::CompactString;
 
@@ -135,7 +136,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainerOptions::new(GPT4_PATTERN, 1000);
 
         let samples = vec![
             "hello world",

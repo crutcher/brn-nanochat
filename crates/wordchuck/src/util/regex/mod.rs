@@ -33,39 +33,36 @@
 //!
 //! The chosen solution to this is the combination of:
 //! * [`RegexSupplier`] / [`RegexSupplierHandle`]
-//! * [`parallel_regex_supplier`].
+//! * [`maybe_parallel_regex_supplier`].
 //!
 //! Users of a [`RegexWrapper`] that *may* be under heavy thread contention should use
-//! [`parallel_regex_supplier`]; which in some build environments will provide
+//! [`maybe_parallel_regex_supplier`]; which in some build environments will provide
 //! a thread local clone regex supplier, and in some, a simple clone implementation.
 
-mod alt_list;
-mod re_supplier;
-mod re_wrapper;
+pub mod alt_list;
+#[cfg(feature = "std")]
+pub mod re_pool;
 
-pub use alt_list::{fixed_alternative_list_regex_pattern, fixed_alternative_list_regex_wrapper};
-pub use re_supplier::{RegexSupplier, RegexSupplierHandle, SimpleRegexSupplier};
+pub mod re_supplier;
+pub mod re_wrapper;
+
+pub use re_supplier::{RegexSupplier, RegexSupplierHandle};
 pub use re_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};
-
-#[cfg(feature = "std")]
-mod re_pool;
-#[cfg(feature = "std")]
-use re_pool::RegexWrapperPool;
 
 /// Build a regex supplier for (potentially) parallel execution.
 ///
 /// Users of a [`RegexWrapper`] that *may* be under heavy thread contention should use
-/// [`parallel_regex_supplier`]; which in some build environments will provide
+/// [`maybe_parallel_regex_supplier`]; which in some build environments will provide
 /// a thread local clone regex supplier, and in some, a simple clone implementation.
-pub fn parallel_regex_supplier<R>(regex: R) -> RegexSupplierHandle
+pub fn maybe_parallel_regex_supplier<R>(regex: R) -> RegexSupplierHandle
 where
     R: Into<RegexWrapperHandle>,
 {
     let regex = regex.into();
 
     #[cfg(feature = "std")]
-    return alloc::sync::Arc::new(RegexWrapperPool::new(regex));
+    return alloc::sync::Arc::new(re_pool::RegexWrapperPool::new(regex));
 
     #[cfg(not(feature = "std"))]
-    return regex.into();
+    return regex;
 }

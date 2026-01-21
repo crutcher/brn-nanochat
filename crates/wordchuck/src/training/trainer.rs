@@ -1,6 +1,6 @@
 //! # Vocab Trainer
 
-use crate::training::pair_index::{PairIndex, PairIndexOptions};
+use crate::training::pair_index::PairIndex;
 use crate::training::word::Word;
 use crate::training::word_count::{WordCounter, WordCounterOptions};
 use crate::types::{CountType, Pair, StringChunkType, TokenType};
@@ -8,10 +8,10 @@ use crate::util::regex::RegexWrapperPattern;
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
 use crate::vocab::UnifiedTokenVocab;
-use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
 use ahash::{AHashMap, AHashSet};
 use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
+use std::sync::Arc;
 
 /// Options for [`BinaryPairVocabTrainer`].
 #[derive(Debug, Clone)]
@@ -21,21 +21,17 @@ pub struct BinaryPairVocabTrainerOptions {
 
     /// The vocab size.
     pub vocab_size: usize,
-
-    /// Whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
-    pub parallel: bool,
 }
 
 impl BinaryPairVocabTrainerOptions {
-    /// Creates a new [`BinaryPairVocabTrainerOptions`].
-    ///
-    /// # Arguments
-    /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
-    pub fn new_with_vocab_size(vocab_size: usize) -> Self {
+    /// Create new options.
+    pub fn new(
+        pattern: impl Into<RegexWrapperPattern>,
+        vocab_size: usize,
+    ) -> Self {
         Self {
-            pattern: DEFAULT_PATTERN.into(),
+            pattern: pattern.into(),
             vocab_size,
-            parallel: DEFAULT_PARALLEL,
         }
     }
 }
@@ -62,17 +58,6 @@ impl BinaryPairVocabTrainerOptions {
         Self { pattern, ..self }
     }
 
-    /// Sets whether to use parallel processing for indexing; requires the `rayon` feature to be enabled.
-    pub fn with_parallel(
-        self,
-        parallel: bool,
-    ) -> Self {
-        Self {
-            parallel: validators::expect_parallel(parallel),
-            ..self
-        }
-    }
-
     /// Initializes a [`BinaryPairVocabTrainer`] from these options.
     pub fn init<K, C>(self) -> BinaryPairVocabTrainer<K, C>
     where
@@ -80,9 +65,12 @@ impl BinaryPairVocabTrainerOptions {
         C: CountType,
     {
         let word_counter = WordCounter::<K, C>::new(
-            WordCounterOptions::default()
-                .with_pattern(self.pattern.clone())
-                .with_parallel(self.parallel),
+            Arc::new(
+                self.pattern
+                    .compile()
+                    .expect("regex pattern compilation failed"),
+            ),
+            WordCounterOptions::default(),
         );
 
         BinaryPairVocabTrainer {
@@ -173,8 +161,7 @@ where
         samples: I,
     ) where
         I: IntoIterator,
-        I::Item: AsRef<str> + Send,
-        I::IntoIter: Send,
+        I::Item: AsRef<str>,
     {
         self.word_counter.update_from_samples(samples);
     }
@@ -210,13 +197,7 @@ where
         let PairIndex {
             mut pair_counts,
             pair_to_word_index,
-        } = PairIndex::index_unique_word_counts_table(
-            &words,
-            &word_counts,
-            PairIndexOptions {
-                parallel: self.options.parallel,
-            },
-        );
+        } = PairIndex::build_from_word_counts_table(&words, &word_counts);
 
         let zero = C::zero();
         let one = C::one();
@@ -334,55 +315,38 @@ mod tests {
     use crate::training::trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
+    use crate::vocab::public::patterns::GPT4_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
-    use crate::{DEFAULT_PARALLEL, DEFAULT_PATTERN};
     use alloc::sync::Arc;
     use compact_str::CompactString;
     use core::cmp::Ordering;
 
     #[test]
     fn test_tokenizer_options() {
-        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
-        assert_eq!(options.vocab_size, 1000);
-        assert_eq!(options.pattern, DEFAULT_PATTERN.into());
-        assert_eq!(options.parallel, DEFAULT_PARALLEL);
+        let options = BinaryPairVocabTrainerOptions::new(GPT4_PATTERN, 1000);
 
-        let options = options
-            .with_vocab_size(2000)
-            .with_pattern(r"\S+")
-            .with_parallel(true);
+        assert_eq!(options.vocab_size, 1000);
+        assert_eq!(options.pattern, GPT4_PATTERN.into());
+
+        let options = options.with_vocab_size(2000).with_pattern(r"\S+");
 
         assert_eq!(options.vocab_size, 2000);
         assert_eq!(options.pattern, r"\S+".into());
-        assert_eq!(options.parallel, true);
     }
 
     #[test]
     #[should_panic(expected = "regex pattern compilation failed")]
     fn test_tokenizer_options_bad_pattern() {
-        let _ = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000)
-            .with_pattern(r"(")
-            .init::<String, u32>();
+        let _ = BinaryPairVocabTrainerOptions::new(r"(", 1000).init::<String, u32>();
     }
 
     #[test]
-    #[cfg(feature = "rayon")]
-    fn test_train_tokenizer_parallel() {
-        test_train_tokenizer(true);
-    }
-
-    #[test]
-    fn test_train_tokenizer_serial() {
-        test_train_tokenizer(false);
-    }
-
-    fn test_train_tokenizer(parallel: bool) {
+    fn test_train_tokenizer() {
         type T = u16;
         type C = u32;
         type K = CompactString;
 
-        let options =
-            BinaryPairVocabTrainerOptions::new_with_vocab_size(1000).with_parallel(parallel);
+        let options = BinaryPairVocabTrainerOptions::new(GPT4_PATTERN, 1000);
 
         let samples = vec![
             "hello world",

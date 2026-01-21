@@ -9,6 +9,7 @@ use wordchuck::decoders::{DictionaryDecoder, ParallelRayonDecoder, TokenDecoder}
 use wordchuck::encoders::{ParallelRayonEncoder, TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
 use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
+use wordchuck::vocab::public::patterns::GPT4_PATTERN;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
@@ -88,7 +89,8 @@ fn main() -> anyhow::Result<()> {
     println!("Training Tokenizer on shards: {:?}", shards);
     let t0 = std::time::Instant::now();
 
-    let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(args.vocab_size);
+    let vocab_size = args.vocab_size;
+    let options = BinaryPairVocabTrainerOptions::new(GPT4_PATTERN, vocab_size);
 
     let mut trainer = options.init::<K, C>();
 

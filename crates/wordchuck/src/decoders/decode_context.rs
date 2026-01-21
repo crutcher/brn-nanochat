@@ -1,7 +1,7 @@
 //! Token Decoder Context
 
-use crate::BYTES_PER_TOKEN_HINT;
 use crate::types::TokenType;
+use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 
 /// Representation of a token decoding context.
 #[derive(Clone)]
@@ -15,7 +15,7 @@ pub struct TokenDecodeContext<T: TokenType> {
 
 impl<T: TokenType> From<Vec<T>> for TokenDecodeContext<T> {
     fn from(tokens: Vec<T>) -> Self {
-        Self::for_tokens_with_hint(tokens, BYTES_PER_TOKEN_HINT)
+        Self::for_tokens_with_hint(tokens, EXPECTED_BYTES_PER_TOKEN)
     }
 }
 
