@@ -101,21 +101,20 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
     /// Compiled expansion dictionary.
     pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
-        let mut dictionary: AHashMap<T, Vec<u8>> = self
-            .clone()
-            .extend_word_vocab_from_pair_vocab()
-            .word_vocab
-            .iter()
-            .map(|(chunk, &token)| (token, chunk.to_vec()))
-            .collect();
+        let mut export_vocab = self.word_vocab.clone();
+
+        export_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
 
         if let Some(specials) = &self.specials {
             for (chunk, &t) in &specials.words {
-                dictionary.insert(t, chunk.clone());
+                export_vocab.add_bytes_word(chunk.clone(), t);
             }
         }
 
-        dictionary
+        export_vocab
+            .iter()
+            .map(|(chunk, &token)| (token, chunk.to_vec()))
+            .collect()
     }
 
     /// Compile the unified vocabulary into a dictionary decoders.
