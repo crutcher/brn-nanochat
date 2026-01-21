@@ -1,13 +1,12 @@
 use arrow::array::{Array, StringArray};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
-use compact_str::CompactString;
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
-use wordchuck::decoders::{DictionaryDecoder, ParallelDecoder, TokenDecoder};
-use wordchuck::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
+use wordchuck::decoders::{DictionaryDecoder, ParallelRayonDecoder, TokenDecoder};
+use wordchuck::encoders::{ParallelRayonEncoder, TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
 use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
@@ -82,41 +81,36 @@ fn main() -> anyhow::Result<()> {
     cache.load_shards(&shards)?;
 
     type T = u32;
-    type C = u32;
-    type K = CompactString;
+    type C = u64;
+    type K = String;
 
     println!();
     println!("Training Tokenizer on shards: {:?}", shards);
     let t0 = std::time::Instant::now();
 
-    let cache_ref = &cache;
+    let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(args.vocab_size);
 
-    // TODO: `indicatif` for optional progress bar for users waiting on this.
+    let mut trainer = options.init::<K, C>();
 
-    let mut trainer =
-        BinaryPairVocabTrainerOptions::new_with_vocab_size(args.vocab_size).init::<K, C>();
+    for &shard in &shards {
+        println!("- shard: {}", shard);
+        for batch in cache.read_cached_batches(shard)? {
+            let batch = batch?;
 
-    let samples = shards.clone().into_iter().flat_map(move |shard| {
-        cache_ref
-            .read_cached_batches(shard)
-            .expect("failed to read batch")
-            .flat_map(|batch| {
-                batch
-                    .iter()
-                    .flat_map(|sample| {
-                        let text = sample
-                            .column(0)
-                            .as_any()
-                            .downcast_ref::<StringArray>()
-                            .unwrap();
-                        text.iter().map(|s| s.unwrap().to_string())
-                    })
-                    .collect::<Vec<_>>()
-            })
-    });
+            let samples = batch
+                .column_by_name("text")
+                .expect("failed to find 'text' column in batch")
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .iter()
+                .filter_map(|s| s.map(|s| s.to_string()));
 
-    trainer.update_from_samples(samples);
+            trainer.update_from_samples(samples);
+        }
+    }
 
+    println!("- train");
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
         .train()
         .expect("training failed")
@@ -124,8 +118,8 @@ fn main() -> anyhow::Result<()> {
         .into();
 
     let training_duration = std::time::Instant::now().duration_since(t0);
-    println!("- training_duration: {:#?}", training_duration);
-    println!("- vocab_size: {:#?}", vocab.max_token());
+    println!("- training_duration: {:.2?}", training_duration);
+    println!("- vocab_size: {:?}", vocab.max_token());
 
     if let Some(path) = args.tiktoken_save_path {
         save_word_map_to_tiktoken_path(&vocab.word_vocab, &path)?;
@@ -134,10 +128,10 @@ fn main() -> anyhow::Result<()> {
 
     if args.time_encode_decode {
         let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
-        let encoder = ParallelEncoder::new(encoder);
+        let encoder = ParallelRayonEncoder::new(encoder);
 
         let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
-        let decoder = ParallelDecoder::new(decoder);
+        let decoder = ParallelRayonDecoder::new(decoder);
 
         let mut samples = Vec::new();
         {
