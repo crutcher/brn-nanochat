@@ -5,6 +5,7 @@ use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
+use wordchuck::DEFAULT_PATTERN;
 use wordchuck::decoders::{DictionaryDecoder, ParallelRayonDecoder, TokenDecoder};
 use wordchuck::encoders::{ParallelRayonEncoder, TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
@@ -88,7 +89,8 @@ fn main() -> anyhow::Result<()> {
     println!("Training Tokenizer on shards: {:?}", shards);
     let t0 = std::time::Instant::now();
 
-    let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(args.vocab_size);
+    let vocab_size = args.vocab_size;
+    let options = BinaryPairVocabTrainerOptions::new(DEFAULT_PATTERN, vocab_size);
 
     let mut trainer = options.init::<K, C>();
 

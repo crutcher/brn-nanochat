@@ -1,7 +1,7 @@
 //! Token Decoder Context
 
-use crate::BYTES_PER_TOKEN_HINT;
 use crate::types::TokenType;
+use crate::vocab::common_stats::BYTES_PER_TOKEN_HINT;
 
 /// Representation of a token decoding context.
 #[derive(Clone)]

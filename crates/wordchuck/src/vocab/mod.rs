@@ -1,5 +1,6 @@
 //! # Vocabulary
 
+pub mod common_stats;
 pub mod io;
 pub mod pair_vocab;
 pub mod unified_vocab;

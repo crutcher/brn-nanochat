@@ -1,11 +1,9 @@
 //! # Text Segmentor
 
-use crate::BYTES_PER_TOKEN_HINT;
-use crate::util::regex::{
-    RegexSupplier, RegexSupplierHandle, fixed_alternative_list_regex_wrapper,
-};
-use crate::util::regex::{RegexWrapperPattern, parallel_regex_supplier};
-use alloc::sync::Arc;
+use crate::util::regex::RegexSupplierHandle;
+use crate::util::regex::alt_list::fixed_alternative_list_regex_wrapper;
+use crate::util::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
+use crate::vocab::common_stats::BYTES_PER_TOKEN_HINT;
 use core::ops::Range;
 
 /// Word Reference for [`TextSegmentor`].
@@ -21,8 +19,8 @@ pub enum WordRef<'a> {
 /// Word Split + Special Words Segmentor
 #[derive(Clone)]
 pub struct TextSegmentor {
-    word_re_supplier: Arc<dyn RegexSupplier>,
-    special_re_supplier: Option<Arc<dyn RegexSupplier>>,
+    word_re_supplier: RegexSupplierHandle,
+    special_re_supplier: Option<RegexSupplierHandle>,
 }
 
 impl TextSegmentor {
@@ -31,10 +29,10 @@ impl TextSegmentor {
         word_pattern: RegexWrapperPattern,
         specials: Option<&[S]>,
     ) -> Self {
-        let word_re_supplier = parallel_regex_supplier(word_pattern);
+        let word_re_supplier = maybe_parallel_regex_supplier(word_pattern);
 
         let special_re_supplier: Option<RegexSupplierHandle> = match specials.as_ref() {
-            Some(specials) if !specials.is_empty() => Some(parallel_regex_supplier(
+            Some(specials) if !specials.is_empty() => Some(maybe_parallel_regex_supplier(
                 fixed_alternative_list_regex_wrapper(specials),
             )),
             _ => None,
@@ -45,8 +43,8 @@ impl TextSegmentor {
 
     /// Create a new text segmentor with the given regex suppliers.
     pub fn new(
-        word_re_supplier: Arc<dyn RegexSupplier>,
-        special_re_supplier: Option<Arc<dyn RegexSupplier>>,
+        word_re_supplier: RegexSupplierHandle,
+        special_re_supplier: Option<RegexSupplierHandle>,
     ) -> Self {
         Self {
             word_re_supplier,

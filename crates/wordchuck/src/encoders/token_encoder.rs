@@ -1,9 +1,9 @@
 //! # Token Encoder Trait
 
-use crate::BYTES_PER_TOKEN_HINT;
 use crate::encoders::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
+use crate::vocab::common_stats::BYTES_PER_TOKEN_HINT;
 use crate::vocab::word_vocab::WordMapTokenVocab;
 
 /// A trait for token encoders.

@@ -1,6 +1,6 @@
-//! Regex Supplier Trait
+//! # Regex Supplier Trait
 
-use crate::util::regex::re_wrapper::RegexWrapper;
+use crate::util::regex::RegexWrapper;
 use alloc::sync::Arc;
 
 /// Common Regex Supplier Handle Type
@@ -26,25 +26,14 @@ impl core::fmt::Debug for dyn RegexSupplier {
     }
 }
 
-/// Simple Regex Supplier
-#[derive(Debug, Clone)]
-pub struct SimpleRegexSupplier {
-    regex: Arc<RegexWrapper>,
-}
-
-impl SimpleRegexSupplier {
-    /// Create a new simple regex supplier.
-    pub fn new(regex: Arc<RegexWrapper>) -> Self {
-        Self { regex }
-    }
-}
-
-impl RegexSupplier for SimpleRegexSupplier {
-    fn get_pattern(&self) -> String {
-        self.regex.as_str().to_string()
-    }
-
+impl RegexSupplier for RegexWrapper {
     fn get_regex(&self) -> Arc<RegexWrapper> {
-        self.regex.clone()
+        Arc::new(self.clone())
+    }
+}
+
+impl RegexSupplier for Arc<RegexWrapper> {
+    fn get_regex(&self) -> Arc<RegexWrapper> {
+        self.clone()
     }
 }

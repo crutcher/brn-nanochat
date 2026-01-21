@@ -120,6 +120,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::DEFAULT_PATTERN;
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
@@ -135,7 +136,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainerOptions::new(DEFAULT_PATTERN, 1000);
 
         let samples = vec![
             "hello world",

@@ -51,6 +51,7 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::DEFAULT_PATTERN;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::BinaryPairVocabTrainerOptions;
@@ -65,7 +66,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(1000);
+        let options = BinaryPairVocabTrainerOptions::new(DEFAULT_PATTERN, 1000);
 
         let samples = vec![
             "hello world",

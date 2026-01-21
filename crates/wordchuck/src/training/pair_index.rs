@@ -10,33 +10,6 @@ pub type PairCountMap<T, C> = AHashMap<Pair<T>, C>;
 /// A map from [`Pair`] to indices over ``words``.
 pub type PairIndexMap<T> = AHashMap<Pair<T>, AHashSet<usize>>;
 
-/// Options for building a [`PairIndex`].
-#[derive(Debug, Clone, Copy)]
-pub struct PairIndexOptions {
-    /// Whether to use parallel processing for indexing.
-    ///
-    /// Requires the `rayon` feature to be enabled.
-    pub parallel: bool,
-}
-
-impl Default for PairIndexOptions {
-    fn default() -> Self {
-        Self {
-            parallel: crate::DEFAULT_PARALLEL,
-        }
-    }
-}
-
-impl PairIndexOptions {
-    /// Sets the parallel processing flag.
-    pub fn with_parallel(
-        self,
-        parallel: bool,
-    ) -> Self {
-        Self { parallel }
-    }
-}
-
 /// An index of [`Pair`]s over an index set of ``(word, count)``.
 #[derive(Debug)]
 pub struct PairIndex<T: TokenType, C: CountType> {
@@ -55,123 +28,36 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
     /// # Arguments
     /// * `words` - the slice of words; Words are assumed to be unique.
     /// * `word_counts` - `word_counts[i]` is the count of `words[i]`.
-    /// * `options` - options for building the index.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(words, word_counts)))]
-    pub fn index_unique_word_counts_table(
+    pub fn build_from_word_counts_table(
         words: &[Word<T>],
         word_counts: &[C],
-        options: PairIndexOptions,
     ) -> Self {
-        if options.parallel {
-            #[cfg(not(feature = "rayon"))]
-            panic!("Parallel processing requires the `rayon` feature to be enabled.");
+        let size_hint = words.len() / 1000;
 
-            #[cfg(feature = "rayon")]
-            Self::index_unique_word_counts_table_rayon(words, word_counts, options)
-        } else {
-            Self::index_unique_word_counts_table_serial(words, word_counts, options)
-        }
-    }
+        let mut pair_index = PairIndex {
+            pair_counts: PairCountMap::with_capacity(size_hint),
+            pair_to_word_index: PairIndexMap::with_capacity(size_hint),
+        };
 
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(skip(pair_counts, pair_to_word_index, index, w, word_count))
-    )]
-    fn observe_word(
-        pair_counts: &mut PairCountMap<T, C>,
-        pair_to_word_index: &mut PairIndexMap<T>,
-        index: usize,
-        w: &Word<T>,
-        word_count: C,
-    ) {
-        if word_count != C::zero() && w.len() >= 2 {
-            for p in w.pairs() {
-                *pair_counts.entry(p).or_default() += word_count;
-                pair_to_word_index.entry(p).or_default().insert(index);
-            }
-        }
-    }
-
-    /// Build a [`PairIndex`] from a slice of [`Word`]s, using a count table.
-    ///
-    /// This is a serial implementation that does not use parallelism;
-    /// this ignores the `options.parallel` flag.
-    ///
-    /// # Arguments
-    /// * `words` - the slice of words.
-    /// * `words` - the slice of words; Words are assumed to be unique.
-    /// * `options` - options for building the index.
-    pub fn index_unique_word_counts_table_serial(
-        words: &[Word<T>],
-        word_counts: &[C],
-        _options: PairIndexOptions,
-    ) -> Self {
-        let size_hint = words.len() / 100;
-        let mut pair_counts: PairCountMap<T, C> = PairCountMap::with_capacity(size_hint);
-        let mut pair_to_word_index: PairIndexMap<T> = PairIndexMap::with_capacity(size_hint);
+        let zero = C::zero();
 
         for (word_index, word) in words.iter().enumerate() {
-            Self::observe_word(
-                &mut pair_counts,
-                &mut pair_to_word_index,
-                word_index,
-                word,
-                word_counts[word_index],
-            );
-        }
+            let word_count = word_counts[word_index];
 
-        Self {
-            pair_counts,
-            pair_to_word_index,
-        }
-    }
-
-    /// Build a [`PairIndex`] from a slice of [`Word`]s, using a count table.
-    ///
-    /// This is a `rayon` implementation that uses parallelism;
-    /// this ignores the `options.parallel` flag.
-    ///
-    /// # Arguments
-    /// * `words` - the slice of words; Words are assumed to be unique.
-    /// * `word_counts` - `word_counts[i]` is the duplication count of `words[i]`.
-    /// * `options` - options for building the index.
-    #[cfg(feature = "rayon")]
-    pub fn index_unique_word_counts_table_rayon(
-        words: &[Word<T>],
-        word_counts: &[C],
-        _options: PairIndexOptions,
-    ) -> Self {
-        use rayon::prelude::*;
-
-        let (pair_counts, pair_to_word_index) = words
-            .par_iter()
-            .enumerate()
-            .map(|(word_index, word)| {
-                let mut local_pc: PairCountMap<T, C> = Default::default();
-                let mut local_wtu: PairIndexMap<T> = Default::default();
-                Self::observe_word(
-                    &mut local_pc,
-                    &mut local_wtu,
-                    word_index,
-                    word,
-                    word_counts[word_index],
-                );
-                (local_pc, local_wtu)
-            })
-            .reduce(Default::default, |(mut acc_pc, mut acc_wtu), (pc, wtu)| {
-                for (k, v) in pc {
-                    *acc_pc.entry(k).or_default() += v;
+            if word_count != zero && word.len() >= 2 {
+                for p in word.pairs() {
+                    *pair_index.pair_counts.entry(p).or_default() += word_count;
+                    pair_index
+                        .pair_to_word_index
+                        .entry(p)
+                        .or_default()
+                        .insert(word_index);
                 }
-                for (k, s) in wtu {
-                    acc_wtu.entry(k).or_default().extend(s);
-                }
-                (acc_pc, acc_wtu)
-            });
-
-        Self {
-            pair_counts,
-            pair_to_word_index,
+            }
         }
+
+        pair_index
     }
 }
 
@@ -182,27 +68,15 @@ mod tests {
 
     #[test]
     fn test_pair_index_serial_token_u32_count_usize() {
-        test_pair_index::<u32, usize>(false);
-    }
-
-    #[test]
-    #[cfg(feature = "rayon")]
-    fn test_pair_index_rayon_token_u32_count_usize() {
-        test_pair_index::<u32, usize>(true);
+        test_pair_index::<u32, usize>();
     }
 
     #[test]
     fn test_pair_index_serial_token_u16_count_i32() {
-        test_pair_index::<u16, i32>(false);
+        test_pair_index::<u16, i32>();
     }
 
-    #[test]
-    #[cfg(feature = "rayon")]
-    fn test_pair_index_rayon_token_u16_count_i32() {
-        test_pair_index::<u16, i32>(true);
-    }
-
-    fn test_pair_index<T: TokenType, C: CountType>(parallel: bool) {
+    fn test_pair_index<T: TokenType, C: CountType>() {
         let words: Vec<Word<T>> = vec![
             Word::from_string("hello"),
             Word::from_string("world"),
@@ -218,11 +92,7 @@ mod tests {
         let PairIndex {
             pair_counts,
             pair_to_word_index,
-        } = PairIndex::<T, C>::index_unique_word_counts_table(
-            &words,
-            &word_counts,
-            PairIndexOptions::default().with_parallel(parallel),
-        );
+        } = PairIndex::<T, C>::build_from_word_counts_table(&words, &word_counts);
 
         assert_eq!(
             pair_counts,
