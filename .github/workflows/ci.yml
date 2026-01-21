@@ -41,5 +41,8 @@ jobs:
       - name: Clippy Lint
         run: cargo clippy --no-deps
 
-      - name: Build and Test
+      - name: Test
         run: cargo test --workspace --exclude nanochat
+
+      - name: no_std Test
+        run: cargo test -p wordchuck --no-default-features --tests

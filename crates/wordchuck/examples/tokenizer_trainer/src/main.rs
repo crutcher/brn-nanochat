@@ -83,8 +83,8 @@ fn main() -> anyhow::Result<()> {
     cache.load_shards(&shards)?;
 
     type T = u32;
-    type C = u64;
     type K = String;
+    type C = u32;
 
     println!();
     println!("Training Tokenizer on shards: {:?}", shards);
