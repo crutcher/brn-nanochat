@@ -8,14 +8,14 @@ use crate::vocab::TokenVocabIndex;
 ///
 /// Enables ``rayon`` decoding of batches when available.
 #[derive(Clone)]
-pub struct ParallelDecoder<T: TokenType, D: TokenDecoder<T>> {
+pub struct ParallelRayonDecoder<T: TokenType, D: TokenDecoder<T>> {
     /// Wrapped decoder.
     pub inner: D,
 
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T, D> ParallelDecoder<T, D>
+impl<T, D> ParallelRayonDecoder<T, D>
 where
     T: TokenType,
     D: TokenDecoder<T>,
@@ -29,7 +29,7 @@ where
     }
 }
 
-impl<T, D> TokenVocabIndex<T> for ParallelDecoder<T, D>
+impl<T, D> TokenVocabIndex<T> for ParallelRayonDecoder<T, D>
 where
     T: TokenType,
     D: TokenDecoder<T>,
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<T, D> TokenDecoder<T> for ParallelDecoder<T, D>
+impl<T, D> TokenDecoder<T> for ParallelRayonDecoder<T, D>
 where
     T: TokenType,
     D: TokenDecoder<T>,
@@ -55,18 +55,12 @@ where
         &self,
         batch: &[Vec<T>],
     ) -> anyhow::Result<Vec<Vec<u8>>> {
-        #[cfg(feature = "rayon")]
-        {
-            use rayon::prelude::*;
+        use rayon::prelude::*;
 
-            batch
-                .into_par_iter()
-                .map(|tokens| self.try_decode_to_bytes(tokens))
-                .collect()
-        }
-
-        #[cfg(not(feature = "rayon"))]
-        batch.iter().map(|t| self.try_decode_to_bytes(t)).collect()
+        batch
+            .into_par_iter()
+            .map(|tokens| self.try_decode_to_bytes(tokens))
+            .collect()
     }
 }
 
@@ -108,7 +102,8 @@ mod tests {
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
 
-        let decoder = ParallelDecoder::new(DictionaryDecoder::new(vocab.compiled_dictionary()));
+        let decoder =
+            ParallelRayonDecoder::new(DictionaryDecoder::new(vocab.compiled_dictionary()));
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

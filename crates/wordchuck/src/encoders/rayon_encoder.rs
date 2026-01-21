@@ -10,14 +10,14 @@ use crate::vocab::word_vocab::WordMapTokenVocab;
 ///
 /// Enables ``rayon`` encoding of batches when available.
 #[derive(Clone)]
-pub struct ParallelEncoder<T: TokenType, D: TokenEncoder<T>> {
+pub struct ParallelRayonEncoder<T: TokenType, D: TokenEncoder<T>> {
     /// Inner encoder.
     pub inner: D,
 
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T, D> ParallelEncoder<T, D>
+impl<T, D> ParallelRayonEncoder<T, D>
 where
     T: TokenType,
     D: TokenEncoder<T>,
@@ -31,7 +31,7 @@ where
     }
 }
 
-impl<T, D> TokenVocabIndex<T> for ParallelEncoder<T, D>
+impl<T, D> TokenVocabIndex<T> for ParallelRayonEncoder<T, D>
 where
     T: TokenType,
     D: TokenEncoder<T>,
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<T, D> TokenEncoder<T> for ParallelEncoder<T, D>
+impl<T, D> TokenEncoder<T> for ParallelRayonEncoder<T, D>
 where
     T: TokenType,
     D: TokenEncoder<T>,
@@ -73,23 +73,15 @@ where
         &self,
         batch: &[String],
     ) -> Vec<Vec<T>> {
-        #[cfg(feature = "rayon")]
-        {
-            use rayon::prelude::*;
-            batch.par_iter().map(|text| self.encode(text)).collect()
-        }
-
-        #[cfg(not(feature = "rayon"))]
-        {
-            batch.iter().map(|text| self.encode(text)).collect()
-        }
+        use rayon::prelude::*;
+        batch.par_iter().map(|text| self.encode(text)).collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::decoders::TokenDecoder;
-    use crate::encoders::{ParallelEncoder, TokenEncoder, UnifiedVocabEncoder};
+    use crate::encoders::{ParallelRayonEncoder, TokenEncoder, UnifiedVocabEncoder};
     use crate::training::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
@@ -124,7 +116,7 @@ mod tests {
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
-        let encoder = ParallelEncoder::new(encoder);
+        let encoder = ParallelRayonEncoder::new(encoder);
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
