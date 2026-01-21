@@ -9,8 +9,3 @@ pub mod token_decoder;
 pub use decode_context::TokenDecodeContext;
 pub use dictionary_decoder::DictionaryDecoder;
 pub use token_decoder::TokenDecoder;
-
-#[cfg(feature = "rayon")]
-pub mod rayon_decoder;
-#[cfg(feature = "rayon")]
-pub use rayon_decoder::ParallelRayonDecoder;
