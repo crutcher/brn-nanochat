@@ -1,4 +1,4 @@
-//! # LLM Tokenizer
+//! # `WordChuck` LLM Tokenizer
 //!
 //! Work in Progress.
 //!

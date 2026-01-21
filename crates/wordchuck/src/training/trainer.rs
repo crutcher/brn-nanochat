@@ -25,8 +25,8 @@ pub struct BinaryPairVocabTrainerOptions {
 
 impl BinaryPairVocabTrainerOptions {
     /// Create new options.
-    pub fn new(
-        pattern: impl Into<RegexWrapperPattern>,
+    pub fn new<P: Into<RegexWrapperPattern>>(
+        pattern: P,
         vocab_size: usize,
     ) -> Self {
         Self {
@@ -59,24 +59,16 @@ impl BinaryPairVocabTrainerOptions {
     }
 
     /// Initializes a [`BinaryPairVocabTrainer`] from these options.
+    ///
+    /// # Parameters
+    /// * `K` - the type used to store strings in the word counts.
+    /// * `C` - the type used to store counts in the word counts.
     pub fn init<K, C>(self) -> BinaryPairVocabTrainer<K, C>
     where
         K: StringChunkType,
         C: CountType,
     {
-        let word_counter = WordCounter::<K, C>::new(
-            Arc::new(
-                self.pattern
-                    .compile()
-                    .expect("regex pattern compilation failed"),
-            ),
-            WordCounterOptions::default(),
-        );
-
-        BinaryPairVocabTrainer {
-            options: self,
-            word_counter,
-        }
+        BinaryPairVocabTrainer::init(self)
     }
 }
 
@@ -130,6 +122,10 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 }
 
 /// Trainer for learning binary pair encodings.
+///
+/// # Parameters
+/// * `K` - the type used to store strings in the word counts.
+/// * `C` - the type used to store counts in the word counts.
 pub struct BinaryPairVocabTrainer<K = String, C = u32>
 where
     K: StringChunkType,
@@ -147,6 +143,24 @@ where
     K: StringChunkType,
     C: CountType,
 {
+    ///
+    pub fn init(options: BinaryPairVocabTrainerOptions) -> Self {
+        let word_counter = WordCounter::<K, C>::new(
+            Arc::new(
+                options
+                    .pattern
+                    .compile()
+                    .expect("regex pattern compilation failed"),
+            ),
+            WordCounterOptions::default(),
+        );
+
+        BinaryPairVocabTrainer {
+            options,
+            word_counter,
+        }
+    }
+
     /// Update the word counts inplace from a text string.
     pub fn update_from_text<S: AsRef<str>>(
         &mut self,
@@ -172,6 +186,9 @@ where
     /// * the trainer's word split pattern,
     /// * a ``{(T, T) -> T}`` pair map vocab with the learned binary pair merges,
     /// * a ``{Vec<u8> -> T}`` word map that is empty.
+    ///
+    /// # Parameters
+    /// * `T` - the [`TokenType`] of the trained vocab.
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(skip(self, words, word_counts))
