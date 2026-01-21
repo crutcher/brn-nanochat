@@ -3,7 +3,7 @@
 use crate::encoders::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
-use crate::vocab::common_stats::BYTES_PER_TOKEN_HINT;
+use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use crate::vocab::word_vocab::WordMapTokenVocab;
 
 /// A trait for token encoders.
@@ -53,7 +53,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         text: S,
     ) -> Vec<T> {
         let text = text.as_ref();
-        let capacity = text.len() as f64 / (BYTES_PER_TOKEN_HINT * 0.5);
+        let capacity = text.len() as f64 / (EXPECTED_BYTES_PER_TOKEN * 0.5);
         let mut tokens = Vec::with_capacity(capacity as usize);
 
         self.encode_append(text, &mut tokens);

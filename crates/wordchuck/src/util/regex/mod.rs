@@ -43,8 +43,8 @@ pub mod alt_list;
 #[cfg(feature = "std")]
 pub mod re_pool;
 
-mod re_supplier;
-mod re_wrapper;
+pub mod re_supplier;
+pub mod re_wrapper;
 
 pub use re_supplier::{RegexSupplier, RegexSupplierHandle};
 pub use re_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};

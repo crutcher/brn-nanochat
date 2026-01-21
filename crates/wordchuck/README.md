@@ -35,31 +35,58 @@ See:
 - the iterator stream for samples may be quite large.
 - training a `nanochat` equivalent tokenizer takes ~80 CPU minutes.
 
-```rust,ignore
-    let options = BinaryPairVocabTrainerOptions::new_with_vocab_size(args.vocab_size);
+```rust,no_run
+use wordchuck::training::trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
+use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
+use wordchuck::vocab::public::patterns::GPT4_PATTERN;
+use wordchuck::vocab::UnifiedTokenVocab;
+use wordchuck::encoders::{ParallelRayonEncoder, UnifiedVocabEncoder};
+use wordchuck::decoders::{ParallelRayonDecoder, DictionaryDecoder};
+use std::sync::Arc;
 
-    let mut trainer = options.init::<K, C>();
-    
+fn example<I, S>(
+    vocab_size: usize,
+    batches: I,
+    tiktoken_save_path: Option<String>,
+) where
+    I: IntoIterator,
+    I::Item: AsRef<[S]>,
+    S: AsRef<str>,
+{
+    // We can pick any unsigned integer type > vocab_size;
+    // See [`wordchuck::types::TokenType`].
+    type T = u32;
+    type K = String;
+    type C = u64;
+
+    let options = BinaryPairVocabTrainerOptions::new(
+        GPT4_PATTERN,
+        vocab_size,
+    );
+
+    let mut trainer: BinaryPairVocabTrainer<K, C> = options.init();
+
     for batch in batches {
-        trainer.update_from_sampples(batch.iter());
+        trainer.update_from_samples(batch.as_ref());
     }
-    
+
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-        .train()
+        .train::<T>()
         .expect("training failed")
-        .extend_word_vocab_from_pair_vocab()
         .into();
 
-    if let Some(path) = args.tiktoken_save_path {
-        vocab.word_vocab.save_to_tiktoken_path(&path)?;
+    if let Some(path) = tiktoken_save_path {
+        save_word_map_to_tiktoken_path(&vocab.word_vocab, &path)
+            .expect("failed to save tiktoken vocab");
         println!("- tiktoken vocab: {path:?}");
     }
 
     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
-    let encoder = ParallelEncoder::new(encoder);
+    let encoder = ParallelRayonEncoder::new(encoder);
 
     let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
-    let decoder = ParallelDecoder::new(decoder);
+    let decoder = ParallelRayonDecoder::new(decoder);
+}
 ```
 
 # Example Tokenizer Trainer

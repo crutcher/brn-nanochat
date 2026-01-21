@@ -3,7 +3,7 @@
 use crate::training::word::Word;
 use crate::types::{CountType, StringChunkType, TokenType};
 use crate::util::regex::{RegexSupplierHandle, RegexWrapper};
-use crate::vocab::common_stats::AVERAGE_WORD_LENGTH;
+use crate::vocab::public::size_hints::EXPECTED_WORD_LENGTH;
 use ahash::AHashMap;
 use std::fmt::Debug;
 
@@ -48,7 +48,7 @@ pub struct WordCounterOptions {
 impl Default for WordCounterOptions {
     fn default() -> Self {
         Self {
-            avg_word_len: AVERAGE_WORD_LENGTH,
+            avg_word_len: EXPECTED_WORD_LENGTH,
         }
     }
 }

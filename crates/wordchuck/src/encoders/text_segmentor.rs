@@ -3,7 +3,7 @@
 use crate::util::regex::RegexSupplierHandle;
 use crate::util::regex::alt_list::fixed_alternative_list_regex_wrapper;
 use crate::util::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
-use crate::vocab::common_stats::BYTES_PER_TOKEN_HINT;
+use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use core::ops::Range;
 
 /// Word Reference for [`TextSegmentor`].
@@ -25,11 +25,14 @@ pub struct TextSegmentor {
 
 impl TextSegmentor {
     /// Create a new text segmentor with the given regex pattern and special words.
-    pub fn create<S: AsRef<str>>(
-        word_pattern: RegexWrapperPattern,
+    pub fn create<P, S: AsRef<str>>(
+        word_pattern: P,
         specials: Option<&[S]>,
-    ) -> Self {
-        let word_re_supplier = maybe_parallel_regex_supplier(word_pattern);
+    ) -> Self
+    where
+        P: Into<RegexWrapperPattern>,
+    {
+        let word_re_supplier = maybe_parallel_regex_supplier(word_pattern.into());
 
         let special_re_supplier: Option<RegexSupplierHandle> = match specials.as_ref() {
             Some(specials) if !specials.is_empty() => Some(maybe_parallel_regex_supplier(
@@ -115,7 +118,7 @@ impl TextSegmentor {
         &self,
         text: &'a str,
     ) -> Vec<WordRef<'a>> {
-        let capacity = text.len() as f64 / (BYTES_PER_TOKEN_HINT * 0.5);
+        let capacity = text.len() as f64 / (EXPECTED_BYTES_PER_TOKEN * 0.5);
         let mut words = Vec::with_capacity(capacity as usize);
 
         self.split_append_words(text, &mut words);
@@ -126,14 +129,11 @@ impl TextSegmentor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::GPT4_PATTERN;
+    use crate::vocab::public::patterns::GPT4_PATTERN;
 
     #[test]
     fn test_split_words() {
-        let segmentor = TextSegmentor::create(
-            RegexWrapperPattern::Adaptive(GPT4_PATTERN.to_string()),
-            Some(&["<|FNORD|>", "<|NORP|>"]),
-        );
+        let segmentor = TextSegmentor::create(GPT4_PATTERN, Some(&["<|FNORD|>", "<|NORP|>"]));
 
         let buf = "hello<|FNORD|> wor<|NORP|>ld!";
 

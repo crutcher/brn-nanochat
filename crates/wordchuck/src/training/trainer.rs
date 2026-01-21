@@ -161,8 +161,7 @@ where
         samples: I,
     ) where
         I: IntoIterator,
-        I::Item: AsRef<str> + Send,
-        I::IntoIter: Send,
+        I::Item: AsRef<str>,
     {
         self.word_counter.update_from_samples(samples);
     }
@@ -310,13 +309,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::DEFAULT_PATTERN;
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
+    use crate::vocab::public::patterns::GPT4_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
     use compact_str::CompactString;
@@ -324,10 +323,10 @@ mod tests {
 
     #[test]
     fn test_tokenizer_options() {
-        let options = BinaryPairVocabTrainerOptions::new(DEFAULT_PATTERN, 1000);
+        let options = BinaryPairVocabTrainerOptions::new(GPT4_PATTERN, 1000);
 
         assert_eq!(options.vocab_size, 1000);
-        assert_eq!(options.pattern, DEFAULT_PATTERN.into());
+        assert_eq!(options.pattern, GPT4_PATTERN.into());
 
         let options = options.with_vocab_size(2000).with_pattern(r"\S+");
 
@@ -347,7 +346,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainerOptions::new(DEFAULT_PATTERN, 1000);
+        let options = BinaryPairVocabTrainerOptions::new(GPT4_PATTERN, 1000);
 
         let samples = vec![
             "hello world",

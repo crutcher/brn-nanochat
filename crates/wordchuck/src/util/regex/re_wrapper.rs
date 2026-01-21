@@ -41,6 +41,47 @@ impl core::fmt::Display for ErrorWrapper {
 
 impl core::error::Error for ErrorWrapper {}
 
+/// Const Regex Wrapper Pattern
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ConstRegexWrapperPattern {
+    /// This is a pattern for the `regex` crate.
+    Basic(&'static str),
+
+    /// This is a pattern for the `fancy_regex` crate.
+    Fancy(&'static str),
+}
+
+impl ConstRegexWrapperPattern {
+    /// Get the underlying regex pattern.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Basic(pattern) => pattern,
+            Self::Fancy(pattern) => pattern,
+        }
+    }
+
+    /// Convert to [`RegexWrapperPattern`]
+    pub fn to_pattern(self) -> RegexWrapperPattern {
+        self.into()
+    }
+
+    /// Compile the regex pattern into a `RegexWrapper`.
+    pub fn compile(&self) -> Result<RegexWrapper, ErrorWrapper> {
+        RegexWrapperPattern::from(*self).compile()
+    }
+}
+
+impl From<ConstRegexWrapperPattern> for RegexWrapperPattern {
+    fn from(pattern: ConstRegexWrapperPattern) -> Self {
+        use ConstRegexWrapperPattern::*;
+        match pattern {
+            Basic(pattern) => RegexWrapperPattern::Basic(pattern.to_string()),
+            Fancy(pattern) => RegexWrapperPattern::Fancy(pattern.to_string()),
+        }
+    }
+}
+
 /// Label for regex patterns.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
