@@ -1,6 +1,6 @@
 //! Alternative List Utilities
 
-use crate::util::regex::re_wrapper::{RegexWrapper, RegexWrapperPattern};
+use crate::regex::re_wrapper::{RegexWrapper, RegexWrapperPattern};
 
 /// Create a list of fixed-match alternatives into a regex pattern.
 ///

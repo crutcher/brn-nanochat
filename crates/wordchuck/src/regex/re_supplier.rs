@@ -1,6 +1,6 @@
 //! # Regex Supplier Trait
 
-use crate::util::regex::RegexWrapper;
+use crate::regex::RegexWrapper;
 use alloc::sync::Arc;
 
 /// Common Regex Supplier Handle Type

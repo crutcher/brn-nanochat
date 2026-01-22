@@ -1,10 +1,10 @@
 //! # Vocab Trainer
 
+use crate::regex::RegexWrapperPattern;
 use crate::training::pair_index::PairIndex;
 use crate::training::word::Word;
 use crate::training::word_count::{WordCounter, WordCounterOptions};
 use crate::types::{CountType, Pair, StringChunkType, TokenType};
-use crate::util::regex::RegexWrapperPattern;
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
 use crate::vocab::UnifiedTokenVocab;
