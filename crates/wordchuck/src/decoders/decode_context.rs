@@ -1,4 +1,4 @@
-//! Token Decoder Context
+//! # `crate::vocab::TokenDecoder`] Context
 
 use crate::types::TokenType;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;

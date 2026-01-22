@@ -1,4 +1,4 @@
-//! # Dictionary Decoder
+//! # Dictionary ``{ T -> Vec<u8> }`` Token Decoder
 
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;

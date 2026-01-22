@@ -1,11 +1,11 @@
-//! # Expansion Decoder
+//! # Pair Expansion ``{ T -> (T, T) }`` Token Decoder
 
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
 use crate::vocab::TokenVocabIndex;
 
-/// An ``{ (T, T) -> T }``  [`TokenDecoder`].
+/// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
 pub struct PairExpansionDecoder<T: TokenType> {
     /// Token to pair mapping.
