@@ -8,15 +8,22 @@ license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+
 [lints]
 workspace = true
 
+
 [features]
 default = ["rayon"]
+
+# This is only partial support for no_std.
+# It *is* tested by CI, but it isn't propagated to the dependents of this crate;
+# and some of those will require feature degradation.
 std = []
 
 rayon = ["dep:rayon", "std"]
 tracing = ["dep:tracing"]
+
 
 [dependencies]
 anyhow = { workspace = true }
@@ -37,6 +44,7 @@ parking_lot = { workspace = true }
 num-traits = { workspace = true }
 ahash = { workspace = true, features = ["serde"] }
 dary_heap = { workspace = true }
+
 
 [dev-dependencies]
 compact_str = { workspace = true }

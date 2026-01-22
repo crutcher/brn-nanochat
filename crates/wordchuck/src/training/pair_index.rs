@@ -1,4 +1,4 @@
-//! Pair Count / Word Indexing
+//! # `PairIndex` Builder
 
 use crate::training::word::Word;
 use crate::types::{CountType, Pair, TokenType};

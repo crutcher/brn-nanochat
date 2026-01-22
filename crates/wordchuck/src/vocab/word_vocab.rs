@@ -1,4 +1,4 @@
-//! # Word Map Vocabulary Data
+//! # Word Map ``{ Vec<u8> -> T }`` Token Vocabulary
 
 use crate::decoders::pair_decoder::PairExpansionDecoder;
 use crate::decoders::token_decoder::TokenDecoder;

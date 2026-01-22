@@ -1,4 +1,4 @@
-//! # Binary-Pair Encoding Vocabulary Data
+//! # Pair Map ``{ (T, T) -> T }`` Token Vocabulary
 
 use crate::types::{PairToTokenMap, TokenType};
 use crate::vocab::vocab_index::TokenVocabIndex;

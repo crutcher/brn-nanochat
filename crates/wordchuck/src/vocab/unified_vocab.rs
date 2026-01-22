@@ -1,4 +1,4 @@
-//! # Unified Vocabulary Data
+//! # Unified Token Vocabulary
 
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::regex::RegexWrapperPattern;

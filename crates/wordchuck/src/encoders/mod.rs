@@ -1,4 +1,4 @@
-//! # Tokenizer Structures
+//! # Token Encoders
 
 pub mod bp_merge;
 pub mod text_segmentor;

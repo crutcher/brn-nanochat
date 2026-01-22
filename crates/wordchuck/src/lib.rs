@@ -1,8 +1,7 @@
 //! # `WordChuck` LLM Tokenizer
 //!
-//! Work in Progress.
 //!
-//! # Training Example
+//! ## Training Example
 //!
 //! Consider the following, to train a tokenizer and export it a "*.tiktoken" file.
 //!

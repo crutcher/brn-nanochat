@@ -1,4 +1,4 @@
-//! # Token Vocabulary
+//! # Token Vocabulary Index
 
 use crate::types::TokenType;
 
