@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.4"
+version = "0.0.5"
 repository = "https://github.com/crutcher/brn-nanochat"
 rust-version = "1.90.0"
 edition = "2024"
