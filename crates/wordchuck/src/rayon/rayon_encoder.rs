@@ -85,7 +85,7 @@ mod tests {
     use crate::rayon::rayon_encoder::ParallelRayonEncoder;
     use crate::training::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::public::openai::patterns::GPT3_CL100K_WORD_PATTERN;
+    use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
     use compact_str::CompactString;
 
@@ -95,7 +95,7 @@ mod tests {
         type C = u32;
         type K = CompactString;
 
-        let options = BinaryPairVocabTrainerOptions::new(GPT3_CL100K_WORD_PATTERN, 1000);
+        let options = BinaryPairVocabTrainerOptions::new(OA_GPT3_CL100K_WORD_PATTERN, 1000);
 
         let samples = vec![
             "hello world",
