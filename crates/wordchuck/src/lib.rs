@@ -11,7 +11,7 @@
 //! ```rust,no_run
 //! use wordchuck::training::trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
 //! use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
-//! use wordchuck::vocab::public::openai::patterns::GPT3_CL100K_WORD_PATTERN;
+//! use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
 //! use wordchuck::vocab::UnifiedTokenVocab;
 //! use wordchuck::encoders::UnifiedVocabEncoder;
 //! use wordchuck::decoders::DictionaryDecoder;
@@ -34,7 +34,7 @@
 //!     type C = u64;
 //!
 //!     let options = BinaryPairVocabTrainerOptions::new(
-//!         GPT3_CL100K_WORD_PATTERN,
+//!         OA_GPT3_CL100K_WORD_PATTERN,
 //!         vocab_size,
 //!     );
 //!
