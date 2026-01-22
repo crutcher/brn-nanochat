@@ -96,27 +96,6 @@ impl<T> StringChunkType for T where
 {
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_byte_token() {
-        assert!(is_byte_token(0_u16));
-        assert!(is_byte_token(0_u32));
-        assert!(is_byte_token(0_u64));
-        assert!(is_byte_token(0_usize));
-
-        assert!(is_byte_token(255_u16));
-        assert!(is_byte_token(255_u32));
-        assert!(is_byte_token(255_u64));
-        assert!(is_byte_token(255_usize));
-
-        assert!(!is_byte_token(256_u16));
-        assert!(!is_byte_token(256_u32));
-    }
-}
-
 /// [`Pair<T>`] to T map.
 pub type PairToTokenMap<T> = ahash::AHashMap<Pair<T>, T>;
 
@@ -136,3 +115,53 @@ pub(crate) fn check_is_send<S: Send>(_: S) {}
 #[cfg(test)]
 /// Check if a type is `Sync`.
 pub(crate) fn check_is_sync<S: Sync>(_: S) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use compact_str::CompactString;
+
+    #[test]
+    fn test_common_token_types() {
+        struct IsToken<T: TokenType>(std::marker::PhantomData<T>);
+
+        let _: IsToken<u16>;
+        let _: IsToken<u32>;
+        let _: IsToken<u64>;
+        let _: IsToken<usize>;
+    }
+
+    #[test]
+    fn test_common_count_types() {
+        struct IsCount<T: CountType>(std::marker::PhantomData<T>);
+
+        let _: IsCount<u16>;
+        let _: IsCount<u32>;
+        let _: IsCount<u64>;
+        let _: IsCount<usize>;
+    }
+
+    #[test]
+    fn test_common_string_chunk_types() {
+        struct IsStringChunk<T: StringChunkType>(std::marker::PhantomData<T>);
+
+        let _: IsStringChunk<String>;
+        let _: IsStringChunk<CompactString>;
+    }
+
+    #[test]
+    fn test_is_byte_token() {
+        assert!(is_byte_token(0_u16));
+        assert!(is_byte_token(0_u32));
+        assert!(is_byte_token(0_u64));
+        assert!(is_byte_token(0_usize));
+
+        assert!(is_byte_token(255_u16));
+        assert!(is_byte_token(255_u32));
+        assert!(is_byte_token(255_u64));
+        assert!(is_byte_token(255_usize));
+
+        assert!(!is_byte_token(256_u16));
+        assert!(!is_byte_token(256_u32));
+    }
+}
