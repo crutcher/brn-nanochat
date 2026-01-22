@@ -80,3 +80,4 @@ pub mod vocab;
 
 #[cfg(feature = "rayon")]
 pub mod rayon;
+pub mod regex;

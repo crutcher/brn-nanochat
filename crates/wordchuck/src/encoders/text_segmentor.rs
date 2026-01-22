@@ -1,8 +1,8 @@
 //! # Text Segmentor
 
-use crate::util::regex::RegexSupplierHandle;
-use crate::util::regex::alt_list::fixed_alternative_list_regex_wrapper;
-use crate::util::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
+use crate::regex::RegexSupplierHandle;
+use crate::regex::alt_list::fixed_alternative_list_regex_wrapper;
+use crate::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use core::ops::Range;
 

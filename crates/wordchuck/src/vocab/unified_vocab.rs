@@ -1,8 +1,8 @@
 //! # Unified Vocabulary Data
 
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
+use crate::regex::RegexWrapperPattern;
 use crate::types::TokenType;
-use crate::util::regex::RegexWrapperPattern;
 use crate::vocab::pair_vocab::PairMapTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use crate::vocab::word_vocab::WordMapTokenVocab;

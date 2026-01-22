@@ -1,8 +1,8 @@
 //! # Word Counter
 
+use crate::regex::{RegexSupplierHandle, RegexWrapper};
 use crate::training::word::Word;
 use crate::types::{CountType, StringChunkType, TokenType};
-use crate::util::regex::{RegexSupplierHandle, RegexWrapper};
 use crate::vocab::public::size_hints::EXPECTED_WORD_LENGTH;
 use ahash::AHashMap;
 use std::fmt::Debug;
@@ -147,9 +147,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
     use crate::training::word::Word;
     use crate::types::{CountType, StringChunkType};
-    use crate::util::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
 
     const PATTERN: &str = r"\w+";
 
