@@ -129,11 +129,12 @@ impl TextSegmentor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vocab::public::patterns::GPT4_PATTERN;
+    use crate::vocab::public::patterns::GPT3_CL100K_WORD_PATTERN;
 
     #[test]
     fn test_split_words() {
-        let segmentor = TextSegmentor::create(GPT4_PATTERN, Some(&["<|FNORD|>", "<|NORP|>"]));
+        let segmentor =
+            TextSegmentor::create(GPT3_CL100K_WORD_PATTERN, Some(&["<|FNORD|>", "<|NORP|>"]));
 
         let buf = "hello<|FNORD|> wor<|NORP|>ld!";
 
