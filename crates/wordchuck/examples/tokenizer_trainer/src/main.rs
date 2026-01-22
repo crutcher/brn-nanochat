@@ -10,7 +10,7 @@ use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
 use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
-use wordchuck::vocab::public::patterns::GPT3_CL100K_WORD_PATTERN;
+use wordchuck::vocab::public::openai::patterns::GPT3_CL100K_WORD_PATTERN;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
