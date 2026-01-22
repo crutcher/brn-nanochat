@@ -89,6 +89,8 @@ mod tests {
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
+        assert_eq!(decoder.max_token(), vocab.max_token());
+
         for sample in samples {
             let tokens = encoder.encode(sample);
             let decoded = decoder.try_decode_to_string(&tokens).unwrap();
