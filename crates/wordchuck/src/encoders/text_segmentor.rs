@@ -129,7 +129,7 @@ impl TextSegmentor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vocab::public::patterns::GPT3_CL100K_WORD_PATTERN;
+    use crate::vocab::public::openai::patterns::GPT3_CL100K_WORD_PATTERN;
 
     #[test]
     fn test_split_words() {

@@ -3,6 +3,7 @@
 pub mod io;
 pub mod pair_vocab;
 pub mod public;
+pub mod tooling;
 pub mod unified_vocab;
 pub mod vocab_index;
 pub mod word_vocab;

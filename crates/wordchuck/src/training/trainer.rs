@@ -332,7 +332,7 @@ mod tests {
     use crate::training::trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
-    use crate::vocab::public::patterns::GPT3_CL100K_WORD_PATTERN;
+    use crate::vocab::public::openai::patterns::GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
     use compact_str::CompactString;
