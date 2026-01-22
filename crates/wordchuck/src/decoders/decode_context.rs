@@ -59,3 +59,34 @@ impl<T: TokenType> TokenDecodeContext<T> {
         self.try_result().unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_complete() {
+        let mut ctx = TokenDecodeContext::<u8>::for_tokens_with_hint(vec![0, 1, 2], 1.0);
+        assert!(!ctx.is_complete());
+
+        ctx.stack.pop();
+        ctx.buf.push('a' as u8);
+
+        assert!(!ctx.is_complete());
+
+        assert_eq!(
+            ctx.clone()
+                .try_result()
+                .expect_err("expected failure")
+                .to_string(),
+            anyhow::anyhow!("Incomplete context: [1, ...]").to_string(),
+        );
+
+        ctx.stack.pop();
+        ctx.buf.push('b' as u8);
+        ctx.stack.pop();
+        ctx.buf.push('c' as u8);
+
+        assert_eq!(ctx.unwrap(), vec!['a' as u8, 'b' as u8, 'c' as u8]);
+    }
+}

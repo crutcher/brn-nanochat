@@ -1,6 +1,5 @@
 //! # Token Encoders
 
-pub mod bp_merge;
 pub mod text_segmentor;
 pub mod token_encoder;
 pub mod unified_encoder;
