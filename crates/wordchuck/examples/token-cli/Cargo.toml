@@ -1,0 +1,21 @@
+[package]
+name = "token-cli"
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+burn = { workspace = true, features = ["network"] }
+nanochat-data = { path = "../../../nanochat-data" }
+wordchuck = { path = "../..", features = ["rayon"] }
+
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+
+parquet = { workspace = true, features = ["arrow"] }
+arrow = { workspace = true }

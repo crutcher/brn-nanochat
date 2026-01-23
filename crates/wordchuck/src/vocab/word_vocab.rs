@@ -17,6 +17,12 @@ pub struct WordMapTokenVocab<T: TokenType> {
     pub words: WordToTokenMap<T>,
 }
 
+impl<T: TokenType> From<WordToTokenMap<T>> for WordMapTokenVocab<T> {
+    fn from(words: WordToTokenMap<T>) -> Self {
+        Self { words }
+    }
+}
+
 impl<'a, T: TokenType> IntoIterator for &'a WordMapTokenVocab<T> {
     type Item = (&'a Vec<u8>, &'a T);
 

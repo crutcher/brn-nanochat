@@ -12,6 +12,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/nanochat-data/examples/pull_shards/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck-trainer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck/examples/token-cli/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/crates/nanochat/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/crates/wordchuck/target" />
