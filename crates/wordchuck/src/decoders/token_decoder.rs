@@ -48,21 +48,25 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     }
 
     /// Decodes tokens into a string, returning an error if the decoding fails.
+    ///
+    /// UTF-8 lossy decoding is used to handle invalid UTF-8 sequences.
     fn try_decode_to_string<S: AsRef<[T]>>(
         &self,
         tokens: S,
     ) -> anyhow::Result<String> {
-        Ok(String::from_utf8(self.try_decode_to_bytes(tokens)?)?)
+        Ok(String::from_utf8_lossy(&self.try_decode_to_bytes(tokens)?).to_string())
     }
 
     /// Decodes a batch of tokens into a vector of strings, returning an error if the decoding fails.
+    ///
+    /// UTF-8 lossy decoding is used to handle invalid UTF-8 sequences.
     fn try_decode_batch_to_strings(
         &self,
         batch: &[Vec<T>],
     ) -> anyhow::Result<Vec<String>> {
         self.try_decode_batch_to_bytes(batch).map(|b| {
             b.iter()
-                .map(|b| String::from_utf8(b.to_vec()).unwrap())
+                .map(|b| String::from_utf8_lossy(b).to_string())
                 .collect()
         })
     }

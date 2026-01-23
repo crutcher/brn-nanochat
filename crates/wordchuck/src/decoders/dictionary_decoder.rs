@@ -35,10 +35,10 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         while let Some(t) = ctx.stack.pop() {
-            if let Some(b) = t.to_u8() {
-                ctx.buf.push(b);
-            } else if let Some(w) = self.token_to_word.get(&t) {
+            if let Some(w) = self.token_to_word.get(&t) {
                 ctx.buf.extend_from_slice(w.as_slice());
+            } else if let Some(b) = t.to_u8() {
+                ctx.buf.push(b);
             } else {
                 ctx.stack.push(t);
                 break;

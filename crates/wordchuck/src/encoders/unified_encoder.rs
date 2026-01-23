@@ -41,13 +41,11 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             .unwrap();
 
         // If there are byte table overrides, apply them.
-        data.word_vocab
-            .words
-            .iter()
-            .filter(|&(bs, _)| bs.len() == 1)
-            .for_each(|(bs, t)| {
-                byte_table[*bs.first().unwrap() as usize] = *t;
-            });
+        data.word_vocab.words.iter().for_each(|(bs, &token)| {
+            if bs.len() == 1 {
+                byte_table[bs[0] as usize] = token;
+            }
+        });
 
         Self {
             data,
