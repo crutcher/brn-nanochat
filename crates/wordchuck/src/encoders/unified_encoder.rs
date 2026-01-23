@@ -95,19 +95,19 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     ) {
         let chunk = word.as_bytes();
 
-        /*
-        NOTE: these optimizations appear to be a wash, statistically.
-
         if chunk.len() == 1 {
             tokens.push(self.byte_table[chunk[0] as usize]);
             return;
         }
 
+        // Correctness-wise - Some words may not exist in the pair mappings.
+        //
+        // Speed-wise - This is a wash; the hash is slow enough that the
+        // cache hits don't speed us up.
         if let Some(token) = self.data.word_vocab.lookup_token(chunk) {
             tokens.push(token);
             return;
         }
-         */
 
         // Reuse the output buffer as our working memory.
         // Append the byte-tokens to the buffer.
