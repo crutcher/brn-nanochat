@@ -3,7 +3,23 @@
 use core::fmt::Debug;
 use num_traits::{FromPrimitive, PrimInt};
 
-/// Checks if a slice is a valid permutation.
+/// Verifies if the given slice represents a valid permutation of integers from 0 to `n-1`.
+///
+/// # Parameters
+/// - `perm`: A slice of elements implementing the `PrimInt` and `Debug` traits. The slice
+///   is expected to contain integers ranging from 0 to `n-1`, where `n` is the length of the slice.
+///
+/// # Returns
+/// - `Ok(())`: If the slice is a valid permutation, i.e., each number from 0 to `n-1` appears exactly once.
+/// - `Err`: If the slice is not a valid permutation, providing details about the:
+///   - Duplicate values present in the slice,
+///   - Missing values in the expected range `[0, n-1]`,
+///   - And a debug representation of the input slice, `perm`.
+///
+/// # Type Parameters
+/// - `T`: The type of the elements in the slice. It must implement the following traits:
+///   - `PrimInt`: To allow arithmetic operations and conversion to `usize`.
+///   - `Debug`: To enable debug output when reporting errors.
 pub fn try_check_permutation<T>(perm: &[T]) -> anyhow::Result<()>
 where
     T: PrimInt + Debug,
@@ -12,12 +28,23 @@ where
     let mut target_counts: Vec<u8> = vec![0; n];
 
     for &x in perm {
-        target_counts[x.to_usize().unwrap()] += 1;
+        let target_idx = x.to_usize().unwrap();
+        if target_idx >= n {
+            anyhow::bail!(
+                "Bad {n}-permutation: target {} outside of 0..{}\n{:?}",
+                target_idx,
+                n,
+                perm
+            );
+        }
+        target_counts[target_idx] += 1;
     }
 
     if target_counts.iter().all(|&x| x == 1) {
         return Ok(());
     }
+
+    // Slow path for nice error messages.
 
     let mut dups: Vec<usize> = Default::default();
     let mut missing: Vec<usize> = Default::default();
@@ -38,6 +65,11 @@ where
 }
 
 /// Computes the inverse permutation.
+///
+/// Assumes that the input slice is a valid permutation.
+///
+/// # Panics
+/// If the permutation has target values outside ``0..perm.len()``.
 pub fn invert_permutation<T>(perm: &[T]) -> Vec<T>
 where
     T: PrimInt + FromPrimitive + Debug,
@@ -66,6 +98,11 @@ mod tests {
         assert_eq!(
             try_check_permutation(&[0, 2, 2]).err().unwrap().to_string(),
             "Bad 3-permutation: [2] duplicated, [1] missing\n[0, 2, 2]",
+        );
+
+        assert_eq!(
+            try_check_permutation(&[0, 3, 2]).err().unwrap().to_string(),
+            "Bad 3-permutation: target 3 outside of 0..3\n[0, 3, 2]",
         );
     }
 
