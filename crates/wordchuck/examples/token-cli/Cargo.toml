@@ -14,6 +14,9 @@ burn = { workspace = true, features = ["network"] }
 nanochat-data = { path = "../../../nanochat-data" }
 wordchuck = { path = "../..", features = ["rayon"] }
 
+edit-distance = { workspace = true }
+rayon = { workspace = true }
+
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 

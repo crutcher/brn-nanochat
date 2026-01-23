@@ -3307,6 +3307,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1d926b4d407d372f141f93bb444696142c29d32962ccbd3531117cf3aa0bfa9"
 
 [[package]]
+name = "edit-distance"
+version = "2.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "324d428080b707bac399325341bd61af5ded1b30f33b7c949792ca464733c2d5"
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7430,8 +7436,10 @@ dependencies = [
  "arrow",
  "burn 0.20.0",
  "clap",
+ "edit-distance",
  "nanochat-data",
  "parquet",
+ "rayon",
  "wordchuck",
 ]
 
@@ -7443,7 +7451,6 @@ dependencies = [
  "arrow",
  "burn 0.20.0",
  "clap",
- "compact_str 0.9.0",
  "nanochat-data",
  "parquet",
  "wordchuck",

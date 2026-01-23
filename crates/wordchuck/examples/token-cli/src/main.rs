@@ -1,5 +1,6 @@
 use arrow::array::StringArray;
 use clap::Parser;
+use edit_distance::edit_distance;
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::sync::Arc;
 use std::time::Duration;
@@ -192,8 +193,8 @@ fn run_load(
             let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
             let t1 = std::time::Instant::now();
 
-            // TODO: edit distance score
-            // assert_eq!(sample, &decoded_sample);
+            let score = batch_score(&decoded_sample, sample);
+            println!("- sample score: {:}", score);
 
             let delay = t1.duration_since(t0);
             delay.as_nanos() as u64
@@ -208,4 +209,33 @@ fn run_load(
         Duration::from_nanos(avg_sample_time_ns)
     );
     Ok(())
+}
+
+pub fn batch_score(
+    actual: &[String],
+    expected: &[String],
+) -> f64 {
+    score_batch(actual, expected).iter().sum::<f64>() / actual.len() as f64
+}
+
+pub fn score_batch(
+    actual: &[String],
+    expected: &[String],
+) -> Vec<f64> {
+    assert_eq!(actual.len(), expected.len());
+    actual
+        .iter()
+        .zip(expected.iter())
+        .map(|(a, e)| edit_score(a, e))
+        .collect::<Vec<_>>()
+}
+
+pub fn edit_score(
+    actual: &str,
+    expected: &str,
+) -> f64 {
+    let distance = edit_distance(actual, expected);
+    let size = expected.len();
+
+    (size as isize - distance as isize).abs() as f64 / ((size + 1) as f64)
 }
