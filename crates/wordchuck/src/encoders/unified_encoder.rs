@@ -15,6 +15,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
     /// Data for the encoders.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
+    byte_table: [T; 256],
     segmentor: TextSegmentor,
 }
 
@@ -33,7 +34,26 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 
         let segmentor = TextSegmentor::create(data.word_pattern.clone(), specials.as_deref());
 
-        Self { data, segmentor }
+        let mut byte_table: [T; 256] = (0..=255)
+            .map(|b| T::from_u8(b).unwrap())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        // If there are byte table overrides, apply them.
+        data.word_vocab
+            .words
+            .iter()
+            .filter(|&(bs, _)| bs.len() == 1)
+            .for_each(|(bs, t)| {
+                byte_table[*bs.first().unwrap() as usize] = *t;
+            });
+
+        Self {
+            data,
+            segmentor,
+            byte_table,
+        }
     }
 
     /// Build a [`DictionaryDecoder`] from this [`UnifiedVocabEncoder`].
@@ -74,8 +94,12 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         tokens: &mut Vec<T>,
     ) {
         let chunk = word.as_bytes();
+
+        /*
+        NOTE: these optimizations appear to be a wash, statistically.
+
         if chunk.len() == 1 {
-            tokens.push(T::from_u8(chunk[0]).unwrap());
+            tokens.push(self.byte_table[chunk[0] as usize]);
             return;
         }
 
@@ -83,13 +107,14 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
             tokens.push(token);
             return;
         }
+         */
 
-        // Reuse the output buffer as a stack.
+        // Reuse the output buffer as our working memory.
         // Append the byte-tokens to the buffer.
         let start = tokens.len();
-        tokens.extend(chunk.iter().map(|&b| T::from_u8(b).unwrap()));
+        tokens.extend(chunk.iter().map(|&b| self.byte_table[b as usize]));
 
-        // Incrementally shrink the "stack" (the new buffer end)
+        // Incrementally shrink the working memory (the new buffer end)
         // Until we can no longer find pairs to merge.
         let stop = start + 2;
         while tokens.len() >= stop {
