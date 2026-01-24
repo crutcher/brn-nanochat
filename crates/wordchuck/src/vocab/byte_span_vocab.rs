@@ -5,13 +5,14 @@ use crate::vocab::byte_table::ByteTable;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::{AHashMap, AHashSet};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ByteSpanTokenMapVocab<T: TokenType> {
+    /// The byte/token mapping table.
+    byte_table: Arc<ByteTable<T>>,
+
     /// The regex pattern used for text spl
     /// Map of ``{ Vec<u8> -> T }``.
     span_map: ByteSpanTokenMap<T>,
@@ -24,8 +25,8 @@ impl<T: TokenType> Default for ByteSpanTokenMapVocab<T> {
 }
 
 impl<T: TokenType> From<ByteSpanTokenMap<T>> for ByteSpanTokenMapVocab<T> {
-    fn from(words: ByteSpanTokenMap<T>) -> Self {
-        Self { span_map: words }
+    fn from(span_map: ByteSpanTokenMap<T>) -> Self {
+        Self::from_span_map(span_map)
     }
 }
 
@@ -40,21 +41,74 @@ impl<'a, T: TokenType> IntoIterator for &'a ByteSpanTokenMapVocab<T> {
 }
 
 impl<T: TokenType> ByteSpanTokenMapVocab<T> {
-    /// Create a word vocabulary from a byte/token mapping table.
+    /// Build vocabulary from just a [`ByteTable`].
+    ///
+    /// Will have 255 span entries, each 1-byte long.
     pub fn from_byte_table<B>(byte_table: B) -> Self
     where
         B: Into<Arc<ByteTable<T>>>,
     {
         let byte_table = byte_table.into();
 
-        let mut words = ByteSpanTokenMap::default();
-        for idx in 0..256 {
-            let byte = idx as u8;
-            let token = byte_table.get_token(byte);
-            words.insert(vec![byte], token);
+        let span_map: ByteSpanTokenMap<T> = byte_table.to_span_pairs().collect();
+
+        Self::new(byte_table, span_map)
+    }
+
+    /// Build a vocabulary from just a [`ByteSpanTokenMap`].
+    ///
+    /// The [`ByteTable`] will be inferred from the [`ByteSpanTokenMap`],
+    /// and the default ordinal byte to token mappings.
+    ///
+    /// # Panics
+    /// If the [`ByteTable`] mapping is not 1:1.
+    pub fn from_span_map(span_map: ByteSpanTokenMap<T>) -> Self {
+        let byte_to_token = (0..256)
+            .map(|ord| {
+                let byte = ord as u8;
+                if let Some(&token) = span_map.get(&vec![byte]) {
+                    token
+                } else {
+                    T::from_usize(ord).unwrap()
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let byte_table = Arc::new(ByteTable::from_byte_to_token(&byte_to_token));
+
+        Self::new(byte_table, span_map)
+    }
+
+    /// Build vocabulary.
+    ///
+    /// The span map will be the union of the span map,
+    /// and all overrides from the `byte_table`.
+    ///
+    /// # Panics
+    /// If the [`ByteTable`] disagrees with the `span_map`.
+    pub fn new<B>(
+        byte_table: B,
+        mut span_map: ByteSpanTokenMap<T>,
+    ) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
+        let byte_table = byte_table.into();
+        for (span, token) in byte_table.to_span_pairs() {
+            if let Some(previous) = span_map.insert(span, token)
+                && previous != token
+            {
+                panic!(
+                    "ByteTable disagrees with span_map: {:?} != {:?}",
+                    previous, token
+                );
+            }
         }
 
-        Self { span_map: words }
+        Self {
+            byte_table,
+            span_map,
+        }
     }
 
     /// Get the span => token map.
@@ -236,9 +290,12 @@ mod tests {
     #[test]
     fn test_lookup_token() {
         type T = u32;
-        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
-        vocab.add_str_word("apple", 300);
-        vocab.add_str_word("a", 301);
+
+        let mut span_map: AHashMap<Vec<u8>, T> = Default::default();
+        span_map.insert("apple".as_bytes().to_vec(), 300);
+        span_map.insert("a".as_bytes().to_vec(), 301);
+
+        let vocab = ByteSpanTokenMapVocab::<T>::from_span_map(span_map);
 
         assert_eq!(vocab.lookup_token(b"apple"), Some(300));
         assert_eq!(vocab.lookup_token(b"a"), Some(301));

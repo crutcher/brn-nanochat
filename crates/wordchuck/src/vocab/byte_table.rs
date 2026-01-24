@@ -5,10 +5,10 @@ use crate::vocab::TokenVocabIndex;
 use ahash::AHashMap;
 use core::fmt::Debug;
 
-/// 0..255 Rank Byte/Token Bijection Table
+/// ``0..=255`` Rank Byte/Token Bijection Table
 ///
 /// This will always have 255 entries, one for each byte value.
-/// The token values are not required to be dense, or in the range 0..255.
+/// The token values are not required to be dense, or in the range ``0..=255``.
 /// This is required to be a bijection (255 distinct tokens).
 #[derive(Clone, PartialEq)]
 pub struct ByteTable<T: TokenType> {
