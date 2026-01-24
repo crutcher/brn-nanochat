@@ -39,7 +39,7 @@
 //! [`maybe_parallel_regex_supplier`]; which in some build environments will provide
 //! a thread local clone regex supplier, and in some, a simple clone implementation.
 
-pub mod alt_list;
+pub mod exact_match_union;
 #[cfg(feature = "std")]
 pub mod re_pool;
 
