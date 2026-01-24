@@ -85,7 +85,7 @@ mod tests {
     use crate::decoders::DictionaryDecoder;
     use crate::encoders::UnifiedVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::training::trainer::BinaryPairVocabTrainerOptions;
+    use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;

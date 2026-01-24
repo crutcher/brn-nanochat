@@ -3,6 +3,7 @@
 use crate::regex::{RegexSupplierHandle, RegexWrapper};
 use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CountType, StringChunkType, TokenType};
+use crate::vocab::byte_table::ByteTable;
 use crate::vocab::public::size_hints::EXPECTED_WORD_LENGTH;
 use ahash::AHashMap;
 use std::fmt::Debug;
@@ -137,10 +138,16 @@ where
     }
 
     /// Convert the word counter to a [`TokenSpanBuf<T>`] count iterator.
-    pub fn to_word_counts_iter<T: TokenType>(&self) -> impl Iterator<Item = (TokenSpanBuf<T>, C)> {
+    ///
+    /// # Arguments
+    /// * `byte_table` - the byte table to use for byte translation.
+    pub fn to_text_span_counts_iter<T: TokenType>(
+        &self,
+        byte_table: &ByteTable,
+    ) -> impl Iterator<Item = (TokenSpanBuf<T>, C)> {
         self.word_counts
             .iter()
-            .map(|(k, v)| (TokenSpanBuf::from_string(k), *v))
+            .map(|(k, v)| (TokenSpanBuf::from_string(k, byte_table), *v))
     }
 }
 
@@ -196,6 +203,8 @@ mod tests {
         type T = usize;
         type C = u64;
 
+        let byte_table: ByteTable = Default::default();
+
         let mut word_counts = TextSpanCounter::<K, C>::new(
             maybe_parallel_regex_supplier(get_regex()),
             TextSpanCounterOptions::default(),
@@ -205,15 +214,16 @@ mod tests {
 
         word_counts.update_from_samples(samples.iter());
 
-        let counts: AHashMap<TokenSpanBuf<T>, C> = word_counts.to_word_counts_iter().collect();
+        let counts: AHashMap<TokenSpanBuf<T>, C> =
+            word_counts.to_text_span_counts_iter(&byte_table).collect();
         let mut counts = counts.into_iter().collect::<Vec<_>>();
         counts.sort();
 
         let mut expected = AHashMap::new();
-        expected.insert(TokenSpanBuf::from_string("Hello"), 1);
-        expected.insert(TokenSpanBuf::from_string("Foo"), 1);
-        expected.insert(TokenSpanBuf::from_string("bar"), 1);
-        expected.insert(TokenSpanBuf::from_string("world"), 3);
+        expected.insert(TokenSpanBuf::from_string("Hello", &byte_table), 1);
+        expected.insert(TokenSpanBuf::from_string("Foo", &byte_table), 1);
+        expected.insert(TokenSpanBuf::from_string("bar", &byte_table), 1);
+        expected.insert(TokenSpanBuf::from_string("world", &byte_table), 3);
         let mut expected: Vec<_> = expected.into_iter().collect();
         expected.sort();
 

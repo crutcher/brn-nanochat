@@ -1,6 +1,7 @@
-//! # Word Structures
+//! # Token Span Buffer
 
 use crate::types::{Pair, TokenType};
+use crate::vocab::byte_table::ByteTable;
 use core::hash::Hash;
 
 /// A mutable span of tokens (a chunk or "word").
@@ -18,38 +19,62 @@ impl<T: TokenType, S: AsRef<[T]>> From<S> for TokenSpanBuf<T> {
 }
 
 impl<T: TokenType> TokenSpanBuf<T> {
-    /// Create a new word from a list of ids.
+    /// Create a new span buffer from tokens.
     pub fn from_tokens<S>(tokens: S) -> Self
     where
         S: AsRef<[T]>,
     {
-        let tokens = tokens.as_ref().to_vec();
-        Self { tokens }
+        Self {
+            tokens: tokens.as_ref().to_vec(),
+        }
     }
 
-    /// Create a new word from a byte slice.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        let tokens: Vec<T> = bytes.iter().map(|&b| T::from_u8(b).unwrap()).collect();
-        Self { tokens }
+    /// Create a new span buf from a byte slice.
+    ///
+    /// # Arguments
+    /// * `bytes` - the bytes to translate to byte-level tokens.
+    /// * `byte_table` - the translation for the byte tokens.
+    pub fn from_bytes<B: AsRef<[u8]>>(
+        bytes: B,
+        byte_table: &ByteTable,
+    ) -> Self {
+        Self {
+            tokens: bytes
+                .as_ref()
+                .iter()
+                .map(|&b| byte_table.get_token(b))
+                .collect(),
+        }
     }
 
-    /// Create a new word from a string slice.
-    pub fn from_string<S: AsRef<str>>(s: S) -> Self {
-        Self::from_bytes(s.as_ref().as_bytes())
+    /// Create a new span buf from a string slice.
+    ///
+    /// # Arguments
+    /// * `text` - the text to turn into UTF-8 bytes, and translate to byte-level tokens.
+    /// * `byte_table` - the translation for the byte tokens.
+    pub fn from_string<S: AsRef<str>>(
+        text: S,
+        byte_table: &ByteTable,
+    ) -> Self {
+        Self::from_bytes(text.as_ref().as_bytes(), byte_table)
     }
 
-    /// Get a list of ids that make up this word.
+    /// View the tokens as a slice.
     pub fn tokens(&self) -> &[T] {
         &self.tokens
     }
 
-    /// Get the number of ids in this word.
-    #[allow(clippy::len_without_is_empty)]
+    /// Get the length of the span.
     pub fn len(&self) -> usize {
         self.tokens.len()
     }
 
-    /// Get an iterator over pairs of ids in this word.
+    /// Is this span empty?
+    pub fn is_empty(&self) -> bool {
+        self.tokens.is_empty()
+    }
+
+    /// Get an iterator over [`Pair<T>`] windows of this span.
     pub fn pairs<'a>(&'a self) -> impl Iterator<Item = Pair<T>> + 'a {
         self.tokens.windows(2).map(|w| (w[0], w[1]))
     }
@@ -130,7 +155,7 @@ impl<T: TokenType> TokenSpanBuf<T> {
     /// * `replacement` - the token to replace `pair` with.
     ///
     /// # Returns
-    /// a delta list of pair count deltas for this word:
+    /// a delta list of pair count deltas for this span:
     /// * `(Pair, +1)` - for each instance of an added `Pair`.
     /// * `(Pair, -1)` - for each instance of a removed `Pair`.
     pub fn merge_pair(
@@ -149,42 +174,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_word_constructor() {
-        let word: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3]);
-        assert_eq!(word.tokens(), &[1, 2, 3]);
-        assert_eq!(word.len(), 3);
+    fn test_from_tokens() {
+        let span: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3]);
+        assert_eq!(span.tokens(), &[1, 2, 3]);
+        assert_eq!(span.len(), 3);
     }
 
     #[test]
-    fn test_word_from() {
-        let word: TokenSpanBuf<u32> = vec![1, 2, 3].into();
-        assert_eq!(word.tokens(), &[1, 2, 3]);
+    fn test_into_span() {
+        let span: TokenSpanBuf<u32> = vec![1, 2, 3].into();
+        assert_eq!(span.tokens(), &[1, 2, 3]);
 
-        let word: TokenSpanBuf<u32> = [1, 2, 3].into();
-        assert_eq!(word.tokens(), &[1, 2, 3]);
+        let span: TokenSpanBuf<u32> = [1, 2, 3].into();
+        assert_eq!(span.tokens(), &[1, 2, 3]);
 
-        let word: TokenSpanBuf<u32> = (&[1, 2, 3]).into();
-        assert_eq!(word.tokens(), &[1, 2, 3]);
+        let span: TokenSpanBuf<u32> = (&[1, 2, 3]).into();
+        assert_eq!(span.tokens(), &[1, 2, 3]);
     }
 
     #[test]
-    fn test_word_from_str() {
-        let word: TokenSpanBuf<u32> = TokenSpanBuf::from_string("hello");
-        assert_eq!(word.tokens(), &[104, 101, 108, 108, 111]);
+    fn test_span_from_str() {
+        let byte_table: ByteTable = Default::default();
+
+        let span: TokenSpanBuf<u32> = TokenSpanBuf::from_string("hello", &byte_table);
+        assert_eq!(span.tokens(), &[104, 101, 108, 108, 111]);
+
+        let mut perm = (10..256).map(|v| v as u8).collect::<Vec<_>>();
+        perm.extend((0..10).map(|v| v as u8));
+        let shift_table: ByteTable = ByteTable::from_permutation(&perm);
+
+        let span: TokenSpanBuf<u32> = TokenSpanBuf::from_string("hello", &shift_table);
+        assert_eq!(span.tokens(), &[114, 111, 118, 118, 121]);
     }
 
     #[test]
-    fn test_word_pairs() {
-        let word: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3]);
-        assert_eq!(word.pairs().collect::<Vec<_>>(), vec![(1, 2), (2, 3)]);
+    fn test_span_pairs() {
+        let span: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3]);
+        assert_eq!(span.pairs().collect::<Vec<_>>(), vec![(1, 2), (2, 3)]);
     }
 
     #[test]
-    fn test_word_merge_pair() {
-        let mut word: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
+    fn test_span_merge_pair() {
+        let mut span: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
 
-        let deltas = word.merge_pair((1, 2), 1);
-        assert_eq!(word.tokens(), &[1, 3, 1, 2, 1]);
+        let deltas = span.merge_pair((1, 2), 1);
+        assert_eq!(span.tokens(), &[1, 3, 1, 2, 1]);
 
         assert_eq!(
             deltas,
@@ -205,14 +239,14 @@ mod tests {
     }
 
     #[test]
-    fn test_word_merge_pair_cb() {
-        let mut word: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
+    fn test_span_merge_pair_cb() {
+        let mut span: TokenSpanBuf<u32> = TokenSpanBuf::from_tokens(vec![1, 2, 3, 1, 2, 2, 1]);
         let mut deltas = vec![];
 
-        word.merge_pair_cb((1, 2), 1, &mut |p, d| {
+        span.merge_pair_cb((1, 2), 1, &mut |p, d| {
             deltas.push((p, d));
         });
-        assert_eq!(word.tokens(), &[1, 3, 1, 2, 1]);
+        assert_eq!(span.tokens(), &[1, 3, 1, 2, 1]);
 
         assert_eq!(
             deltas,
@@ -231,7 +265,7 @@ mod tests {
             ]
         );
 
-        word.shrink_to_fit();
-        assert_eq!(word.tokens().len(), word.tokens.capacity());
+        span.shrink_to_fit();
+        assert_eq!(span.tokens().len(), span.tokens.capacity());
     }
 }

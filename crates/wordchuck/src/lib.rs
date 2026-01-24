@@ -9,7 +9,7 @@
 //! - training a `nanochat` equivalent tokenizer takes ~80 CPU minutes.
 //!
 //! ```rust,no_run
-//! use wordchuck::training::trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
+//! use wordchuck::training::bpe_trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
 //! use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
 //! use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
 //! use wordchuck::vocab::UnifiedTokenVocab;

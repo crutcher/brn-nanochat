@@ -220,8 +220,10 @@ where
 
         let mut vocab = UnifiedTokenVocab::new(self.options.pattern.clone());
 
-        let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) =
-            self.span_counter.to_word_counts_iter().unzip();
+        let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) = self
+            .span_counter
+            .to_text_span_counts_iter(&self.options.byte_table)
+            .unzip();
 
         log::info!("Building pair index...");
         let PairSpanIndex {
@@ -343,7 +345,7 @@ mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
-    use crate::training::trainer::{BinaryPairVocabTrainerOptions, MergeJob};
+    use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
