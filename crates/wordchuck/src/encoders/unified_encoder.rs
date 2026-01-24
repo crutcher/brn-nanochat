@@ -4,9 +4,9 @@ use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::encoders::text_segmentor::{TextSegmentor, WordRef};
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::types::TokenType;
+use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
-use crate::vocab::word_vocab::WordMapTokenVocab;
 use alloc::sync::Arc;
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
@@ -24,7 +24,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
     pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         let specials = match &data.specials {
             Some(specials) => specials
-                .words
+                .span_map()
                 .keys()
                 .map(|word| String::from_utf8(word.clone()).unwrap())
                 .collect::<Vec<String>>()
@@ -41,7 +41,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             .unwrap();
 
         // If there are byte table overrides, apply them.
-        data.word_vocab.words.iter().for_each(|(bs, &token)| {
+        data.word_vocab.span_map().iter().for_each(|(bs, &token)| {
             if bs.len() == 1 {
                 byte_table[bs[0] as usize] = token;
             }
@@ -61,8 +61,8 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.data.compound_tokens_iter()
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.data.unordered_tokens_iter()
     }
     fn max_token(&self) -> T {
         self.data.max_token()
@@ -74,7 +74,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         self.data.word_pattern.as_str().to_string()
     }
 
-    fn special_vocab(&self) -> Option<&WordMapTokenVocab<T>> {
+    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
         self.data.specials.as_ref()
     }
 
@@ -122,7 +122,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
                 .filter_map(|(idx, w)| {
                     self.data
                         .pair_vocab
-                        .pairs
+                        .pairs()
                         .get(&(w[0], w[1]))
                         .map(|&token| (token, idx))
                 })
@@ -150,6 +150,7 @@ mod tests {
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
+    use crate::vocab::byte_table::ByteTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use alloc::sync::Arc;
     use compact_str::CompactString;
@@ -171,7 +172,9 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let mut vocab = trainer.train::<T>().unwrap();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+
+        let mut vocab = trainer.train(byte_table.clone()).unwrap();
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 

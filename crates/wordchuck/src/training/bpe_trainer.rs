@@ -1,14 +1,15 @@
 //! # Vocab Trainer
 
 use crate::regex::RegexWrapperPattern;
-use crate::training::pair_span_index::PairSpanIndex;
+use crate::training::pair_span_index::{PairIndexMap, PairSpanIndex};
 use crate::training::text_span_counter::{TextSpanCounter, TextSpanCounterOptions};
 use crate::training::token_span_buffer::TokenSpanBuf;
-use crate::types::{CountType, Pair, StringChunkType, TokenType};
+use crate::types::{CountType, Pair, PairTokenMap, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
-use crate::vocab::UnifiedTokenVocab;
 use crate::vocab::byte_table::ByteTable;
+use crate::vocab::pair_vocab::PairTokenMapVocab;
+use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 use ahash::{AHashMap, AHashSet};
 use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
@@ -22,9 +23,6 @@ pub struct BinaryPairVocabTrainerOptions {
 
     /// The vocab size.
     pub vocab_size: usize,
-
-    /// The byte/token mapping table.
-    pub byte_table: ByteTable,
 }
 
 impl BinaryPairVocabTrainerOptions {
@@ -36,7 +34,6 @@ impl BinaryPairVocabTrainerOptions {
         Self {
             pattern: pattern.into(),
             vocab_size,
-            byte_table: ByteTable::default(),
         }
     }
 }
@@ -61,14 +58,6 @@ impl BinaryPairVocabTrainerOptions {
         let pattern = pattern.into();
         pattern.compile().expect("regex pattern compilation failed");
         Self { pattern, ..self }
-    }
-
-    /// Sets the byte/token mapping table.
-    pub fn with_byte_table(
-        self,
-        byte_table: ByteTable,
-    ) -> Self {
-        Self { byte_table, ..self }
     }
 
     /// Initializes a [`BinaryPairVocabTrainer`] from these options.
@@ -202,15 +191,24 @@ where
     ///
     /// # Parameters
     /// * `T` - the [`TokenType`] of the trained vocab.
+    ///
+    /// # Arguments
+    /// * `byte_table` - the byte/token mapping table to use for training.
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(skip(self, words, word_counts))
     )]
-    pub fn train<T>(self) -> anyhow::Result<UnifiedTokenVocab<T>>
+    pub fn train<T, B>(
+        self,
+        byte_table: B,
+    ) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         C: CountType,
+        B: Into<Arc<ByteTable<T>>>,
     {
+        let byte_table = byte_table.into();
+
         validators::expect_vocab_size::<T>(self.options.vocab_size);
 
         let num_merges = self.options.vocab_size - U8_SIZE;
@@ -218,18 +216,18 @@ where
 
         self.options.pattern.compile()?;
 
-        let mut vocab = UnifiedTokenVocab::new(self.options.pattern.clone());
+        let mut pairs: PairTokenMap<T> = AHashMap::with_capacity(num_merges);
 
         let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) = self
             .span_counter
-            .to_text_span_counts_iter(&self.options.byte_table)
+            .to_text_span_counts_iter(&byte_table)
             .unzip();
 
         log::info!("Building pair index...");
+
         let PairSpanIndex {
             mut pair_counts,
-            // FIXME(crutcher): should this be updated while we merge?
-            pair_index,
+            pair_index: table_pair_index,
         } = PairSpanIndex::from_span_count_table(&words, &word_counts);
 
         let zero = C::zero();
@@ -238,7 +236,7 @@ where
         // ---- Build heap ----
         log::info!("Building heap with {} unique pairs", pair_counts.len());
         let mut heap = OctonaryHeap::with_capacity(pair_counts.len());
-        for (pair, word_indices) in pair_index.into_iter() {
+        for (pair, word_indices) in table_pair_index.into_iter() {
             let count = *pair_counts.get(&pair).unwrap_or(&zero);
             if count > zero {
                 heap.push(MergeJob {
@@ -253,7 +251,8 @@ where
         let mut merges_done = 0;
         let mut last_log_percent = 0;
 
-        let mut next_token_index = U8_SIZE;
+        // The first token we'll allocate is after all the byte tokens.
+        let mut next_token = byte_table.max_token() + T::one();
 
         while merges_done < num_merges {
             let Some(mut job) = heap.pop() else {
@@ -279,31 +278,36 @@ where
             }
 
             // Generate a new token ID for this merge
-            let new_token = T::from_usize(next_token_index).expect("new_token is a valid T");
-            next_token_index += 1;
+            let new_token = next_token;
+            next_token = next_token + T::one();
 
             // Record merge
-            vocab.pair_vocab.add_pair(job.pair, new_token);
+            pairs.insert(job.pair, new_token);
+
+            let mut new_token_pair_map: PairIndexMap<T> = AHashMap::with_capacity(16);
 
             // Merge this pair in all words where it occurs
-            let mut local_pos_updates: AHashMap<Pair<T>, AHashSet<usize>> =
-                AHashMap::with_capacity(16);
             for &word_idx in &job.word_indices {
                 // Apply merge to this word.
                 words[word_idx].merge_pair_cb(job.pair, new_token, &mut |pair, delta| {
                     // Update global pair counts based on this word's count
                     if delta < 0 {
+                        // This (a, b) pair was removed from this span.
                         *pair_counts.entry(pair).or_default() -= one;
                     }
                     if delta > 0 {
+                        // This (a, b) pair was added to this span.
+                        // And either a or b is new_token.
                         *pair_counts.entry(pair).or_default() += one;
-                        local_pos_updates.entry(pair).or_default().insert(word_idx);
+                        new_token_pair_map.entry(pair).or_default().insert(word_idx);
                     }
                 });
             }
 
-            // Add the updated pair counts back to the heap
-            for (pair, word_indices) in local_pos_updates {
+            // These will all contain the new token and are not yet in the heap:
+            // * ``(_, T)`` or ``(T, _)``
+            // and are not yet in the heap.
+            for (pair, word_indices) in new_token_pair_map {
                 let count = *pair_counts.get(&pair).unwrap_or(&zero);
                 if count > zero {
                     heap.push(MergeJob {
@@ -332,7 +336,11 @@ where
             }
         }
 
-        vocab.shrink_to_fit();
+        pairs.shrink_to_fit();
+
+        let pair_vocab: PairTokenMapVocab<T> = PairTokenMapVocab::new(byte_table, pairs);
+
+        let vocab = UnifiedTokenVocab::<T>::new(self.options.pattern).with_pair_vocab(pair_vocab);
 
         log::info!("Finished training: {} merges completed", merges_done);
 
@@ -348,6 +356,7 @@ mod tests {
     use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
+    use crate::vocab::byte_table::ByteTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -390,11 +399,9 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-            .train::<T>()
-            .unwrap()
-            .extend_word_vocab_from_pair_vocab()
-            .into();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_table.clone()).unwrap().into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
         check_is_send(&encoder);

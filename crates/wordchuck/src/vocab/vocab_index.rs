@@ -12,19 +12,18 @@ pub trait TokenVocabIndex<T: TokenType>: Clone + Send + Sync {
     /// Returns an iterator over all non-byte tokens.
     ///
     /// All returned tokens will have rank >= 256.
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T>;
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T>;
 
-    /// Returns an iterator over all tokens in the vocabulary.
-    ///
-    /// This will include all byte tokens (0-255),
-    /// as well as the tokens returned by [`Self::compound_tokens_iter`].
-    fn all_tokens_iter(&self) -> impl Iterator<Item = T> {
-        byte_tokens_iter().chain(self.compound_tokens_iter())
+    /// Returns a sorted vector of all tokens.
+    fn sorted_tokens(&self) -> Vec<T> {
+        let mut tokens: Vec<T> = self.unordered_tokens_iter().collect();
+        tokens.sort();
+        tokens
     }
 
     /// Gets the highest ranked token.
     fn max_token(&self) -> T {
-        self.all_tokens_iter().max().unwrap()
+        self.unordered_tokens_iter().max().unwrap()
     }
 }
 

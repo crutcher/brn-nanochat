@@ -4,7 +4,7 @@ use crate::encoders::TokenEncoder;
 use crate::encoders::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
-use crate::vocab::word_vocab::WordMapTokenVocab;
+use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 
 /// Batch-Level Parallel Encoder Wrapper.
 ///
@@ -36,8 +36,8 @@ where
     T: TokenType,
     D: TokenEncoder<T>,
 {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.inner.compound_tokens_iter()
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.inner.unordered_tokens_iter()
     }
 }
 
@@ -50,7 +50,7 @@ where
         self.inner.pattern()
     }
 
-    fn special_vocab(&self) -> Option<&WordMapTokenVocab<T>> {
+    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
         self.inner.special_vocab()
     }
 
@@ -85,9 +85,11 @@ mod tests {
     use crate::rayon::rayon_encoder::ParallelRayonEncoder;
     use crate::training::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::byte_table::ByteTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
     use compact_str::CompactString;
+    use std::sync::Arc;
 
     #[test]
     fn test_encoder() {
@@ -107,8 +109,11 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
-        let mut vocab: UnifiedTokenVocab<T> =
-            trainer.train::<T>().expect("training vocab should succeed");
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+
+        let mut vocab: UnifiedTokenVocab<T> = trainer
+            .train(byte_table.clone())
+            .expect("training vocab should succeed");
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 

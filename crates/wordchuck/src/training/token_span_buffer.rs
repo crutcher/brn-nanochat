@@ -36,7 +36,7 @@ impl<T: TokenType> TokenSpanBuf<T> {
     /// * `byte_table` - the translation for the byte tokens.
     pub fn from_bytes<B: AsRef<[u8]>>(
         bytes: B,
-        byte_table: &ByteTable,
+        byte_table: &ByteTable<T>,
     ) -> Self {
         Self {
             tokens: bytes
@@ -54,7 +54,7 @@ impl<T: TokenType> TokenSpanBuf<T> {
     /// * `byte_table` - the translation for the byte tokens.
     pub fn from_string<S: AsRef<str>>(
         text: S,
-        byte_table: &ByteTable,
+        byte_table: &ByteTable<T>,
     ) -> Self {
         Self::from_bytes(text.as_ref().as_bytes(), byte_table)
     }
@@ -194,16 +194,22 @@ mod tests {
 
     #[test]
     fn test_span_from_str() {
-        let byte_table: ByteTable = Default::default();
+        type T = u32;
 
-        let span: TokenSpanBuf<u32> = TokenSpanBuf::from_string("hello", &byte_table);
+        let byte_table: ByteTable<T> = Default::default();
+
+        let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &byte_table);
         assert_eq!(span.tokens(), &[104, 101, 108, 108, 111]);
 
-        let mut perm = (10..256).map(|v| v as u8).collect::<Vec<_>>();
-        perm.extend((0..10).map(|v| v as u8));
-        let shift_table: ByteTable = ByteTable::from_permutation(&perm);
+        let shifted_tokens = byte_table
+            .byte_to_token()
+            .iter()
+            .map(|&token| token + 10)
+            .collect::<Vec<_>>();
 
-        let span: TokenSpanBuf<u32> = TokenSpanBuf::from_string("hello", &shift_table);
+        let shift_table: ByteTable<T> = ByteTable::from_byte_to_token(&shifted_tokens);
+
+        let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &shift_table);
         assert_eq!(span.tokens(), &[114, 111, 118, 118, 121]);
     }
 

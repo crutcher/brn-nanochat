@@ -3,9 +3,10 @@
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::regex::RegexWrapperPattern;
 use crate::types::TokenType;
-use crate::vocab::pair_vocab::PairMapTokenVocab;
+use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
+use crate::vocab::pair_vocab::PairTokenMapVocab;
+use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
-use crate::vocab::word_vocab::WordMapTokenVocab;
 use ahash::AHashMap;
 
 /// Unified token vocabulary.
@@ -15,13 +16,13 @@ pub struct UnifiedTokenVocab<T: TokenType> {
     pub word_pattern: RegexWrapperPattern,
 
     /// Special tokens vocabulary.
-    pub specials: Option<WordMapTokenVocab<T>>,
+    pub specials: Option<SpecialWordsTokenVocab<T>>,
 
     /// ``{ Vec<u8> -> T }`` vocabulary.
-    pub word_vocab: WordMapTokenVocab<T>,
+    pub word_vocab: ByteSpanTokenMapVocab<T>,
 
     /// ``{ (T, T) -> T }`` vocabulary.
-    pub pair_vocab: PairMapTokenVocab<T>,
+    pub pair_vocab: PairTokenMapVocab<T>,
 }
 
 impl<T: TokenType> UnifiedTokenVocab<T> {
@@ -41,7 +42,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Mutable reference to the special tokens vocabulary.
     ///
     /// Will create the vocabulary if it doesn't exist.
-    pub fn specials_vocab_mut(&mut self) -> &mut WordMapTokenVocab<T> {
+    pub fn specials_vocab_mut(&mut self) -> &mut SpecialWordsTokenVocab<T> {
         if self.specials.is_none() {
             self.specials = Some(Default::default());
         }
@@ -59,26 +60,10 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         }
     }
 
-    /// Shrinks the capacity of the underlying data structures to fit its current size.
-    pub fn shrink_to_fit(&mut self) {
-        self.pair_vocab.shrink_to_fit();
-        self.word_vocab.shrink_to_fit();
-    }
-
-    /// Materialize the tokens in the `pair_vocab` into the `word_vocab`.
-    ///
-    /// Leaves tokens which already exist in the `word_vocab`.
-    pub fn extend_word_vocab_from_pair_vocab(self) -> Self {
-        let mut word_vocab = self.word_vocab;
-        word_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
-
-        Self { word_vocab, ..self }
-    }
-
     /// Replace special tokens vocabulary.
     pub fn with_specials(
         self,
-        specials: Option<WordMapTokenVocab<T>>,
+        specials: Option<SpecialWordsTokenVocab<T>>,
     ) -> Self {
         Self { specials, ..self }
     }
@@ -86,7 +71,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Replace the binary-pair vocabulary.
     pub fn with_pair_vocab(
         self,
-        pair_vocab: PairMapTokenVocab<T>,
+        pair_vocab: PairTokenMapVocab<T>,
     ) -> Self {
         Self { pair_vocab, ..self }
     }
@@ -94,26 +79,34 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Replace the word vocabulary.
     pub fn with_word_vocab(
         self,
-        word_vocab: WordMapTokenVocab<T>,
+        word_vocab: ByteSpanTokenMapVocab<T>,
     ) -> Self {
         Self { word_vocab, ..self }
     }
 
     /// Compiled expansion dictionary.
     pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
-        let mut export_vocab = self.word_vocab.clone();
+        let mut tmp = AHashMap::default();
 
-        export_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
+        self.word_vocab.iter().for_each(|(chunk, &token)| {
+            tmp.insert(chunk.clone(), token);
+        });
+
+        for (span, token) in self.pair_vocab.to_span_pairs() {
+            if tmp.contains_key(&span) {
+                continue;
+            }
+            tmp.insert(span, token);
+        }
 
         if let Some(specials) = &self.specials {
-            for (chunk, &t) in &specials.words {
-                export_vocab.add_bytes_word(chunk.clone(), t);
+            for (chunk, &t) in specials.span_map().iter() {
+                tmp.insert(chunk.clone(), t);
             }
         }
 
-        export_vocab
-            .iter()
-            .map(|(chunk, &token)| (token, chunk.to_vec()))
+        tmp.into_iter()
+            .map(|(chunk, token)| (token, chunk))
             .collect()
     }
 
@@ -124,10 +117,10 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for UnifiedTokenVocab<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        let mut tokens = self.pair_vocab.compound_tokens_iter().collect::<Vec<_>>();
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        let mut tokens = self.pair_vocab.unordered_tokens_iter().collect::<Vec<_>>();
 
-        tokens.extend(self.word_vocab.compound_tokens_iter());
+        tokens.extend(self.word_vocab.unordered_tokens_iter());
 
         tokens.into_iter()
     }

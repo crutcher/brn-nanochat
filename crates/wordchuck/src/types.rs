@@ -97,13 +97,13 @@ impl<T> StringChunkType for T where
 }
 
 /// [`Pair<T>`] to T map.
-pub type PairToTokenMap<T> = ahash::AHashMap<Pair<T>, T>;
+pub type PairTokenMap<T> = ahash::AHashMap<Pair<T>, T>;
 
 /// T to [`Pair<T>`] map.
 pub type TokenToPairMap<T> = ahash::AHashMap<T, Pair<T>>;
 
 /// Byte vector to T map.
-pub type WordToTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
+pub type ByteSpanTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
 
 /// T to byte vector map.
 pub type TokenToWordMap<T> = ahash::AHashMap<T, Vec<u8>>;

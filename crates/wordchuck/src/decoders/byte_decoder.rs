@@ -5,16 +5,34 @@
 use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
+use crate::vocab::byte_table::ByteTable;
+use crate::vocab::vocab_index::byte_tokens_iter;
 
 /// A decoders that only decodes byte tokens.
 #[derive(Clone, Default)]
 pub struct ByteDecoder<T: TokenType> {
+    byte_table: ByteTable<T>,
     _marker: std::marker::PhantomData<T>,
 }
 
+impl<T: TokenType> ByteDecoder<T> {
+    /// Create a new byte decoder.
+    pub fn new(byte_table: ByteTable<T>) -> Self {
+        Self {
+            byte_table,
+            _marker: Default::default(),
+        }
+    }
+
+    /// Get the byte table.
+    pub fn byte_table(&self) -> &ByteTable<T> {
+        &self.byte_table
+    }
+}
+
 impl<T: TokenType> TokenVocabIndex<T> for ByteDecoder<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        vec![].into_iter()
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        byte_tokens_iter::<T>()
     }
 }
 
@@ -25,7 +43,7 @@ impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
         ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         while let Some(t) = ctx.stack.pop() {
-            if let Some(b) = t.to_u8() {
+            if let Some(b) = self.byte_table.get_byte(t) {
                 ctx.buf.push(b);
             } else {
                 ctx.stack.push(t);

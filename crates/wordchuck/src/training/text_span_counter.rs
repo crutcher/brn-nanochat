@@ -143,7 +143,7 @@ where
     /// * `byte_table` - the byte table to use for byte translation.
     pub fn to_text_span_counts_iter<T: TokenType>(
         &self,
-        byte_table: &ByteTable,
+        byte_table: &ByteTable<T>,
     ) -> impl Iterator<Item = (TokenSpanBuf<T>, C)> {
         self.word_counts
             .iter()
@@ -203,7 +203,7 @@ mod tests {
         type T = usize;
         type C = u64;
 
-        let byte_table: ByteTable = Default::default();
+        let byte_table: ByteTable<T> = Default::default();
 
         let mut word_counts = TextSpanCounter::<K, C>::new(
             maybe_parallel_regex_supplier(get_regex()),

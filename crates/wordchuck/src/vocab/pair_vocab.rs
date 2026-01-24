@@ -1,90 +1,95 @@
 //! # Pair Map ``{ (T, T) -> T }`` Token Vocabulary
 
-use crate::types::{PairToTokenMap, TokenType};
+use crate::decoders::TokenDecoder;
+use crate::decoders::pair_decoder::PairExpansionDecoder;
+use crate::types::{PairTokenMap, TokenType};
+use crate::vocab::byte_table::ByteTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
-use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-/// Token vocabulary as a binary-pair encoding map of ``{ (T, T) -> T }``.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
-pub struct PairMapTokenVocab<T: TokenType> {
+/// Pair ``(T, T) -> T`` Vocabulary.
+///
+/// - Grounded in a `ByteTable<T>` for byte-to-token mapping.
+/// - Collection of ``(T, T) -> T`` pairs.
+#[derive(Default, Debug, Clone)]
+pub struct PairTokenMapVocab<T: TokenType> {
+    /// Byte/token mapping table.
+    byte_table: Arc<ByteTable<T>>,
+
     /// Map of ``{ (T, T) -> T }``.
-    pub pairs: PairToTokenMap<T>,
+    pairs: PairTokenMap<T>,
 }
 
-impl<'a, T: TokenType> IntoIterator for &'a PairMapTokenVocab<T> {
-    type Item = (&'a (T, T), &'a T);
-    type IntoIter = std::collections::hash_map::Iter<'a, (T, T), T>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.pairs.iter()
+impl<T: TokenType> PairTokenMapVocab<T> {
+    /// Create a new vocab.
+    pub fn new<B>(
+        byte_table: B,
+        pairs: PairTokenMap<T>,
+    ) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
+        Self {
+            byte_table: byte_table.into(),
+            pairs,
+        }
     }
-}
 
-impl<T: TokenType> PairMapTokenVocab<T> {
-    /// The number of words in the vocabulary.
+    /// Get the byte/token mapping table.
+    pub fn byte_table(&self) -> &Arc<ByteTable<T>> {
+        &self.byte_table
+    }
+
+    /// Get the map of pairs.
+    pub fn pairs(&self) -> &PairTokenMap<T> {
+        &self.pairs
+    }
+
+    /// Get the number of tokens in the vocabulary.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.pairs.len()
+        self.byte_table.len() + self.pairs.len()
     }
 
-    /// Returns `true` if the vocabulary contains no words.
-    pub fn is_empty(&self) -> bool {
-        self.pairs.is_empty()
-    }
+    /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
+    ///
+    /// This includes the pairs from the `ByteTable`.
+    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        let decoder = PairExpansionDecoder::from_pair_map(self.byte_table().clone(), self.pairs());
 
-    /// Iterate over the pairs in the vocabulary.
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = (&'a (T, T), &'a T)> + 'a {
-        self.pairs.iter()
-    }
-
-    /// Add a pair to the vocab.
-    pub fn add_pair(
-        &mut self,
-        pair: (T, T),
-        token: T,
-    ) {
-        self.pairs.insert(pair, token);
-    }
-
-    /// Shrinks the capacity of the underlying data structures to fit its current size.
-    pub fn shrink_to_fit(&mut self) {
-        self.pairs.shrink_to_fit();
+        self.byte_table.to_span_pairs().chain(
+            self.pairs
+                .values()
+                .map(move |&t| (decoder.try_decode_to_bytes([t]).unwrap(), t)),
+        )
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for PairMapTokenVocab<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.pairs.values().copied()
-    }
-
-    fn max_token(&self) -> T {
-        self.pairs
-            .values()
-            .max()
-            .copied()
-            .unwrap_or(T::from_u8(u8::MAX).unwrap())
+impl<T: TokenType> TokenVocabIndex<T> for PairTokenMapVocab<T> {
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.byte_table
+            .unordered_tokens_iter()
+            .chain(self.pairs.values().copied())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::FromPrimitive;
-    use std::collections::HashSet;
 
     #[test]
-    fn test_tokens_iter() {
+    fn test_tokens_sorted() {
         type T = u32;
-        let byte_tokens: Vec<T> = (0..256).map(|b| T::from_usize(b).unwrap()).collect();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
-        let mut vocab = PairMapTokenVocab::<T> {
-            pairs: PairToTokenMap::default(),
+        let mut vocab = PairTokenMapVocab::<T> {
+            pairs: PairTokenMap::default(),
+            byte_table: byte_table.clone(),
         };
 
         assert_eq!(vocab.max_token(), 255);
 
-        assert_eq!(vocab.compound_tokens_iter().collect::<Vec<T>>(), vec![]);
-
-        assert_eq!(&vocab.all_tokens_iter().collect::<Vec<T>>(), &byte_tokens);
+        assert_eq!(&vocab.sorted_tokens(), &byte_table.sorted_tokens());
 
         vocab.pairs.insert((1, 2), 300);
         vocab.pairs.insert((3, 4), 301);
@@ -92,16 +97,13 @@ mod tests {
 
         assert_eq!(vocab.max_token(), 302);
 
-        let non_byte_tokens: HashSet<T> = [300, 301, 302].iter().copied().collect();
-
-        let mut combined: HashSet<T> = byte_tokens.iter().copied().collect();
-        combined.extend(&non_byte_tokens);
-
         assert_eq!(
-            &vocab.compound_tokens_iter().collect::<HashSet<T>>(),
-            &non_byte_tokens,
+            &vocab.sorted_tokens(),
+            &byte_table
+                .sorted_tokens()
+                .into_iter()
+                .chain([300_u32, 301, 302].into_iter())
+                .collect::<Vec<T>>()
         );
-
-        assert_eq!(&vocab.all_tokens_iter().collect::<HashSet<T>>(), &combined);
     }
 }

@@ -9,7 +9,8 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
-use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
+use wordchuck::vocab::byte_table::ByteTable;
+use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
 use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
@@ -113,11 +114,12 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+
     println!("- train");
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-        .train()
+        .train(byte_table.clone())
         .expect("training failed")
-        .extend_word_vocab_from_pair_vocab()
         .into();
 
     let training_duration = std::time::Instant::now().duration_since(t0);
@@ -125,7 +127,7 @@ fn main() -> anyhow::Result<()> {
     println!("- vocab_size: {:?}", vocab.max_token());
 
     if let Some(path) = args.tiktoken_save_path {
-        save_word_map_to_tiktoken_path(&vocab.word_vocab, &path)?;
+        save_span_map_to_tiktoken_path(vocab.word_vocab.span_map(), &path)?;
         println!("- tiktoken vocab: {path:?}");
     }
 
