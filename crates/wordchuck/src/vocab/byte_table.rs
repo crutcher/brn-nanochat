@@ -2,7 +2,6 @@
 
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
-use crate::vocab::tooling::permutations::{invert_permutation, try_check_permutation};
 use ahash::AHashMap;
 use core::fmt::Debug;
 
@@ -34,74 +33,34 @@ impl<T: TokenType> Debug for ByteTable<T> {
 
 impl<T: TokenType> Default for ByteTable<T> {
     fn default() -> Self {
-        let ord_table = (0..256)
+        let byte_to_token = (0..256)
             .map(|i| T::from_usize(i).unwrap())
             .collect::<Vec<_>>();
-        Self::from_byte_to_token(&ord_table)
+        Self::from_byte_to_token(&byte_to_token)
     }
 }
 
 impl<T: TokenType> ByteTable<T> {
-    /// Construct a new table from a valid permutation.
-    ///
-    /// # Panics
-    /// If the permutation is invalid.
-    pub fn from_permutation<P>(perm: P) -> Self
-    where
-        P: AsRef<[u8]>,
-    {
-        let perm = perm.as_ref();
-
-        assert_eq!(
-            perm.len(),
-            256,
-            "ByteTable::from_permutation: invalid permutation length"
-        );
-        let perm: [u8; 256] = perm.try_into().unwrap();
-
-        try_check_permutation(&perm).expect("ByteTable::from_permutation: invalid permutation");
-
-        let inv: [u8; 256] = invert_permutation(&perm).try_into().unwrap();
-
-        let ord_table: [T; 256] = perm
-            .iter()
-            .map(|&byte| T::from_u8(byte).unwrap())
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        let tokens: AHashMap<T, u8> = inv
-            .iter()
-            .enumerate()
-            .map(|(t, &b)| (T::from_usize(t).unwrap(), b))
-            .collect();
-
-        Self {
-            token_to_byte: tokens,
-            byte_to_token: ord_table,
-        }
-    }
-
     /// Build a `ByteTable` from a byte-ord => token table.
     ///
     /// # Panics
     /// If the map is not a 1:1 bijection.
-    pub fn from_byte_to_token(token_table: &[T]) -> Self {
-        assert_eq!(token_table.len(), 256);
+    pub fn from_byte_to_token(byte_to_token: &[T]) -> Self {
+        assert_eq!(byte_to_token.len(), 256);
 
-        let ord_table: [T; 256] = token_table.try_into().unwrap();
+        let byte_to_token: [T; 256] = byte_to_token.try_into().unwrap();
 
-        let tokens: AHashMap<T, u8> = ord_table
+        let token_to_byte: AHashMap<T, u8> = byte_to_token
             .iter()
             .enumerate()
             .map(|(t, &token)| (token, t as u8))
             .collect();
 
-        assert_eq!(tokens.len(), 256);
+        assert_eq!(token_to_byte.len(), 256);
 
         Self {
-            token_to_byte: tokens,
-            byte_to_token: ord_table,
+            token_to_byte,
+            byte_to_token,
         }
     }
 
@@ -109,16 +68,16 @@ impl<T: TokenType> ByteTable<T> {
     ///
     /// # Panics
     /// If there the map is not a 1:1 bijection.
-    pub fn from_token_to_byte(tokens: &AHashMap<T, u8>) -> Self {
-        let tokens = tokens.clone();
+    pub fn from_token_to_byte(token_to_byte: &AHashMap<T, u8>) -> Self {
+        let token_to_byte = token_to_byte.clone();
 
-        let ord_map: AHashMap<u8, T> = tokens.iter().map(|(&t, &b)| (b, t)).collect();
+        let ord_map: AHashMap<u8, T> = token_to_byte.iter().map(|(&t, &b)| (b, t)).collect();
         assert_eq!(ord_map.len(), 256);
 
         let mut ord_items = ord_map.into_iter().collect::<Vec<_>>();
         ord_items.sort_by_key(|(b, _)| *b);
 
-        let ord_table: [T; 256] = ord_items
+        let byte_to_token: [T; 256] = ord_items
             .into_iter()
             .map(|(_, t)| t)
             .collect::<Vec<_>>()
@@ -126,8 +85,8 @@ impl<T: TokenType> ByteTable<T> {
             .unwrap();
 
         Self {
-            byte_to_token: ord_table,
-            token_to_byte: tokens,
+            byte_to_token,
+            token_to_byte,
         }
     }
 
@@ -160,13 +119,14 @@ impl<T: TokenType> ByteTable<T> {
 
 impl<T: TokenType> TokenVocabIndex<T> for ByteTable<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        (0..256).map(move |i| self.get_token(i as u8))
+        self.byte_to_token.iter().copied()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_traits::FromPrimitive;
 
     #[test]
     fn test_byte_table_default() {
@@ -184,17 +144,19 @@ mod tests {
 
     #[test]
     fn test_byte_table() {
-        let mut perm = (0..256).into_iter().map(|i| i as u8).collect::<Vec<_>>();
-        perm.reverse();
-
         type T = u32;
-        let table: ByteTable<T> = ByteTable::from_permutation(&perm);
+        let byte_to_token: Vec<T> = (0..256)
+            .map(|i| T::from_usize(i).unwrap() + 100)
+            .collect::<Vec<_>>();
 
-        assert_eq!(table.get_token(0_u8), 255_u32);
-        assert_eq!(table.get_token(1_u8), 254_u32);
-        assert_eq!(table.get_byte(255_u32), Some(0_u8));
-        assert_eq!(table.get_byte(254_u32), Some(1_u8));
+        let table: ByteTable<T> = ByteTable::from_byte_to_token(&byte_to_token);
 
-        assert_eq!(table.get_byte(256_u32), None);
+        assert_eq!(table.get_token(0_u8), 100);
+        assert_eq!(table.get_token(255_u8), 355);
+
+        assert_eq!(table.get_byte(99_u32), None);
+        assert_eq!(table.get_byte(100_u32), Some(0));
+        assert_eq!(table.get_byte(355_u32), Some(255));
+        assert_eq!(table.get_byte(356_u32), None);
     }
 }
