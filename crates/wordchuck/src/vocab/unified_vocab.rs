@@ -61,7 +61,6 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
     /// Shrinks the capacity of the underlying data structures to fit its current size.
     pub fn shrink_to_fit(&mut self) {
-        self.pair_vocab.shrink_to_fit();
         self.word_vocab.shrink_to_fit();
     }
 

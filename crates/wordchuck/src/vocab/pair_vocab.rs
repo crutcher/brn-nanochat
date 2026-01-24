@@ -4,52 +4,37 @@ use crate::types::{PairTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
 
-/// Token vocabulary as a binary-pair encoding map of ``{ (T, T) -> T }``.
+/// Pair ``(T, T) -> T`` Vocabulary.
+///
+/// - Grounded in a `ByteTable<T>` for byte-to-token mapping.
+/// - Collection of ``(T, T) -> T`` pairs.
 #[derive(Default, Debug, Clone)]
 pub struct PairTokenMapVocab<T: TokenType> {
     /// Byte/token mapping table.
-    pub byte_table: ByteTable<T>,
+    byte_table: ByteTable<T>,
 
     /// Map of ``{ (T, T) -> T }``.
-    pub pairs: PairTokenMap<T>,
-}
-
-impl<'a, T: TokenType> IntoIterator for &'a PairTokenMapVocab<T> {
-    type Item = (&'a (T, T), &'a T);
-    type IntoIter = std::collections::hash_map::Iter<'a, (T, T), T>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.pairs.iter()
-    }
+    pairs: PairTokenMap<T>,
 }
 
 impl<T: TokenType> PairTokenMapVocab<T> {
-    /// The number of words in the vocabulary.
-    pub fn len(&self) -> usize {
-        self.pairs.len()
+    /// Create a new vocab.
+    pub fn new(
+        byte_table: &ByteTable<T>,
+        pairs: PairTokenMap<T>,
+    ) -> Self {
+        let byte_table = byte_table.clone();
+        Self { byte_table, pairs }
     }
 
-    /// Returns `true` if the vocabulary contains no words.
-    pub fn is_empty(&self) -> bool {
-        self.pairs.is_empty()
+    /// Get the byte/token mapping table.
+    pub fn byte_table(&self) -> &ByteTable<T> {
+        &self.byte_table
     }
 
-    /// Iterate over the pairs in the vocabulary.
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = (&'a (T, T), &'a T)> + 'a {
-        self.pairs.iter()
-    }
-
-    /// Add a pair to the vocab.
-    pub fn add_pair(
-        &mut self,
-        pair: (T, T),
-        token: T,
-    ) {
-        self.pairs.insert(pair, token);
-    }
-
-    /// Shrinks the capacity of the underlying data structures to fit its current size.
-    pub fn shrink_to_fit(&mut self) {
-        self.pairs.shrink_to_fit();
+    /// Get the map of pairs.
+    pub fn pairs(&self) -> &PairTokenMap<T> {
+        &self.pairs
     }
 }
 

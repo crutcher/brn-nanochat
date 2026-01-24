@@ -4,10 +4,11 @@ use crate::regex::RegexWrapperPattern;
 use crate::training::pair_span_index::{PairIndexMap, PairSpanIndex};
 use crate::training::text_span_counter::{TextSpanCounter, TextSpanCounterOptions};
 use crate::training::token_span_buffer::TokenSpanBuf;
-use crate::types::{CountType, Pair, StringChunkType, TokenType};
+use crate::types::{CountType, Pair, PairTokenMap, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
 use crate::vocab::byte_table::ByteTable;
+use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 use ahash::{AHashMap, AHashSet};
 use core::cmp::Ordering;
@@ -212,7 +213,7 @@ where
 
         self.options.pattern.compile()?;
 
-        let mut vocab = UnifiedTokenVocab::new(self.options.pattern.clone());
+        let mut pairs: PairTokenMap<T> = AHashMap::with_capacity(num_merges);
 
         let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) = self
             .span_counter
@@ -278,7 +279,7 @@ where
             next_token = next_token + T::one();
 
             // Record merge
-            vocab.pair_vocab.add_pair(job.pair, new_token);
+            pairs.insert(job.pair, new_token);
 
             let mut new_token_pair_map: PairIndexMap<T> = AHashMap::with_capacity(16);
 
@@ -332,7 +333,11 @@ where
             }
         }
 
-        vocab.shrink_to_fit();
+        pairs.shrink_to_fit();
+
+        let pair_vocab: PairTokenMapVocab<T> = PairTokenMapVocab::new(byte_table, pairs);
+
+        let vocab = UnifiedTokenVocab::<T>::new(self.options.pattern).with_pair_vocab(pair_vocab);
 
         log::info!("Finished training: {} merges completed", merges_done);
 

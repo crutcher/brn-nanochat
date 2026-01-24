@@ -121,7 +121,7 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
             Some(self.unordered_tokens_iter().collect())
         };
 
-        let decoder = PairExpansionDecoder::from_pair_map(&pair_vocab.pairs);
+        let decoder = PairExpansionDecoder::from_pair_map(pair_vocab.pairs());
         for token in pair_vocab.unordered_tokens_iter() {
             if let Some(skip) = &skip
                 && skip.contains(&token)
@@ -137,7 +137,9 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
 
     /// Build a binary pair map from the word vocabulary.
     pub fn to_pair_vocab(&self) -> PairTokenMapVocab<T> {
-        let mut pair_vocab = PairTokenMapVocab::<T>::default();
+        let byte_table: ByteTable<T> = Default::default();
+
+        let mut pairs = AHashMap::default();
 
         let token_to_words: AHashMap<T, &[u8]> = self
             .span_map
@@ -155,12 +157,12 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
                     && a < token
                     && b < token
                 {
-                    pair_vocab.add_pair((a, b), token);
+                    pairs.insert((a, b), token);
                 }
             }
         }
 
-        pair_vocab
+        PairTokenMapVocab::new(&byte_table, pairs)
     }
 }
 
@@ -243,7 +245,7 @@ mod tests {
 
         let pair_vocab = vocab.to_pair_vocab();
         assert_eq!(
-            &pair_vocab.pairs,
+            pair_vocab.pairs(),
             &[
                 (('a' as u32, 't' as u32), 300),
                 ((300, 'e' as u32), 301),

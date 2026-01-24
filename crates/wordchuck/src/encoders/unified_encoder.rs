@@ -122,7 +122,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
                 .filter_map(|(idx, w)| {
                     self.data
                         .pair_vocab
-                        .pairs
+                        .pairs()
                         .get(&(w[0], w[1]))
                         .map(|&token| (token, idx))
                 })

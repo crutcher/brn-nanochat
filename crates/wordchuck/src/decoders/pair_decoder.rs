@@ -99,7 +99,7 @@ mod tests {
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
 
-        let decoder = PairExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs);
+        let decoder = PairExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
