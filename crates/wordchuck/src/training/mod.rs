@@ -1,8 +1,8 @@
 //! # Vocabulary Training
 
-pub mod pair_index;
+pub mod pair_span_index;
+pub mod text_span_counter;
+pub mod token_span_buffer;
 pub mod trainer;
-pub mod word;
-pub mod word_count;
 
 pub use trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};

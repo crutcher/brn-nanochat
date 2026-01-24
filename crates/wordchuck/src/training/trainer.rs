@@ -1,13 +1,14 @@
 //! # Vocab Trainer
 
 use crate::regex::RegexWrapperPattern;
-use crate::training::pair_index::PairIndex;
-use crate::training::word::Word;
-use crate::training::word_count::{WordCounter, WordCounterOptions};
+use crate::training::pair_span_index::PairSpanIndex;
+use crate::training::text_span_counter::{TextSpanCounter, TextSpanCounterOptions};
+use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CountType, Pair, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
 use crate::vocab::UnifiedTokenVocab;
+use crate::vocab::byte_table::ByteTable;
 use ahash::{AHashMap, AHashSet};
 use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
@@ -21,6 +22,9 @@ pub struct BinaryPairVocabTrainerOptions {
 
     /// The vocab size.
     pub vocab_size: usize,
+
+    /// The byte/token mapping table.
+    pub byte_table: ByteTable,
 }
 
 impl BinaryPairVocabTrainerOptions {
@@ -32,6 +36,7 @@ impl BinaryPairVocabTrainerOptions {
         Self {
             pattern: pattern.into(),
             vocab_size,
+            byte_table: ByteTable::default(),
         }
     }
 }
@@ -56,6 +61,14 @@ impl BinaryPairVocabTrainerOptions {
         let pattern = pattern.into();
         pattern.compile().expect("regex pattern compilation failed");
         Self { pattern, ..self }
+    }
+
+    /// Sets the byte/token mapping table.
+    pub fn with_byte_table(
+        self,
+        byte_table: ByteTable,
+    ) -> Self {
+        Self { byte_table, ..self }
     }
 
     /// Initializes a [`BinaryPairVocabTrainer`] from these options.
@@ -134,8 +147,8 @@ where
     /// Trainer options.
     pub options: BinaryPairVocabTrainerOptions,
 
-    /// The word counter.
-    pub word_counter: WordCounter<K, C>,
+    /// The text span counter.
+    pub span_counter: TextSpanCounter<K, C>,
 }
 
 impl<K, C> BinaryPairVocabTrainer<K, C>
@@ -145,19 +158,19 @@ where
 {
     /// Initializes a [`BinaryPairVocabTrainer`].
     pub fn init(options: BinaryPairVocabTrainerOptions) -> Self {
-        let word_counter = WordCounter::<K, C>::new(
+        let span_counter = TextSpanCounter::<K, C>::new(
             Arc::new(
                 options
                     .pattern
                     .compile()
                     .expect("regex pattern compilation failed"),
             ),
-            WordCounterOptions::default(),
+            TextSpanCounterOptions::default(),
         );
 
         BinaryPairVocabTrainer {
             options,
-            word_counter,
+            span_counter,
         }
     }
 
@@ -166,7 +179,7 @@ where
         &mut self,
         text: S,
     ) {
-        self.word_counter.update_from_text(text);
+        self.span_counter.update_from_text(text);
     }
 
     /// Update word counts inplace from a sample iterator.
@@ -177,7 +190,7 @@ where
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        self.word_counter.update_from_samples(samples);
+        self.span_counter.update_from_samples(samples);
     }
 
     /// Trains [`UnifiedTokenVocab<T>`].
@@ -207,14 +220,15 @@ where
 
         let mut vocab = UnifiedTokenVocab::new(self.options.pattern.clone());
 
-        let (mut words, word_counts): (Vec<Word<T>>, Vec<C>) =
-            self.word_counter.to_word_counts_iter().unzip();
+        let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) =
+            self.span_counter.to_word_counts_iter().unzip();
 
         log::info!("Building pair index...");
-        let PairIndex {
+        let PairSpanIndex {
             mut pair_counts,
-            pair_to_word_index,
-        } = PairIndex::build_from_word_counts_table(&words, &word_counts);
+            // FIXME(crutcher): should this be updated while we merge?
+            pair_index,
+        } = PairSpanIndex::from_span_count_table(&words, &word_counts);
 
         let zero = C::zero();
         let one = C::one();
@@ -222,7 +236,7 @@ where
         // ---- Build heap ----
         log::info!("Building heap with {} unique pairs", pair_counts.len());
         let mut heap = OctonaryHeap::with_capacity(pair_counts.len());
-        for (pair, word_indices) in pair_to_word_index.into_iter() {
+        for (pair, word_indices) in pair_index.into_iter() {
             let count = *pair_counts.get(&pair).unwrap_or(&zero);
             if count > zero {
                 heap.push(MergeJob {
