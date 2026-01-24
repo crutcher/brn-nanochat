@@ -5,7 +5,7 @@ use crate::vocab::tooling::permutations::{invert_permutation, try_check_permutat
 use core::fmt::Debug;
 
 /// 0..255 Rank Byte/Token Bijection Table
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq)]
 pub struct ByteTable {
     perm: [u8; 256],
     inv: [u8; 256],
@@ -27,7 +27,12 @@ impl ByteTable {
     ///
     /// # Panics
     /// If the permutation is invalid.
-    pub fn from_permutation(perm: &[u8]) -> Self {
+    pub fn from_permutation<P>(perm: P) -> Self
+    where
+        P: AsRef<[u8]>,
+    {
+        let perm = perm.as_ref();
+
         assert_eq!(
             perm.len(),
             256,
@@ -43,7 +48,7 @@ impl ByteTable {
     }
 
     /// Get the token corresponding to a given byte.
-    pub fn byte_to_token<T: TokenType>(
+    pub fn get_token<T: TokenType>(
         &self,
         byte: u8,
     ) -> T {
@@ -51,7 +56,7 @@ impl ByteTable {
     }
 
     /// Get the byte corresponding to a given token, if any.
-    pub fn token_to_byte<T: TokenType>(
+    pub fn get_byte<T: TokenType>(
         &self,
         token: T,
     ) -> Option<u8> {
@@ -72,11 +77,11 @@ mod tests {
         let table = ByteTable::from_permutation(&perm);
 
         type T = u32;
-        assert_eq!(table.byte_to_token::<T>(0_u8), 255_u32);
-        assert_eq!(table.byte_to_token::<T>(1_u8), 254_u32);
-        assert_eq!(table.token_to_byte::<T>(255_u32), Some(0_u8));
-        assert_eq!(table.token_to_byte::<T>(254_u32), Some(1_u8));
+        assert_eq!(table.get_token::<T>(0_u8), 255_u32);
+        assert_eq!(table.get_token::<T>(1_u8), 254_u32);
+        assert_eq!(table.get_byte::<T>(255_u32), Some(0_u8));
+        assert_eq!(table.get_byte::<T>(254_u32), Some(1_u8));
 
-        assert_eq!(table.token_to_byte::<T>(256_u32), None);
+        assert_eq!(table.get_byte::<T>(256_u32), None);
     }
 }
