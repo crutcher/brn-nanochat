@@ -72,6 +72,7 @@ extern crate alloc;
 
 pub mod decoders;
 pub mod encoders;
+pub mod regex;
 pub mod training;
 pub mod types;
 pub mod util;
@@ -79,4 +80,3 @@ pub mod vocab;
 
 #[cfg(feature = "rayon")]
 pub mod rayon;
-pub mod regex;
