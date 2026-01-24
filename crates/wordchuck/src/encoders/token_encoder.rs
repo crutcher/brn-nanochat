@@ -1,6 +1,6 @@
 //! # Token Encoder Trait
 
-use crate::encoders::text_segmentor::WordRef;
+use crate::segmentation::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;

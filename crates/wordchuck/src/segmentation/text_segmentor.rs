@@ -3,6 +3,8 @@
 use crate::regex::RegexSupplierHandle;
 use crate::regex::exact_match_union::exact_match_union_regex_wrapper;
 use crate::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
+use crate::segmentation::segmentation_config::SegmentationConfig;
+use crate::types::TokenType;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use core::ops::Range;
 
@@ -14,6 +16,12 @@ pub enum WordRef<'a> {
 
     /// A special word reference.
     Special(&'a str),
+}
+
+impl<T: TokenType> From<SegmentationConfig<T>> for TextSegmentor {
+    fn from(config: SegmentationConfig<T>) -> Self {
+        Self::from_config(config)
+    }
 }
 
 /// Word Split + Special Words Segmentor
@@ -42,6 +50,26 @@ impl TextSegmentor {
         };
 
         Self::new(word_re_supplier, special_re_supplier)
+    }
+
+    /// Create a new text segmentor with the given configuration.
+    pub fn from_config<T: TokenType>(config: SegmentationConfig<T>) -> Self {
+        let word_sup = maybe_parallel_regex_supplier(config.word_pattern);
+        let specials = if config.specials.is_empty() {
+            None
+        } else {
+            Some(maybe_parallel_regex_supplier(
+                exact_match_union_regex_wrapper(
+                    &config
+                        .specials
+                        .span_map()
+                        .keys()
+                        .map(|span| String::from_utf8(span.clone()).unwrap())
+                        .collect::<Vec<_>>(),
+                ),
+            ))
+        };
+        Self::new(word_sup, specials)
     }
 
     /// Create a new text segmentor with the given regex suppliers.

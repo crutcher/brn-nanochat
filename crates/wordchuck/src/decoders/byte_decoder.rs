@@ -7,20 +7,22 @@ use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 use crate::vocab::byte_table::ByteTable;
 use crate::vocab::vocab_index::byte_tokens_iter;
+use std::sync::Arc;
 
 /// A decoders that only decodes byte tokens.
 #[derive(Clone, Default)]
 pub struct ByteDecoder<T: TokenType> {
-    byte_table: ByteTable<T>,
-    _marker: std::marker::PhantomData<T>,
+    byte_table: Arc<ByteTable<T>>,
 }
 
 impl<T: TokenType> ByteDecoder<T> {
     /// Create a new byte decoder.
-    pub fn new(byte_table: ByteTable<T>) -> Self {
+    pub fn new<B>(byte_table: B) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
         Self {
-            byte_table,
-            _marker: Default::default(),
+            byte_table: byte_table.into(),
         }
     }
 
