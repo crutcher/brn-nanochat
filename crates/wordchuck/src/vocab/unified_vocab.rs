@@ -59,11 +59,6 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         }
     }
 
-    /// Shrinks the capacity of the underlying data structures to fit its current size.
-    pub fn shrink_to_fit(&mut self) {
-        self.word_vocab.shrink_to_fit();
-    }
-
     /// Replace special tokens vocabulary.
     pub fn with_specials(
         self,
@@ -92,7 +87,12 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
         let mut export_vocab = self.word_vocab.clone();
 
-        export_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
+        for (span, token) in self.pair_vocab.to_span_pairs() {
+            if export_vocab.span_map().contains_key(&span) {
+                continue;
+            }
+            export_vocab.add_bytes_word(span, token);
+        }
 
         if let Some(specials) = &self.specials {
             for (chunk, &t) in specials.span_map().iter() {

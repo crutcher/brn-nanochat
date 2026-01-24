@@ -4,7 +4,7 @@ use crate::types::{ByteSpanTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTable;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashMap;
 use std::sync::Arc;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
@@ -116,11 +116,6 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
         &self.span_map
     }
 
-    /// Shrinks the capacity of the underlying data structures to fit its current size.
-    pub fn shrink_to_fit(&mut self) {
-        self.span_map.shrink_to_fit();
-    }
-
     /// The number of words in the vocabulary.
     pub fn len(&self) -> usize {
         self.span_map.len()
@@ -164,35 +159,9 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
 
     /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
     pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
-        let mut vocab = Self::default();
-        vocab.extend_from_pair_vocab(pair_vocab, true);
-        vocab
-    }
-
-    /// Extend the word vocabulary from a BPE map vocabulary.
-    ///
-    /// # Arguments
-    /// * `pair_vocab` - the source pair vocab.
-    /// * `overwrite` - whether to overwrite existing entries in the word vocab.
-    pub fn extend_from_pair_vocab(
-        &mut self,
-        pair_vocab: &PairTokenMapVocab<T>,
-        overwrite: bool,
-    ) {
-        let skip: Option<AHashSet<T>> = if overwrite {
-            None
-        } else {
-            Some(self.unordered_tokens_iter().collect())
-        };
-
-        for (span, token) in pair_vocab.to_span_pairs() {
-            if let Some(skip) = &skip
-                && skip.contains(&token)
-            {
-                continue;
-            }
-            self.add_bytes_word(span, token);
-        }
+        let byte_table: Arc<ByteTable<T>> = pair_vocab.byte_table().clone();
+        let span_map: ByteSpanTokenMap<T> = byte_table.to_span_pairs().collect();
+        Self::new(byte_table, span_map)
     }
 
     /// Build a binary pair map from the word vocabulary.
