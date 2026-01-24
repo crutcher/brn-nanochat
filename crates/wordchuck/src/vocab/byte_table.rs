@@ -22,6 +22,17 @@ impl Debug for ByteTable {
     }
 }
 
+impl Default for ByteTable {
+    fn default() -> Self {
+        let perm: [u8; 256] = (0..256)
+            .map(|i| i as u8)
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        Self::from_permutation(perm)
+    }
+}
+
 impl ByteTable {
     /// Construct a new table from a valid permutation.
     ///
@@ -47,6 +58,16 @@ impl ByteTable {
         Self { perm, inv }
     }
 
+    /// Get the byte->token permutation.
+    pub fn perm(&self) -> &[u8] {
+        &self.perm
+    }
+
+    /// Get the inverse token->byte permutation.
+    pub fn inv(&self) -> &[u8] {
+        &self.inv
+    }
+
     /// Get the token corresponding to a given byte.
     pub fn get_token<T: TokenType>(
         &self,
@@ -70,11 +91,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_byte_table_default() {
+        let table = ByteTable::default();
+
+        type T = u32;
+        for idx in 0..256 {
+            let byte = idx as u8;
+            let token = idx as u32;
+
+            assert_eq!(table.get_token::<T>(byte), token);
+            assert_eq!(table.get_byte::<T>(token), Some(byte));
+        }
+    }
+
+    #[test]
     fn test_byte_table() {
         let mut perm = (0..256).into_iter().map(|i| i as u8).collect::<Vec<_>>();
         perm.reverse();
 
         let table = ByteTable::from_permutation(&perm);
+
+        assert_eq!(table.perm(), &perm);
+        assert_eq!(table.inv(), &invert_permutation(&perm));
 
         type T = u32;
         assert_eq!(table.get_token::<T>(0_u8), 255_u32);
