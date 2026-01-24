@@ -62,6 +62,21 @@ where
             .map(|tokens| self.try_decode_to_bytes(tokens))
             .collect()
     }
+
+    fn try_decode_batch_to_strings(
+        &self,
+        batch: &[Vec<T>],
+    ) -> anyhow::Result<Vec<String>> {
+        use rayon::prelude::*;
+
+        batch
+            .into_par_iter()
+            .map(|tokens| {
+                let bs = self.try_decode_to_bytes(tokens)?;
+                Ok(String::from_utf8_lossy(&bs).to_string())
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

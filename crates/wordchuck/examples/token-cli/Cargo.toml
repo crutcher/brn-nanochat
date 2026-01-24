@@ -1,5 +1,5 @@
 [package]
-name = "tokenizer_trainer"
+name = "token-cli"
 repository.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -13,6 +13,9 @@ workspace = true
 burn = { workspace = true, features = ["network"] }
 nanochat-data = { path = "../../../nanochat-data" }
 wordchuck = { path = "../..", features = ["rayon"] }
+
+edit-distance = { workspace = true }
+rayon = { workspace = true }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }

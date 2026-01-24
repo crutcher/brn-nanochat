@@ -41,13 +41,11 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             .unwrap();
 
         // If there are byte table overrides, apply them.
-        data.word_vocab
-            .words
-            .iter()
-            .filter(|&(bs, _)| bs.len() == 1)
-            .for_each(|(bs, t)| {
-                byte_table[*bs.first().unwrap() as usize] = *t;
-            });
+        data.word_vocab.words.iter().for_each(|(bs, &token)| {
+            if bs.len() == 1 {
+                byte_table[bs[0] as usize] = token;
+            }
+        });
 
         Self {
             data,
@@ -95,10 +93,9 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     ) {
         let chunk = word.as_bytes();
 
-        if chunk.len() == 1 {
-            tokens.push(self.byte_table[chunk[0] as usize]);
-            return;
-        }
+        // NOTE: You may think that a bypass for single-byte words
+        // would speed things up here, before the hash lookup.
+        // On real sample data, it appears to incur a small *penalty*.
 
         // Correctness-wise - Some words may not exist in the pair mappings.
         //
@@ -118,22 +115,24 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         // Until we can no longer find pairs to merge.
         let stop = start + 2;
         while tokens.len() >= stop {
-            // Find the pair which merges to the lowest ranked token.
-            let mut best_match: Option<(usize, T)> = None;
+            // Find the lowest ranked merge available.
+            if let Some((token, idx)) = tokens[start..]
+                .windows(2)
+                .enumerate()
+                .filter_map(|(idx, w)| {
+                    self.data
+                        .pair_vocab
+                        .pairs
+                        .get(&(w[0], w[1]))
+                        .map(|&token| (token, idx))
+                })
+                .min()
+            {
+                // Adjust the window index.
+                let idx = start + idx;
 
-            for idx in start..tokens.len() - 1 {
-                let pair = (tokens[idx], tokens[idx + 1]);
-
-                if let Some(&merge_token) = self.data.pair_vocab.pairs.get(&pair)
-                    && (best_match.is_none() || (merge_token < best_match.unwrap().1))
-                {
-                    best_match = Some((idx, merge_token));
-                }
-            }
-
-            if let Some((idx, merge_token)) = best_match {
                 // buf[idx..=idx+1] (a, b) -> buf[idx] t
-                tokens[idx] = merge_token;
+                tokens[idx] = token;
                 tokens.remove(idx + 1);
             } else {
                 // No more merges possible

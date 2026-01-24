@@ -1,5 +1,6 @@
 //! # Vocabulary
 
+pub mod byte_table;
 pub mod io;
 pub mod pair_vocab;
 pub mod public;
