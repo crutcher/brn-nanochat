@@ -5,6 +5,7 @@ use crate::regex::RegexWrapperPattern;
 use crate::types::TokenType;
 use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
+use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::AHashMap;
 
@@ -15,7 +16,7 @@ pub struct UnifiedTokenVocab<T: TokenType> {
     pub word_pattern: RegexWrapperPattern,
 
     /// Special tokens vocabulary.
-    pub specials: Option<ByteSpanTokenMapVocab<T>>,
+    pub specials: Option<SpecialWordsTokenVocab<T>>,
 
     /// ``{ Vec<u8> -> T }`` vocabulary.
     pub word_vocab: ByteSpanTokenMapVocab<T>,
@@ -41,7 +42,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Mutable reference to the special tokens vocabulary.
     ///
     /// Will create the vocabulary if it doesn't exist.
-    pub fn specials_vocab_mut(&mut self) -> &mut ByteSpanTokenMapVocab<T> {
+    pub fn specials_vocab_mut(&mut self) -> &mut SpecialWordsTokenVocab<T> {
         if self.specials.is_none() {
             self.specials = Some(Default::default());
         }
@@ -62,7 +63,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Replace special tokens vocabulary.
     pub fn with_specials(
         self,
-        specials: Option<ByteSpanTokenMapVocab<T>>,
+        specials: Option<SpecialWordsTokenVocab<T>>,
     ) -> Self {
         Self { specials, ..self }
     }
@@ -85,24 +86,27 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
     /// Compiled expansion dictionary.
     pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
-        let mut export_vocab = self.word_vocab.clone();
+        let mut tmp = AHashMap::default();
+
+        self.word_vocab.iter().for_each(|(chunk, &token)| {
+            tmp.insert(chunk.clone(), token);
+        });
 
         for (span, token) in self.pair_vocab.to_span_pairs() {
-            if export_vocab.span_map().contains_key(&span) {
+            if tmp.contains_key(&span) {
                 continue;
             }
-            export_vocab.add_bytes_word(span, token);
+            tmp.insert(span, token);
         }
 
         if let Some(specials) = &self.specials {
             for (chunk, &t) in specials.span_map().iter() {
-                export_vocab.add_bytes_word(chunk.clone(), t);
+                tmp.insert(chunk.clone(), t);
             }
         }
 
-        export_vocab
-            .iter()
-            .map(|(chunk, &token)| (token, chunk.to_vec()))
+        tmp.into_iter()
+            .map(|(chunk, token)| (token, chunk))
             .collect()
     }
 

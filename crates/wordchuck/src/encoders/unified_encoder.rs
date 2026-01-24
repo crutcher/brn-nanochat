@@ -4,7 +4,7 @@ use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::encoders::text_segmentor::{TextSegmentor, WordRef};
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::types::TokenType;
-use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
+use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use alloc::sync::Arc;
@@ -74,7 +74,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         self.data.word_pattern.as_str().to_string()
     }
 
-    fn special_vocab(&self) -> Option<&ByteSpanTokenMapVocab<T>> {
+    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
         self.data.specials.as_ref()
     }
 

@@ -100,29 +100,26 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vocab::ByteSpanTokenMapVocab;
 
     #[test]
     fn test_save_load_tiktoken() {
         type T = u32;
 
-        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
-        vocab.add_str_word("apple", 300);
-        vocab.add_str_word("banana", 301);
-        vocab.add_str_word("pear", 302);
-
-        let span_map = vocab.span_map();
+        let mut span_map: AHashMap<Vec<u8>, T> = Default::default();
+        span_map.insert("apple".as_bytes().to_vec(), 300);
+        span_map.insert("banana".as_bytes().to_vec(), 301);
+        span_map.insert("pear".as_bytes().to_vec(), 302);
 
         tempdir::TempDir::new("vocab_test")
             .and_then(|dir| {
                 let path = dir.path().join("vocab.tiktoken");
 
-                save_span_map_to_tiktoken_path(span_map, &path).expect("Failed to save vocab");
+                save_span_map_to_tiktoken_path(&span_map, &path).expect("Failed to save vocab");
 
                 let loaded_vocab =
                     load_span_map_from_tiktoken_path(&path).expect("Failed to load vocab");
 
-                assert_eq!(&loaded_vocab, span_map);
+                assert_eq!(&loaded_vocab, &span_map);
 
                 Ok(())
             })

@@ -79,6 +79,13 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
         Self::new(byte_table, span_map)
     }
 
+    /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
+    pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
+        let byte_table: Arc<ByteTable<T>> = pair_vocab.byte_table().clone();
+        let span_map: ByteSpanTokenMap<T> = byte_table.to_span_pairs().collect();
+        Self::new(byte_table, span_map)
+    }
+
     /// Build vocabulary.
     ///
     /// The span map will be the union of the span map,
@@ -116,6 +123,13 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
         &self.span_map
     }
 
+    /// Iterate over the span => token pairs.
+    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        self.span_map
+            .iter()
+            .map(|(chunk, &token)| (chunk.clone(), token))
+    }
+
     /// The number of words in the vocabulary.
     pub fn len(&self) -> usize {
         self.span_map.len()
@@ -131,37 +145,12 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
         self.span_map.iter()
     }
 
-    /// Add a word to the vocab.
-    pub fn add_str_word(
-        &mut self,
-        word: &str,
-        token: T,
-    ) {
-        self.add_bytes_word(word.as_bytes().to_vec(), token);
-    }
-
-    /// Add a word to the vocab.
-    pub fn add_bytes_word(
-        &mut self,
-        word: Vec<u8>,
-        token: T,
-    ) {
-        self.span_map.insert(word, token);
-    }
-
     /// Return the associated token for the word, if any.
     pub fn lookup_token(
         &self,
         chunk: &[u8],
     ) -> Option<T> {
         self.span_map.get(chunk).copied()
-    }
-
-    /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
-    pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
-        let byte_table: Arc<ByteTable<T>> = pair_vocab.byte_table().clone();
-        let span_map: ByteSpanTokenMap<T> = byte_table.to_span_pairs().collect();
-        Self::new(byte_table, span_map)
     }
 
     /// Build a binary pair map from the word vocabulary.
@@ -274,10 +263,13 @@ mod tests {
     #[test]
     fn test_build_pair_vocab() {
         type T = u32;
-        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
-        vocab.add_str_word("at", 300);
-        vocab.add_str_word("ate", 301);
-        vocab.add_str_word("cat", 302);
+
+        let mut span_map: AHashMap<Vec<u8>, T> = Default::default();
+        span_map.insert("at".as_bytes().to_vec(), 300);
+        span_map.insert("ate".as_bytes().to_vec(), 301);
+        span_map.insert("cat".as_bytes().to_vec(), 302);
+
+        let vocab = ByteSpanTokenMapVocab::from(span_map);
 
         let pair_vocab = vocab.to_pair_vocab();
         assert_eq!(

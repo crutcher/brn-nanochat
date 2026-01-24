@@ -4,7 +4,7 @@ use crate::encoders::TokenEncoder;
 use crate::encoders::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
-use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
+use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 
 /// Batch-Level Parallel Encoder Wrapper.
 ///
@@ -50,7 +50,7 @@ where
         self.inner.pattern()
     }
 
-    fn special_vocab(&self) -> Option<&ByteSpanTokenMapVocab<T>> {
+    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
         self.inner.special_vocab()
     }
 
