@@ -1,7 +1,7 @@
 //! # Word Counter
 
 use crate::regex::{RegexSupplierHandle, RegexWrapper};
-use crate::training::word::Word;
+use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CountType, StringChunkType, TokenType};
 use crate::vocab::public::size_hints::EXPECTED_WORD_LENGTH;
 use ahash::AHashMap;
@@ -37,15 +37,15 @@ pub fn update_word_counts<K, C>(
     }
 }
 
-/// Options for [`WordCounter`].
+/// Options for [`TextSpanCounter`].
 #[derive(Debug, Clone)]
-pub struct WordCounterOptions {
+pub struct TextSpanCounterOptions {
     /// Expected average word length in characters.
     /// Used when pre-allocating buffers.
     pub avg_word_len: usize,
 }
 
-impl Default for WordCounterOptions {
+impl Default for TextSpanCounterOptions {
     fn default() -> Self {
         Self {
             avg_word_len: EXPECTED_WORD_LENGTH,
@@ -53,7 +53,7 @@ impl Default for WordCounterOptions {
     }
 }
 
-impl WordCounterOptions {
+impl TextSpanCounterOptions {
     /// Set the expected average word length in characters.
     /// Used when pre-allocating buffers.
     pub fn with_avg_word_len(
@@ -65,7 +65,7 @@ impl WordCounterOptions {
 }
 
 /// Word counter structure.
-pub struct WordCounter<K, C>
+pub struct TextSpanCounter<K, C>
 where
     K: StringChunkType,
     C: CountType,
@@ -74,13 +74,13 @@ where
     pub regex_supplier: RegexSupplierHandle,
 
     /// The config options.
-    pub options: WordCounterOptions,
+    pub options: TextSpanCounterOptions,
 
     /// The word counts.
     pub word_counts: AHashMap<K, C>,
 }
 
-impl<K, C> WordCounter<K, C>
+impl<K, C> TextSpanCounter<K, C>
 where
     K: StringChunkType,
     C: CountType,
@@ -88,7 +88,7 @@ where
     /// Create a new word counter.
     pub fn new(
         regex_supplier: RegexSupplierHandle,
-        options: WordCounterOptions,
+        options: TextSpanCounterOptions,
     ) -> Self {
         Self {
             options,
@@ -136,11 +136,11 @@ where
         update_word_counts(&mut self.word_counts, word_counts);
     }
 
-    /// Convert the word counter to a [`Word<T>`] count iterator.
-    pub fn to_word_counts_iter<T: TokenType>(&self) -> impl Iterator<Item = (Word<T>, C)> {
+    /// Convert the word counter to a [`TokenSpanBuf<T>`] count iterator.
+    pub fn to_word_counts_iter<T: TokenType>(&self) -> impl Iterator<Item = (TokenSpanBuf<T>, C)> {
         self.word_counts
             .iter()
-            .map(|(k, v)| (Word::from_string(k), *v))
+            .map(|(k, v)| (TokenSpanBuf::from_string(k), *v))
     }
 }
 
@@ -148,7 +148,7 @@ where
 mod tests {
     use super::*;
     use crate::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
-    use crate::training::word::Word;
+    use crate::training::token_span_buffer::TokenSpanBuf;
     use crate::types::{CountType, StringChunkType};
 
     const PATTERN: &str = r"\w+";
@@ -160,9 +160,9 @@ mod tests {
 
     #[test]
     fn test_word_counter() {
-        let mut wc: WordCounter<String, u64> = WordCounter::new(
+        let mut wc: TextSpanCounter<String, u64> = TextSpanCounter::new(
             maybe_parallel_regex_supplier(get_regex()),
-            WordCounterOptions::default(),
+            TextSpanCounterOptions::default(),
         );
 
         let samples = vec!["Hello world", "Foo world bar world"];
@@ -196,24 +196,24 @@ mod tests {
         type T = usize;
         type C = u64;
 
-        let mut word_counts = WordCounter::<K, C>::new(
+        let mut word_counts = TextSpanCounter::<K, C>::new(
             maybe_parallel_regex_supplier(get_regex()),
-            WordCounterOptions::default(),
+            TextSpanCounterOptions::default(),
         );
 
         let samples = vec!["Hello world", "Foo world bar world"];
 
         word_counts.update_from_samples(samples.iter());
 
-        let counts: AHashMap<Word<T>, C> = word_counts.to_word_counts_iter().collect();
+        let counts: AHashMap<TokenSpanBuf<T>, C> = word_counts.to_word_counts_iter().collect();
         let mut counts = counts.into_iter().collect::<Vec<_>>();
         counts.sort();
 
         let mut expected = AHashMap::new();
-        expected.insert(Word::from_string("Hello"), 1);
-        expected.insert(Word::from_string("Foo"), 1);
-        expected.insert(Word::from_string("bar"), 1);
-        expected.insert(Word::from_string("world"), 3);
+        expected.insert(TokenSpanBuf::from_string("Hello"), 1);
+        expected.insert(TokenSpanBuf::from_string("Foo"), 1);
+        expected.insert(TokenSpanBuf::from_string("bar"), 1);
+        expected.insert(TokenSpanBuf::from_string("world"), 3);
         let mut expected: Vec<_> = expected.into_iter().collect();
         expected.sort();
 

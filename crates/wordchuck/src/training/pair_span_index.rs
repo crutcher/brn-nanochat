@@ -1,6 +1,6 @@
 //! # `PairIndex` Builder
 
-use crate::training::word::Word;
+use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CountType, Pair, TokenType};
 use ahash::{AHashMap, AHashSet};
 
@@ -10,49 +10,45 @@ pub type PairCountMap<T, C> = AHashMap<Pair<T>, C>;
 /// A map from [`Pair`] to indices over ``words``.
 pub type PairIndexMap<T> = AHashMap<Pair<T>, AHashSet<usize>>;
 
-/// An index of [`Pair`]s over an index set of ``(word, count)``.
-#[derive(Debug)]
-pub struct PairIndex<T: TokenType, C: CountType> {
+/// An index of ``(T, T)`` pair information relative to a ``&[TokenSpanBuf<T>]``.
+#[derive(Debug, Clone)]
+pub struct PairSpanIndex<T: TokenType, C: CountType> {
     /// A map from [`Pair`] to its occurrence count.
     ///
     /// ``sum(words[i].non_overlapping_count(pair) * word_counts[i]) for all i``
     pub pair_counts: PairCountMap<T, C>,
 
-    /// A map from [`Pair`] to indices over ``words``.
-    pub pair_to_word_index: PairIndexMap<T>,
+    /// A map from [`Pair`] to span indices.
+    pub pair_index: PairIndexMap<T>,
 }
 
-impl<T: TokenType, C: CountType> PairIndex<T, C> {
-    /// Build a [`PairIndex`] from a slice of [`Word`]s, using a count table.
+impl<T: TokenType, C: CountType> PairSpanIndex<T, C> {
+    /// Build a [`PairSpanIndex`] from a slice of [`TokenSpanBuf`]s, using a count table.
     ///
     /// # Arguments
-    /// * `words` - the slice of words; Words are assumed to be unique.
-    /// * `word_counts` - `word_counts[i]` is the count of `words[i]`.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(words, word_counts)))]
-    pub fn build_from_word_counts_table(
-        words: &[Word<T>],
-        word_counts: &[C],
+    /// * `spans` - a sequence of text spans; assumed to be unique.
+    /// * `counts` - `counts[i]` is the count of `spans[i]`.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(spans, counts)))]
+    pub fn from_span_count_table(
+        spans: &[TokenSpanBuf<T>],
+        counts: &[C],
     ) -> Self {
-        let size_hint = words.len() / 1000;
+        let size_hint = spans.len() / 1000;
 
-        let mut pair_index = PairIndex {
+        let mut pair_index = PairSpanIndex {
             pair_counts: PairCountMap::with_capacity(size_hint),
-            pair_to_word_index: PairIndexMap::with_capacity(size_hint),
+            pair_index: PairIndexMap::with_capacity(size_hint),
         };
 
         let zero = C::zero();
 
-        for (word_index, word) in words.iter().enumerate() {
-            let word_count = word_counts[word_index];
+        for (index, span) in spans.iter().enumerate() {
+            let count = counts[index];
 
-            if word_count != zero && word.len() >= 2 {
-                for p in word.pairs() {
-                    *pair_index.pair_counts.entry(p).or_default() += word_count;
-                    pair_index
-                        .pair_to_word_index
-                        .entry(p)
-                        .or_default()
-                        .insert(word_index);
+            if count != zero && span.len() >= 2 {
+                for p in span.pairs() {
+                    *pair_index.pair_counts.entry(p).or_default() += count;
+                    pair_index.pair_index.entry(p).or_default().insert(index);
                 }
             }
         }
@@ -64,7 +60,7 @@ impl<T: TokenType, C: CountType> PairIndex<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::training::word::Word;
+    use crate::training::token_span_buffer::TokenSpanBuf;
 
     #[test]
     fn test_pair_index_serial_token_u32_count_usize() {
@@ -77,22 +73,22 @@ mod tests {
     }
 
     fn test_pair_index<T: TokenType, C: CountType>() {
-        let words: Vec<Word<T>> = vec![
-            Word::from_string("hello"),
-            Word::from_string("world"),
-            Word::from_string("help"),
-            Word::from_string("☃"), // "☃" := [0xE2 0x98] 0x83
+        let spans: Vec<TokenSpanBuf<T>> = vec![
+            TokenSpanBuf::from_string("hello"),
+            TokenSpanBuf::from_string("world"),
+            TokenSpanBuf::from_string("help"),
+            TokenSpanBuf::from_string("☃"), // "☃" := [0xE2 0x98] 0x83
         ];
 
-        let word_counts: Vec<C> = [1, 2, 3, 4]
+        let counts: Vec<C> = [1, 2, 3, 4]
             .into_iter()
             .map(|c| C::from_u32(c).unwrap())
             .collect();
 
-        let PairIndex {
+        let PairSpanIndex {
             pair_counts,
-            pair_to_word_index,
-        } = PairIndex::<T, C>::build_from_word_counts_table(&words, &word_counts);
+            pair_index: pair_to_word_index,
+        } = PairSpanIndex::<T, C>::from_span_count_table(&spans, &counts);
 
         assert_eq!(
             pair_counts,
