@@ -1,18 +1,18 @@
 //! # Tiktoken Vocabulary IO
 
 use crate::types::TokenType;
-use crate::vocab::WordMapTokenVocab;
+use crate::vocab::ByteSpanTokenMapVocab;
 use anyhow::Context;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
-/// Load a [`WordMapTokenVocab`] from a tiktoken vocab file.
+/// Load a [`ByteSpanTokenMapVocab`] from a tiktoken vocab file.
 ///
 /// # Arguments
 /// * `path` - the path to the vocabulary file.
-pub fn load_word_map_from_tiktoken_path<T, P>(path: P) -> anyhow::Result<WordMapTokenVocab<T>>
+pub fn load_word_map_from_tiktoken_path<T, P>(path: P) -> anyhow::Result<ByteSpanTokenMapVocab<T>>
 where
     T: TokenType,
     P: AsRef<Path>,
@@ -20,19 +20,19 @@ where
     let file = std::fs::File::open(path)?;
     let reader = BufReader::new(file);
 
-    let mut vocab = WordMapTokenVocab::default();
+    let mut vocab = ByteSpanTokenMapVocab::default();
     update_word_map_from_tiktoken_reader(&mut vocab, reader)?;
 
     Ok(vocab)
 }
 
-/// Update a [`WordMapTokenVocab`] from a tiktoken vocab [`BufRead`] stream.
+/// Update a [`ByteSpanTokenMapVocab`] from a tiktoken vocab [`BufRead`] stream.
 ///
 /// # Arguments
 /// * `vocab` - the vocabulary to extend.
 /// * `reader` - the line reader.
 pub fn update_word_map_from_tiktoken_reader<T, R>(
-    vocab: &mut WordMapTokenVocab<T>,
+    vocab: &mut ByteSpanTokenMapVocab<T>,
     reader: R,
 ) -> anyhow::Result<()>
 where
@@ -42,13 +42,13 @@ where
     update_word_map_from_tiktoken_iter(vocab, reader.lines())
 }
 
-/// Update a [`WordMapTokenVocab`] from a tiktoken vocab file.
+/// Update a [`ByteSpanTokenMapVocab`] from a tiktoken vocab file.
 ///
 /// # Arguments
 /// * `vocab` - the vocabulary to extend.
 /// * `stream` - the line iterator.
 pub fn update_word_map_from_tiktoken_iter<T>(
-    vocab: &mut WordMapTokenVocab<T>,
+    vocab: &mut ByteSpanTokenMapVocab<T>,
     stream: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()>
 where
@@ -72,13 +72,13 @@ where
     Ok(())
 }
 
-/// Save a [`WordMapTokenVocab`] to a tiktoken vocab file.
+/// Save a [`ByteSpanTokenMapVocab`] to a tiktoken vocab file.
 ///
 /// # Arguments
 /// * `vocab` - the vocabulary to save.
 /// * `path` - the path to save the vocabulary to.
 pub fn save_word_map_to_tiktoken_path<T: TokenType, P: AsRef<Path>>(
-    vocab: &WordMapTokenVocab<T>,
+    vocab: &ByteSpanTokenMapVocab<T>,
     path: P,
 ) -> anyhow::Result<()> {
     let file = std::fs::File::create(path)?;
@@ -87,9 +87,9 @@ pub fn save_word_map_to_tiktoken_path<T: TokenType, P: AsRef<Path>>(
     save_word_map_to_tiktoken_writer(vocab, &mut writer)
 }
 
-/// Save a [`WordMapTokenVocab`] to a [`Write`] writer.
+/// Save a [`ByteSpanTokenMapVocab`] to a [`Write`] writer.
 pub fn save_word_map_to_tiktoken_writer<T, W>(
-    vocab: &WordMapTokenVocab<T>,
+    vocab: &ByteSpanTokenMapVocab<T>,
     writer: &mut W,
 ) -> anyhow::Result<()>
 where
@@ -120,7 +120,7 @@ mod tests {
     fn test_save_load_tiktoken() {
         type T = u32;
 
-        let mut vocab = WordMapTokenVocab::<T>::default();
+        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
         vocab.add_str_word("apple", 300);
         vocab.add_str_word("banana", 301);
         vocab.add_str_word("pear", 302);

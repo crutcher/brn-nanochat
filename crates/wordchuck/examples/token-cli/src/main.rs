@@ -8,7 +8,7 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::RegexWrapperPattern;
-use wordchuck::types::WordToTokenMap;
+use wordchuck::types::ByteSpanTokenMap;
 use wordchuck::vocab::UnifiedTokenVocab;
 use wordchuck::vocab::io::tiktoken_io::load_word_map_from_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT2_R50K_WORD_PATTERN;
@@ -79,7 +79,7 @@ fn run_load(
         specials
             .iter()
             .map(|(s, t)| (s.as_bytes().to_vec(), *t as T))
-            .collect::<WordToTokenMap<T>>()
+            .collect::<ByteSpanTokenMap<T>>()
             .into(),
     );
 

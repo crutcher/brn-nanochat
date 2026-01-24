@@ -34,8 +34,8 @@ where
     T: TokenType,
     D: TokenDecoder<T>,
 {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.inner.compound_tokens_iter()
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.inner.unordered_tokens_iter()
     }
 }
 
@@ -87,6 +87,7 @@ mod tests {
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::byte_table::ByteTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -111,8 +112,10 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
+        let byte_table: ByteTable<T> = Default::default();
+
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-            .train::<T>()
+            .train::<T>(&byte_table)
             .expect("training vocab should succeed")
             .into();
 

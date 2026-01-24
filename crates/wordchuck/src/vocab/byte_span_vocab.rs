@@ -2,56 +2,74 @@
 
 use crate::decoders::pair_decoder::PairExpansionDecoder;
 use crate::decoders::token_decoder::TokenDecoder;
-use crate::types::{TokenType, WordToTokenMap};
-use crate::vocab::pair_vocab::PairMapTokenVocab;
+use crate::types::{ByteSpanTokenMap, TokenType};
+use crate::vocab::byte_table::ByteTable;
+use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
-pub struct WordMapTokenVocab<T: TokenType> {
+pub struct ByteSpanTokenMapVocab<T: TokenType> {
     /// The regex pattern used for text spl
-    /// Map of ``{ &[u8] -> T }``.
-    pub words: WordToTokenMap<T>,
+    /// Map of ``{ Vec<u8> -> T }``.
+    pub span_map: ByteSpanTokenMap<T>,
 }
 
-impl<T: TokenType> From<WordToTokenMap<T>> for WordMapTokenVocab<T> {
-    fn from(words: WordToTokenMap<T>) -> Self {
-        Self { words }
+impl<T: TokenType> Default for ByteSpanTokenMapVocab<T> {
+    fn default() -> Self {
+        ByteSpanTokenMapVocab::from_byte_table(&ByteTable::default())
     }
 }
 
-impl<'a, T: TokenType> IntoIterator for &'a WordMapTokenVocab<T> {
+impl<T: TokenType> From<ByteSpanTokenMap<T>> for ByteSpanTokenMapVocab<T> {
+    fn from(words: ByteSpanTokenMap<T>) -> Self {
+        Self { span_map: words }
+    }
+}
+
+impl<'a, T: TokenType> IntoIterator for &'a ByteSpanTokenMapVocab<T> {
     type Item = (&'a Vec<u8>, &'a T);
 
     type IntoIter = std::collections::hash_map::Iter<'a, Vec<u8>, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.words.iter()
+        self.span_map.iter()
     }
 }
 
-impl<T: TokenType> WordMapTokenVocab<T> {
+impl<T: TokenType> ByteSpanTokenMapVocab<T> {
+    /// Create a word vocabulary from a byte/token mapping table.
+    pub fn from_byte_table(byte_table: &ByteTable<T>) -> Self {
+        let mut words = ByteSpanTokenMap::default();
+        for idx in 0..256 {
+            let byte = idx as u8;
+            let token = byte_table.get_token(byte);
+            words.insert(vec![byte], token);
+        }
+
+        Self { span_map: words }
+    }
     /// Shrinks the capacity of the underlying data structures to fit its current size.
     pub fn shrink_to_fit(&mut self) {
-        self.words.shrink_to_fit();
+        self.span_map.shrink_to_fit();
     }
 
     /// The number of words in the vocabulary.
     pub fn len(&self) -> usize {
-        self.words.len()
+        self.span_map.len()
     }
 
     /// Returns `true` if the vocabulary contains no words.
     pub fn is_empty(&self) -> bool {
-        self.words.is_empty()
+        self.span_map.is_empty()
     }
 
     /// Iterate over the words in the vocabulary.
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = (&'a Vec<u8>, &'a T)> + 'a {
-        self.words.iter()
+        self.span_map.iter()
     }
 
     /// Add a word to the vocab.
@@ -69,7 +87,7 @@ impl<T: TokenType> WordMapTokenVocab<T> {
         word: Vec<u8>,
         token: T,
     ) {
-        self.words.insert(word, token);
+        self.span_map.insert(word, token);
     }
 
     /// Return the associated token for the word, if any.
@@ -77,20 +95,11 @@ impl<T: TokenType> WordMapTokenVocab<T> {
         &self,
         chunk: &[u8],
     ) -> Option<T> {
-        match self.words.get(chunk) {
-            Some(token) => Some(*token),
-            None => {
-                if chunk.len() == 1 {
-                    Some(T::from_u8(chunk[0]).unwrap())
-                } else {
-                    None
-                }
-            }
-        }
+        self.span_map.get(chunk).copied()
     }
 
-    /// Build word vocabulary from a [`PairMapTokenVocab<T>`].
-    pub fn from_pair_vocab(pair_vocab: &PairMapTokenVocab<T>) -> Self {
+    /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
+    pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
         let mut vocab = Self::default();
         vocab.extend_from_pair_vocab(pair_vocab, true);
         vocab
@@ -103,17 +112,17 @@ impl<T: TokenType> WordMapTokenVocab<T> {
     /// * `overwrite` - whether to overwrite existing entries in the word vocab.
     pub fn extend_from_pair_vocab(
         &mut self,
-        pair_vocab: &PairMapTokenVocab<T>,
+        pair_vocab: &PairTokenMapVocab<T>,
         overwrite: bool,
     ) {
         let skip: Option<AHashSet<T>> = if overwrite {
             None
         } else {
-            Some(self.compound_tokens_iter().collect())
+            Some(self.unordered_tokens_iter().collect())
         };
 
         let decoder = PairExpansionDecoder::from_pair_map(&pair_vocab.pairs);
-        for token in pair_vocab.compound_tokens_iter() {
+        for token in pair_vocab.unordered_tokens_iter() {
             if let Some(skip) = &skip
                 && skip.contains(&token)
             {
@@ -127,16 +136,16 @@ impl<T: TokenType> WordMapTokenVocab<T> {
     }
 
     /// Build a binary pair map from the word vocabulary.
-    pub fn to_pair_vocab(&self) -> PairMapTokenVocab<T> {
-        let mut pair_vocab = PairMapTokenVocab::<T>::default();
+    pub fn to_pair_vocab(&self) -> PairTokenMapVocab<T> {
+        let mut pair_vocab = PairTokenMapVocab::<T>::default();
 
         let token_to_words: AHashMap<T, &[u8]> = self
-            .words
+            .span_map
             .iter()
             .map(|(chunk, &token)| (token, chunk.as_ref()))
             .collect();
 
-        for token in self.compound_tokens_iter() {
+        for token in self.unordered_tokens_iter() {
             let word = token_to_words[&token];
 
             let k = word.len();
@@ -155,25 +164,25 @@ impl<T: TokenType> WordMapTokenVocab<T> {
     }
 }
 
-impl<T: TokenType> From<&PairMapTokenVocab<T>> for WordMapTokenVocab<T> {
-    fn from(pair_vocab: &PairMapTokenVocab<T>) -> Self {
+impl<T: TokenType> From<&PairTokenMapVocab<T>> for ByteSpanTokenMapVocab<T> {
+    fn from(pair_vocab: &PairTokenMapVocab<T>) -> Self {
         Self::from_pair_vocab(pair_vocab)
     }
 }
 
-impl<T: TokenType> From<&WordMapTokenVocab<T>> for PairMapTokenVocab<T> {
-    fn from(vocab: &WordMapTokenVocab<T>) -> Self {
+impl<T: TokenType> From<&ByteSpanTokenMapVocab<T>> for PairTokenMapVocab<T> {
+    fn from(vocab: &ByteSpanTokenMapVocab<T>) -> Self {
         vocab.to_pair_vocab()
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for WordMapTokenVocab<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.words.values().copied()
+impl<T: TokenType> TokenVocabIndex<T> for ByteSpanTokenMapVocab<T> {
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.span_map.values().copied()
     }
 
     fn max_token(&self) -> T {
-        self.words
+        self.span_map
             .values()
             .max()
             .copied()
@@ -184,21 +193,17 @@ impl<T: TokenType> TokenVocabIndex<T> for WordMapTokenVocab<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::FromPrimitive;
-    use std::collections::HashSet;
 
     #[test]
     fn test_tokens_iter() {
         type T = u32;
-        let byte_tokens: Vec<T> = (0..256).map(|b| T::from_usize(b).unwrap()).collect();
 
-        let mut vocab = WordMapTokenVocab::<T>::default();
+        let byte_table: ByteTable<T> = Default::default();
 
-        assert_eq!(vocab.max_token(), 255);
+        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
 
-        assert_eq!(vocab.compound_tokens_iter().collect::<Vec<T>>(), vec![]);
-
-        assert_eq!(&vocab.all_tokens_iter().collect::<Vec<T>>(), &byte_tokens);
+        assert_eq!(vocab.max_token(), byte_table.max_token());
+        assert_eq!(&vocab.sorted_tokens(), &byte_table.sorted_tokens());
 
         vocab.add_str_word("apple", 300);
         vocab.add_str_word("banana", 301);
@@ -206,23 +211,20 @@ mod tests {
 
         assert_eq!(vocab.max_token(), 302);
 
-        let non_byte_tokens: HashSet<T> = [300, 301, 302].iter().copied().collect();
-
-        let mut combined: HashSet<T> = byte_tokens.iter().copied().collect();
-        combined.extend(&non_byte_tokens);
-
         assert_eq!(
-            &vocab.compound_tokens_iter().collect::<HashSet<T>>(),
-            &non_byte_tokens,
+            &vocab.sorted_tokens(),
+            &byte_table
+                .sorted_tokens()
+                .into_iter()
+                .chain([300_u32, 301, 302].into_iter())
+                .collect::<Vec<T>>()
         );
-
-        assert_eq!(&vocab.all_tokens_iter().collect::<HashSet<T>>(), &combined);
     }
 
     #[test]
     fn test_lookup_token() {
         type T = u32;
-        let mut vocab = WordMapTokenVocab::<T>::default();
+        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
         vocab.add_str_word("apple", 300);
         vocab.add_str_word("a", 301);
 
@@ -234,7 +236,7 @@ mod tests {
     #[test]
     fn test_build_pair_vocab() {
         type T = u32;
-        let mut vocab = WordMapTokenVocab::<T>::default();
+        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
         vocab.add_str_word("at", 300);
         vocab.add_str_word("ate", 301);
         vocab.add_str_word("cat", 302);

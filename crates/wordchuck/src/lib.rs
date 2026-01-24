@@ -12,7 +12,7 @@
 //! use wordchuck::training::bpe_trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
 //! use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
 //! use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-//! use wordchuck::vocab::UnifiedTokenVocab;
+//! use wordchuck::vocab::{ByteTable, UnifiedTokenVocab};
 //! use wordchuck::encoders::UnifiedVocabEncoder;
 //! use wordchuck::decoders::DictionaryDecoder;
 //! use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
@@ -48,8 +48,10 @@
 //!         trainer.update_from_samples(batch.as_ref());
 //!     }
 //!
+//!     let byte_table: ByteTable<T> = Default::default();
+//!
 //!     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-//!         .train::<T>()
+//!         .train::<T>(&byte_table)
 //!         .expect("training failed")
 //!         .into();
 //!

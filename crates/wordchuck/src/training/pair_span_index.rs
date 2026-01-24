@@ -74,7 +74,7 @@ mod tests {
     }
 
     fn test_pair_index<T: TokenType, C: CountType>() {
-        let byte_table: ByteTable = Default::default();
+        let byte_table: ByteTable<T> = Default::default();
 
         let spans: Vec<TokenSpanBuf<T>> = vec![
             TokenSpanBuf::from_string("hello", &byte_table),

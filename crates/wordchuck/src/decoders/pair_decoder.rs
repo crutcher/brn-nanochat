@@ -2,7 +2,7 @@
 
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
-use crate::types::{PairToTokenMap, TokenToPairMap, TokenType};
+use crate::types::{PairTokenMap, TokenToPairMap, TokenType};
 use crate::vocab::TokenVocabIndex;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
@@ -23,7 +23,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
 
     /// Build a [`PairExpansionDecoder`] from this [`TokenDecoder`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
-    pub fn from_pair_map(merge_map: &PairToTokenMap<T>) -> Self {
+    pub fn from_pair_map(merge_map: &PairTokenMap<T>) -> Self {
         let expansion_map = merge_map
             .iter()
             .map(|(&pair, &token)| (token, pair))
@@ -33,7 +33,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for PairExpansionDecoder<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.token_to_pair.keys().copied()
     }
 }
@@ -66,6 +66,7 @@ mod tests {
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::byte_table::ByteTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -89,8 +90,10 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
+        let byte_table: ByteTable<T> = Default::default();
+
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-            .train::<T>()
+            .train::<T>(&byte_table)
             .expect("training vocab should succeed")
             .into();
 

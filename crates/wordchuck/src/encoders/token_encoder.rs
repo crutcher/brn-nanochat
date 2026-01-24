@@ -3,8 +3,8 @@
 use crate::encoders::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
+use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
-use crate::vocab::word_vocab::WordMapTokenVocab;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
@@ -12,7 +12,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn pattern(&self) -> String;
 
     /// Return the special vocabulary, if any.
-    fn special_vocab(&self) -> Option<&WordMapTokenVocab<T>>;
+    fn special_vocab(&self) -> Option<&ByteSpanTokenMapVocab<T>>;
 
     /// Split text using the attached pattern and specials.
     fn split_words<'a>(

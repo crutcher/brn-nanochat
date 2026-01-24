@@ -1,18 +1,20 @@
 //! # Pair Map ``{ (T, T) -> T }`` Token Vocabulary
 
-use crate::types::{PairToTokenMap, TokenType};
+use crate::types::{PairTokenMap, TokenType};
+use crate::vocab::byte_table::ByteTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
-use serde::{Deserialize, Serialize};
 
 /// Token vocabulary as a binary-pair encoding map of ``{ (T, T) -> T }``.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: TokenType", deserialize = "T: TokenType"))]
-pub struct PairMapTokenVocab<T: TokenType> {
+#[derive(Default, Debug, Clone)]
+pub struct PairTokenMapVocab<T: TokenType> {
+    /// Byte/token mapping table.
+    pub byte_table: ByteTable<T>,
+
     /// Map of ``{ (T, T) -> T }``.
-    pub pairs: PairToTokenMap<T>,
+    pub pairs: PairTokenMap<T>,
 }
 
-impl<'a, T: TokenType> IntoIterator for &'a PairMapTokenVocab<T> {
+impl<'a, T: TokenType> IntoIterator for &'a PairTokenMapVocab<T> {
     type Item = (&'a (T, T), &'a T);
     type IntoIter = std::collections::hash_map::Iter<'a, (T, T), T>;
     fn into_iter(self) -> Self::IntoIter {
@@ -20,7 +22,7 @@ impl<'a, T: TokenType> IntoIterator for &'a PairMapTokenVocab<T> {
     }
 }
 
-impl<T: TokenType> PairMapTokenVocab<T> {
+impl<T: TokenType> PairTokenMapVocab<T> {
     /// The number of words in the vocabulary.
     pub fn len(&self) -> usize {
         self.pairs.len()
@@ -51,40 +53,31 @@ impl<T: TokenType> PairMapTokenVocab<T> {
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for PairMapTokenVocab<T> {
-    fn compound_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.pairs.values().copied()
-    }
-
-    fn max_token(&self) -> T {
-        self.pairs
-            .values()
-            .max()
-            .copied()
-            .unwrap_or(T::from_u8(u8::MAX).unwrap())
+impl<T: TokenType> TokenVocabIndex<T> for PairTokenMapVocab<T> {
+    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+        self.byte_table
+            .unordered_tokens_iter()
+            .chain(self.pairs.values().copied())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::FromPrimitive;
-    use std::collections::HashSet;
 
     #[test]
-    fn test_tokens_iter() {
+    fn test_tokens_sorted() {
         type T = u32;
-        let byte_tokens: Vec<T> = (0..256).map(|b| T::from_usize(b).unwrap()).collect();
+        let byte_table: ByteTable<T> = Default::default();
 
-        let mut vocab = PairMapTokenVocab::<T> {
-            pairs: PairToTokenMap::default(),
+        let mut vocab = PairTokenMapVocab::<T> {
+            pairs: PairTokenMap::default(),
+            byte_table: byte_table.clone(),
         };
 
         assert_eq!(vocab.max_token(), 255);
 
-        assert_eq!(vocab.compound_tokens_iter().collect::<Vec<T>>(), vec![]);
-
-        assert_eq!(&vocab.all_tokens_iter().collect::<Vec<T>>(), &byte_tokens);
+        assert_eq!(&vocab.sorted_tokens(), &byte_table.sorted_tokens());
 
         vocab.pairs.insert((1, 2), 300);
         vocab.pairs.insert((3, 4), 301);
@@ -92,16 +85,13 @@ mod tests {
 
         assert_eq!(vocab.max_token(), 302);
 
-        let non_byte_tokens: HashSet<T> = [300, 301, 302].iter().copied().collect();
-
-        let mut combined: HashSet<T> = byte_tokens.iter().copied().collect();
-        combined.extend(&non_byte_tokens);
-
         assert_eq!(
-            &vocab.compound_tokens_iter().collect::<HashSet<T>>(),
-            &non_byte_tokens,
+            &vocab.sorted_tokens(),
+            &byte_table
+                .sorted_tokens()
+                .into_iter()
+                .chain([300_u32, 301, 302].into_iter())
+                .collect::<Vec<T>>()
         );
-
-        assert_eq!(&vocab.all_tokens_iter().collect::<HashSet<T>>(), &combined);
     }
 }
