@@ -1,11 +1,11 @@
-//! Alternative List Utilities
+//! Exact Match Union Patterns
 
 use crate::regex::re_wrapper::{RegexWrapper, RegexWrapperPattern};
 
-/// Create a list of fixed-match alternatives into a regex pattern.
+/// Create a union pattern of exact matches.
 ///
 /// This will always be a [`RegexWrapperPattern::Basic`] variant.
-pub fn fixed_alternative_list_regex_pattern<S: AsRef<str>>(alts: &[S]) -> RegexWrapperPattern {
+pub fn exact_match_union_regex_pattern<S: AsRef<str>>(alts: &[S]) -> RegexWrapperPattern {
     let parts = alts
         .iter()
         .map(|s| fancy_regex::escape(s.as_ref()))
@@ -13,11 +13,11 @@ pub fn fixed_alternative_list_regex_pattern<S: AsRef<str>>(alts: &[S]) -> RegexW
     RegexWrapperPattern::Basic(format!("({})", parts.join("|")))
 }
 
-/// Create a list of fixed-match alternatives into a compiled regex.
-pub fn fixed_alternative_list_regex_wrapper<S: AsRef<str>>(alts: &[S]) -> RegexWrapper {
-    fixed_alternative_list_regex_pattern(alts)
-        .compile()
-        .unwrap()
+/// Create a union pattern of exact matches, compiled into a [`RegexWrapper`].
+///
+/// See: [`exact_match_union_regex_pattern`]
+pub fn exact_match_union_regex_wrapper<S: AsRef<str>>(alts: &[S]) -> RegexWrapper {
+    exact_match_union_regex_pattern(alts).compile().unwrap()
 }
 
 #[cfg(test)]
@@ -28,10 +28,10 @@ mod tests {
     fn test_fixed_alternative_list() {
         let alternatives = ["apple", "[x]", "boat"];
 
-        let pattern = fixed_alternative_list_regex_pattern(&alternatives);
+        let pattern = exact_match_union_regex_pattern(&alternatives);
         assert_eq!(pattern.as_str(), r"(apple|\[x\]|boat)");
 
-        let re = fixed_alternative_list_regex_wrapper(&alternatives);
+        let re = exact_match_union_regex_wrapper(&alternatives);
 
         let text = "apple 123 [x] xyz boat";
         assert_eq!(re.find_iter(text).count(), 3);

@@ -1,7 +1,7 @@
 //! # Text Segmentor
 
 use crate::regex::RegexSupplierHandle;
-use crate::regex::alt_list::fixed_alternative_list_regex_wrapper;
+use crate::regex::exact_match_union::exact_match_union_regex_wrapper;
 use crate::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use core::ops::Range;
@@ -36,7 +36,7 @@ impl TextSegmentor {
 
         let special_re_supplier: Option<RegexSupplierHandle> = match specials.as_ref() {
             Some(specials) if !specials.is_empty() => Some(maybe_parallel_regex_supplier(
-                fixed_alternative_list_regex_wrapper(specials),
+                exact_match_union_regex_wrapper(specials),
             )),
             _ => None,
         };
