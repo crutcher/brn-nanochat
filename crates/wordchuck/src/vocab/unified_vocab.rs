@@ -2,6 +2,7 @@
 
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::regex::RegexWrapperPattern;
+use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::TokenType;
 use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
@@ -12,11 +13,8 @@ use ahash::AHashMap;
 /// Unified token vocabulary.
 #[derive(Clone)]
 pub struct UnifiedTokenVocab<T: TokenType> {
-    /// Regex pattern for word splitting.
-    pub word_pattern: RegexWrapperPattern,
-
-    /// Special tokens vocabulary.
-    pub specials: Option<SpecialWordsTokenVocab<T>>,
+    /// Text Segmentation Configuration
+    pub segmentation: SegmentationConfig<T>,
 
     /// ``{ Vec<u8> -> T }`` vocabulary.
     pub word_vocab: ByteSpanTokenMapVocab<T>,
@@ -31,9 +29,10 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// # Arguments
     /// * `word_pattern`: Regex pattern for word splitting.
     pub fn new(word_pattern: RegexWrapperPattern) -> Self {
+        let segmentation = SegmentationConfig::from_pattern(word_pattern);
+
         Self {
-            word_pattern,
-            specials: None,
+            segmentation,
             word_vocab: Default::default(),
             pair_vocab: Default::default(),
         }
@@ -43,10 +42,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     ///
     /// Will create the vocabulary if it doesn't exist.
     pub fn specials_vocab_mut(&mut self) -> &mut SpecialWordsTokenVocab<T> {
-        if self.specials.is_none() {
-            self.specials = Some(Default::default());
-        }
-        self.specials.as_mut().unwrap()
+        &mut self.segmentation.specials
     }
 
     /// Replace the word-split regex pattern.
@@ -55,7 +51,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         word_pattern: RegexWrapperPattern,
     ) -> Self {
         Self {
-            word_pattern,
+            segmentation: self.segmentation.with_word_pattern(word_pattern),
             ..self
         }
     }
@@ -65,7 +61,10 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         self,
         specials: Option<SpecialWordsTokenVocab<T>>,
     ) -> Self {
-        Self { specials, ..self }
+        Self {
+            segmentation: self.segmentation.with_specials(specials),
+            ..self
+        }
     }
 
     /// Replace the binary-pair vocabulary.
@@ -99,7 +98,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
             tmp.insert(span, token);
         }
 
-        if let Some(specials) = &self.specials {
+        if let Some(specials) = &self.segmentation.special_vocab() {
             for (chunk, &t) in specials.span_map().iter() {
                 tmp.insert(chunk.clone(), t);
             }

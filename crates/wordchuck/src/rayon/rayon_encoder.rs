@@ -1,7 +1,7 @@
 //! # Parallel Encoder
 
 use crate::encoders::TokenEncoder;
-use crate::encoders::text_segmentor::WordRef;
+use crate::segmentation::text_segmentor::WordRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;

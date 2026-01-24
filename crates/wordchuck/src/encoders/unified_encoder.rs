@@ -1,8 +1,8 @@
 //! # Encoder for [`UnifiedTokenVocab`].
 
 use crate::decoders::dictionary_decoder::DictionaryDecoder;
-use crate::encoders::text_segmentor::{TextSegmentor, WordRef};
 use crate::encoders::token_encoder::TokenEncoder;
+use crate::segmentation::text_segmentor::{TextSegmentor, WordRef};
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -22,17 +22,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
 impl<T: TokenType> UnifiedVocabEncoder<T> {
     /// Construct an encoder from data.
     pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
-        let specials = match &data.specials {
-            Some(specials) => specials
-                .span_map()
-                .keys()
-                .map(|word| String::from_utf8(word.clone()).unwrap())
-                .collect::<Vec<String>>()
-                .into(),
-            None => None,
-        };
-
-        let segmentor = TextSegmentor::create(data.word_pattern.clone(), specials.as_deref());
+        let segmentor = data.segmentation.clone().into();
 
         let mut byte_table: [T; 256] = (0..=255)
             .map(|b| T::from_u8(b).unwrap())
@@ -71,11 +61,11 @@ impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
 
 impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     fn pattern(&self) -> String {
-        self.data.word_pattern.as_str().to_string()
+        self.data.segmentation.pattern()
     }
 
     fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
-        self.data.specials.as_ref()
+        self.data.segmentation.special_vocab()
     }
 
     fn split_words<'a>(

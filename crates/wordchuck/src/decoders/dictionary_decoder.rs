@@ -16,8 +16,7 @@ pub struct DictionaryDecoder<T: TokenType> {
 
 impl<T: TokenType> DictionaryDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut token_to_word: TokenToWordMap<T>) -> Self {
-        token_to_word.shrink_to_fit();
+    pub fn new(token_to_word: TokenToWordMap<T>) -> Self {
         Self { token_to_word }
     }
 }
@@ -37,8 +36,6 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
         while let Some(t) = ctx.stack.pop() {
             if let Some(w) = self.token_to_word.get(&t) {
                 ctx.buf.extend_from_slice(w.as_slice());
-            } else if let Some(b) = t.to_u8() {
-                ctx.buf.push(b);
             } else {
                 ctx.stack.push(t);
                 break;
