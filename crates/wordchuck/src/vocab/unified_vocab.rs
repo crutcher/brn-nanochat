@@ -64,16 +64,6 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         self.word_vocab.shrink_to_fit();
     }
 
-    /// Materialize the tokens in the `pair_vocab` into the `word_vocab`.
-    ///
-    /// Leaves tokens which already exist in the `word_vocab`.
-    pub fn extend_word_vocab_from_pair_vocab(self) -> Self {
-        let mut word_vocab = self.word_vocab;
-        word_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
-
-        Self { word_vocab, ..self }
-    }
-
     /// Replace special tokens vocabulary.
     pub fn with_specials(
         self,
@@ -105,7 +95,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         export_vocab.extend_from_pair_vocab(&self.pair_vocab, false);
 
         if let Some(specials) = &self.specials {
-            for (chunk, &t) in &specials.span_map {
+            for (chunk, &t) in specials.span_map().iter() {
                 export_vocab.add_bytes_word(chunk.clone(), t);
             }
         }

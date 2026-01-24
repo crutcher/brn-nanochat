@@ -198,14 +198,17 @@ where
         feature = "tracing",
         tracing::instrument(skip(self, words, word_counts))
     )]
-    pub fn train<T>(
+    pub fn train<T, B>(
         self,
-        byte_table: &ByteTable<T>,
+        byte_table: B,
     ) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         C: CountType,
+        B: Into<Arc<ByteTable<T>>>,
     {
+        let byte_table = byte_table.into();
+
         validators::expect_vocab_size::<T>(self.options.vocab_size);
 
         let num_merges = self.options.vocab_size - U8_SIZE;
@@ -217,7 +220,7 @@ where
 
         let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) = self
             .span_counter
-            .to_text_span_counts_iter(byte_table)
+            .to_text_span_counts_iter(&byte_table)
             .unzip();
 
         log::info!("Building pair index...");
@@ -396,13 +399,9 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-            .train::<T>(&byte_table)
-            .unwrap()
-            .extend_word_vocab_from_pair_vocab()
-            .into();
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_table.clone()).unwrap().into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
         check_is_send(&encoder);

@@ -3,38 +3,59 @@
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{PairTokenMap, TokenToPairMap, TokenType};
-use crate::vocab::TokenVocabIndex;
+use crate::vocab::{ByteTable, TokenVocabIndex};
+use std::sync::Arc;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
 pub struct PairExpansionDecoder<T: TokenType> {
+    /// Byte/token mapping table.
+    byte_table: Arc<ByteTable<T>>,
+
     /// Token to pair mapping.
-    ///
-    /// Does not include byte-tokens.
-    pub token_to_pair: TokenToPairMap<T>,
+    token_map: TokenToPairMap<T>,
 }
 
 impl<T: TokenType> PairExpansionDecoder<T> {
     /// Creates a new Decoder.
-    pub fn new(mut token_to_pair: TokenToPairMap<T>) -> Self {
-        token_to_pair.shrink_to_fit();
-        Self { token_to_pair }
+    pub fn new<B>(
+        byte_table: B,
+        token_map: TokenToPairMap<T>,
+    ) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
+        Self {
+            byte_table: byte_table.into(),
+            token_map,
+        }
     }
 
     /// Build a [`PairExpansionDecoder`] from this [`TokenDecoder`].
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
-    pub fn from_pair_map(merge_map: &PairTokenMap<T>) -> Self {
-        let expansion_map = merge_map
+    pub fn from_pair_map<B>(
+        byte_table: B,
+        pair_map: &PairTokenMap<T>,
+    ) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
+        let token_map = pair_map
             .iter()
             .map(|(&pair, &token)| (token, pair))
             .collect();
-        Self::new(expansion_map)
+        Self::new(byte_table, token_map)
+    }
+
+    /// Get the byte table.
+    pub fn byte_table(&self) -> &Arc<ByteTable<T>> {
+        &self.byte_table
     }
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for PairExpansionDecoder<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.token_to_pair.keys().copied()
+        self.token_map.keys().copied()
     }
 }
 
@@ -45,9 +66,9 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
         ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         while let Some(t) = ctx.stack.pop() {
-            if let Some(b) = t.to_u8() {
+            if let Some(b) = self.byte_table.get_byte(t) {
                 ctx.buf.push(b);
-            } else if let Some((a, b)) = self.token_to_pair.get(&t) {
+            } else if let Some((a, b)) = self.token_map.get(&t) {
                 ctx.stack.push(*b);
                 ctx.stack.push(*a);
             } else {
@@ -90,16 +111,17 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-            .train::<T>(&byte_table)
+            .train(byte_table.clone())
             .expect("training vocab should succeed")
             .into();
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
 
-        let decoder = PairExpansionDecoder::from_pair_map(&vocab.pair_vocab.pairs());
+        let decoder =
+            PairExpansionDecoder::from_pair_map(byte_table.clone(), &vocab.pair_vocab.pairs());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

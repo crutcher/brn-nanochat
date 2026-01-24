@@ -90,6 +90,12 @@ impl<T: TokenType> ByteTable<T> {
         }
     }
 
+    /// Get the length of the table.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.byte_to_token.len()
+    }
+
     /// Get the byte-ord => token mapping table.
     pub fn byte_to_token(&self) -> &[T; 256] {
         &self.byte_to_token
@@ -114,6 +120,14 @@ impl<T: TokenType> ByteTable<T> {
         token: T,
     ) -> Option<u8> {
         self.token_to_byte.get(&token).copied()
+    }
+
+    /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
+    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        self.byte_to_token
+            .iter()
+            .enumerate()
+            .map(|(idx, &token)| (vec![idx as u8], token))
     }
 }
 

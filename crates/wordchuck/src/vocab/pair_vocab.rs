@@ -1,8 +1,11 @@
 //! # Pair Map ``{ (T, T) -> T }`` Token Vocabulary
 
+use crate::decoders::TokenDecoder;
+use crate::decoders::pair_decoder::PairExpansionDecoder;
 use crate::types::{PairTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
+use std::sync::Arc;
 
 /// Pair ``(T, T) -> T`` Vocabulary.
 ///
@@ -11,7 +14,7 @@ use crate::vocab::vocab_index::TokenVocabIndex;
 #[derive(Default, Debug, Clone)]
 pub struct PairTokenMapVocab<T: TokenType> {
     /// Byte/token mapping table.
-    byte_table: ByteTable<T>,
+    byte_table: Arc<ByteTable<T>>,
 
     /// Map of ``{ (T, T) -> T }``.
     pairs: PairTokenMap<T>,
@@ -19,22 +22,46 @@ pub struct PairTokenMapVocab<T: TokenType> {
 
 impl<T: TokenType> PairTokenMapVocab<T> {
     /// Create a new vocab.
-    pub fn new(
-        byte_table: &ByteTable<T>,
+    pub fn new<B>(
+        byte_table: B,
         pairs: PairTokenMap<T>,
-    ) -> Self {
-        let byte_table = byte_table.clone();
-        Self { byte_table, pairs }
+    ) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
+        Self {
+            byte_table: byte_table.into(),
+            pairs,
+        }
     }
 
     /// Get the byte/token mapping table.
-    pub fn byte_table(&self) -> &ByteTable<T> {
+    pub fn byte_table(&self) -> &Arc<ByteTable<T>> {
         &self.byte_table
     }
 
     /// Get the map of pairs.
     pub fn pairs(&self) -> &PairTokenMap<T> {
         &self.pairs
+    }
+
+    /// Get the number of tokens in the vocabulary.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.byte_table.len() + self.pairs.len()
+    }
+
+    /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
+    ///
+    /// This includes the pairs from the `ByteTable`.
+    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        let decoder = PairExpansionDecoder::from_pair_map(self.byte_table().clone(), self.pairs());
+
+        self.byte_table.to_span_pairs().chain(
+            self.pairs
+                .values()
+                .map(move |&t| (decoder.try_decode_to_bytes([t]).unwrap(), t)),
+        )
     }
 }
 
@@ -53,7 +80,7 @@ mod tests {
     #[test]
     fn test_tokens_sorted() {
         type T = u32;
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
         let mut vocab = PairTokenMapVocab::<T> {
             pairs: PairTokenMap::default(),

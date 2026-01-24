@@ -24,7 +24,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
     pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         let specials = match &data.specials {
             Some(specials) => specials
-                .span_map
+                .span_map()
                 .keys()
                 .map(|word| String::from_utf8(word.clone()).unwrap())
                 .collect::<Vec<String>>()
@@ -41,7 +41,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             .unwrap();
 
         // If there are byte table overrides, apply them.
-        data.word_vocab.span_map.iter().for_each(|(bs, &token)| {
+        data.word_vocab.span_map().iter().for_each(|(bs, &token)| {
             if bs.len() == 1 {
                 byte_table[bs[0] as usize] = token;
             }
@@ -172,9 +172,9 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
-        let mut vocab = trainer.train::<T>(&byte_table).unwrap();
+        let mut vocab = trainer.train(byte_table.clone()).unwrap();
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
 

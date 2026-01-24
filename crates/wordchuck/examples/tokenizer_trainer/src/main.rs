@@ -114,13 +114,12 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let byte_table: ByteTable<T> = Default::default();
+    let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
     println!("- train");
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-        .train(&byte_table)
+        .train(byte_table.clone())
         .expect("training failed")
-        .extend_word_vocab_from_pair_vocab()
         .into();
 
     let training_duration = std::time::Instant::now().duration_since(t0);

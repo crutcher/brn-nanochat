@@ -1,13 +1,12 @@
 //! # Word Map ``{ Vec<u8> -> T }`` Token Vocabulary
 
-use crate::decoders::pair_decoder::PairExpansionDecoder;
-use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{ByteSpanTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTable;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -15,12 +14,12 @@ use serde::{Deserialize, Serialize};
 pub struct ByteSpanTokenMapVocab<T: TokenType> {
     /// The regex pattern used for text spl
     /// Map of ``{ Vec<u8> -> T }``.
-    pub span_map: ByteSpanTokenMap<T>,
+    span_map: ByteSpanTokenMap<T>,
 }
 
 impl<T: TokenType> Default for ByteSpanTokenMapVocab<T> {
     fn default() -> Self {
-        ByteSpanTokenMapVocab::from_byte_table(&ByteTable::default())
+        ByteSpanTokenMapVocab::from_byte_table(Arc::new(ByteTable::default()))
     }
 }
 
@@ -42,7 +41,12 @@ impl<'a, T: TokenType> IntoIterator for &'a ByteSpanTokenMapVocab<T> {
 
 impl<T: TokenType> ByteSpanTokenMapVocab<T> {
     /// Create a word vocabulary from a byte/token mapping table.
-    pub fn from_byte_table(byte_table: &ByteTable<T>) -> Self {
+    pub fn from_byte_table<B>(byte_table: B) -> Self
+    where
+        B: Into<Arc<ByteTable<T>>>,
+    {
+        let byte_table = byte_table.into();
+
         let mut words = ByteSpanTokenMap::default();
         for idx in 0..256 {
             let byte = idx as u8;
@@ -52,6 +56,12 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
 
         Self { span_map: words }
     }
+
+    /// Get the span => token map.
+    pub fn span_map(&self) -> &ByteSpanTokenMap<T> {
+        &self.span_map
+    }
+
     /// Shrinks the capacity of the underlying data structures to fit its current size.
     pub fn shrink_to_fit(&mut self) {
         self.span_map.shrink_to_fit();
@@ -121,17 +131,13 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
             Some(self.unordered_tokens_iter().collect())
         };
 
-        let decoder = PairExpansionDecoder::from_pair_map(pair_vocab.pairs());
-        for token in pair_vocab.unordered_tokens_iter() {
+        for (span, token) in pair_vocab.to_span_pairs() {
             if let Some(skip) = &skip
                 && skip.contains(&token)
             {
                 continue;
             }
-
-            let tokens = [token];
-            let chunk = decoder.try_decode_to_bytes(tokens).unwrap();
-            self.add_bytes_word(chunk, token);
+            self.add_bytes_word(span, token);
         }
     }
 
@@ -162,7 +168,7 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
             }
         }
 
-        PairTokenMapVocab::new(&byte_table, pairs)
+        PairTokenMapVocab::new(byte_table, pairs)
     }
 }
 
@@ -202,14 +208,18 @@ mod tests {
 
         let byte_table: ByteTable<T> = Default::default();
 
-        let mut vocab = ByteSpanTokenMapVocab::<T>::default();
+        let vocab = ByteSpanTokenMapVocab::<T>::default();
 
         assert_eq!(vocab.max_token(), byte_table.max_token());
         assert_eq!(&vocab.sorted_tokens(), &byte_table.sorted_tokens());
 
-        vocab.add_str_word("apple", 300);
-        vocab.add_str_word("banana", 301);
-        vocab.add_str_word("pear", 302);
+        let mut span_map = vocab.span_map().clone();
+
+        span_map.insert("apple".as_bytes().to_vec(), 300);
+        span_map.insert("banana".as_bytes().to_vec(), 301);
+        span_map.insert("pear".as_bytes().to_vec(), 302);
+
+        let vocab = ByteSpanTokenMapVocab::from(span_map);
 
         assert_eq!(vocab.max_token(), 302);
 

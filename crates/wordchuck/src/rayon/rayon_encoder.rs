@@ -89,6 +89,7 @@ mod tests {
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
     use compact_str::CompactString;
+    use std::sync::Arc;
 
     #[test]
     fn test_encoder() {
@@ -108,10 +109,10 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 
         let mut vocab: UnifiedTokenVocab<T> = trainer
-            .train::<T>(&byte_table)
+            .train(byte_table.clone())
             .expect("training vocab should succeed");
 
         vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);

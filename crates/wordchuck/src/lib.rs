@@ -48,10 +48,10 @@
 //!         trainer.update_from_samples(batch.as_ref());
 //!     }
 //!
-//!     let byte_table: ByteTable<T> = Default::default();
+//!     let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
 //!
 //!     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-//!         .train::<T>(&byte_table)
+//!         .train(byte_table.clone())
 //!         .expect("training failed")
 //!         .into();
 //!
