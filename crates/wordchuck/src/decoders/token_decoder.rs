@@ -96,7 +96,7 @@ mod tests {
             "hello world"
                 .as_bytes()
                 .iter()
-                .map(|b| T::from_u8(*b).unwrap()),
+                .map(|&b| decoder.byte_table().get_token(b)),
         );
         tokens.extend_from_slice(&[256, 3000]);
 

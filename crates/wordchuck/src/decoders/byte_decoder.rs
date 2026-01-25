@@ -5,21 +5,21 @@
 use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
-use crate::vocab::byte_table::ByteTable;
+use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::vocab_index::byte_tokens_iter;
 use std::sync::Arc;
 
 /// A decoders that only decodes byte tokens.
 #[derive(Clone, Default)]
 pub struct ByteDecoder<T: TokenType> {
-    byte_table: Arc<ByteTable<T>>,
+    byte_table: Arc<ByteTokenTable<T>>,
 }
 
 impl<T: TokenType> ByteDecoder<T> {
     /// Create a new byte decoder.
     pub fn new<B>(byte_table: B) -> Self
     where
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         Self {
             byte_table: byte_table.into(),
@@ -27,7 +27,7 @@ impl<T: TokenType> ByteDecoder<T> {
     }
 
     /// Get the byte table.
-    pub fn byte_table(&self) -> &ByteTable<T> {
+    pub fn byte_table(&self) -> &ByteTokenTable<T> {
         &self.byte_table
     }
 }
@@ -59,7 +59,6 @@ impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::FromPrimitive;
 
     #[test]
     fn test_byte_decoder() {
@@ -79,7 +78,7 @@ mod tests {
             "hello world"
                 .as_bytes()
                 .iter()
-                .map(|b| T::from_u8(*b).unwrap()),
+                .map(|&b| decoder.byte_table().get_token(b)),
         );
         tokens.extend_from_slice(&[256, 3000]);
 

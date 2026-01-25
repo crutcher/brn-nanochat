@@ -61,7 +61,7 @@ impl<T: TokenType, C: CountType> PairSpanIndex<T, C> {
 mod tests {
     use super::*;
     use crate::training::token_span_buffer::TokenSpanBuf;
-    use crate::vocab::byte_table::ByteTable;
+    use crate::vocab::byte_table::ByteTokenTable;
 
     #[test]
     fn test_pair_index_serial_token_u32_count_usize() {
@@ -74,7 +74,7 @@ mod tests {
     }
 
     fn test_pair_index<T: TokenType, C: CountType>() {
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: ByteTokenTable<T> = Default::default();
 
         let spans: Vec<TokenSpanBuf<T>> = vec![
             TokenSpanBuf::from_string("hello", &byte_table),

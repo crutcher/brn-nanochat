@@ -1,7 +1,7 @@
 //! # Token Span Buffer
 
 use crate::types::{Pair, TokenType};
-use crate::vocab::byte_table::ByteTable;
+use crate::vocab::byte_table::ByteTokenTable;
 use core::hash::Hash;
 
 /// A mutable span of tokens (a chunk or "word").
@@ -36,7 +36,7 @@ impl<T: TokenType> TokenSpanBuf<T> {
     /// * `byte_table` - the translation for the byte tokens.
     pub fn from_bytes<B: AsRef<[u8]>>(
         bytes: B,
-        byte_table: &ByteTable<T>,
+        byte_table: &ByteTokenTable<T>,
     ) -> Self {
         Self {
             tokens: bytes
@@ -54,7 +54,7 @@ impl<T: TokenType> TokenSpanBuf<T> {
     /// * `byte_table` - the translation for the byte tokens.
     pub fn from_string<S: AsRef<str>>(
         text: S,
-        byte_table: &ByteTable<T>,
+        byte_table: &ByteTokenTable<T>,
     ) -> Self {
         Self::from_bytes(text.as_ref().as_bytes(), byte_table)
     }
@@ -196,7 +196,7 @@ mod tests {
     fn test_span_from_str() {
         type T = u32;
 
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: ByteTokenTable<T> = Default::default();
 
         let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &byte_table);
         assert_eq!(span.tokens(), &[104, 101, 108, 108, 111]);
@@ -207,7 +207,7 @@ mod tests {
             .map(|&token| token + 10)
             .collect::<Vec<_>>();
 
-        let shift_table: ByteTable<T> = ByteTable::from_byte_to_token(&shifted_tokens);
+        let shift_table: ByteTokenTable<T> = ByteTokenTable::from_byte_to_token(&shifted_tokens);
 
         let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &shift_table);
         assert_eq!(span.tokens(), &[114, 111, 118, 118, 121]);

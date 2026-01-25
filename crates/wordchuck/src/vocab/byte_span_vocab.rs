@@ -1,17 +1,15 @@
 //! # Word Map ``{ Vec<u8> -> T }`` Token Vocabulary
 
 use crate::types::{ByteSpanTokenMap, TokenType};
-use crate::vocab::byte_table::ByteTable;
-use crate::vocab::pair_vocab::PairTokenMapVocab;
-use crate::vocab::vocab_index::TokenVocabIndex;
+use crate::vocab::{ByteTokenTable, PairTokenMapVocab, TokenVocabIndex};
 use ahash::AHashMap;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByteSpanTokenMapVocab<T: TokenType> {
     /// The byte/token mapping table.
-    byte_table: Arc<ByteTable<T>>,
+    byte_table: Arc<ByteTokenTable<T>>,
 
     /// The regex pattern used for text spl
     /// Map of ``{ Vec<u8> -> T }``.
@@ -20,7 +18,7 @@ pub struct ByteSpanTokenMapVocab<T: TokenType> {
 
 impl<T: TokenType> Default for ByteSpanTokenMapVocab<T> {
     fn default() -> Self {
-        ByteSpanTokenMapVocab::from_byte_table(Arc::new(ByteTable::default()))
+        ByteSpanTokenMapVocab::from_byte_table(Arc::new(ByteTokenTable::default()))
     }
 }
 
@@ -41,12 +39,12 @@ impl<'a, T: TokenType> IntoIterator for &'a ByteSpanTokenMapVocab<T> {
 }
 
 impl<T: TokenType> ByteSpanTokenMapVocab<T> {
-    /// Build vocabulary from just a [`ByteTable`].
+    /// Build vocabulary from just a [`ByteTokenTable`].
     ///
     /// Will have 255 span entries, each 1-byte long.
     pub fn from_byte_table<B>(byte_table: B) -> Self
     where
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         let byte_table = byte_table.into();
 
@@ -57,11 +55,11 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
 
     /// Build a vocabulary from just a [`ByteSpanTokenMap`].
     ///
-    /// The [`ByteTable`] will be inferred from the [`ByteSpanTokenMap`],
+    /// The [`ByteTokenTable`] will be inferred from the [`ByteSpanTokenMap`],
     /// and the default ordinal byte to token mappings.
     ///
     /// # Panics
-    /// If the [`ByteTable`] mapping is not 1:1.
+    /// If the [`ByteTokenTable`] mapping is not 1:1.
     pub fn from_span_map(span_map: ByteSpanTokenMap<T>) -> Self {
         let byte_to_token = (0..256)
             .map(|ord| {
@@ -74,14 +72,14 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
             })
             .collect::<Vec<_>>();
 
-        let byte_table = Arc::new(ByteTable::from_byte_to_token(&byte_to_token));
+        let byte_table = Arc::new(ByteTokenTable::from_byte_to_token(&byte_to_token));
 
         Self::new(byte_table, span_map)
     }
 
     /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
     pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
-        let byte_table: Arc<ByteTable<T>> = pair_vocab.byte_table().clone();
+        let byte_table: Arc<ByteTokenTable<T>> = pair_vocab.byte_table().clone();
         let span_map: ByteSpanTokenMap<T> = byte_table.to_span_pairs().collect();
         Self::new(byte_table, span_map)
     }
@@ -92,13 +90,13 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
     /// and all overrides from the `byte_table`.
     ///
     /// # Panics
-    /// If the [`ByteTable`] disagrees with the `span_map`.
+    /// If the [`ByteTokenTable`] disagrees with the `span_map`.
     pub fn new<B>(
         byte_table: B,
         mut span_map: ByteSpanTokenMap<T>,
     ) -> Self
     where
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         let byte_table = byte_table.into();
         for (span, token) in byte_table.to_span_pairs() {
@@ -184,41 +182,22 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
     }
 }
 
-impl<T: TokenType> From<&PairTokenMapVocab<T>> for ByteSpanTokenMapVocab<T> {
-    fn from(pair_vocab: &PairTokenMapVocab<T>) -> Self {
-        Self::from_pair_vocab(pair_vocab)
-    }
-}
-
-impl<T: TokenType> From<&ByteSpanTokenMapVocab<T>> for PairTokenMapVocab<T> {
-    fn from(vocab: &ByteSpanTokenMapVocab<T>) -> Self {
-        vocab.to_pair_vocab()
-    }
-}
-
 impl<T: TokenType> TokenVocabIndex<T> for ByteSpanTokenMapVocab<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.span_map.values().copied()
-    }
-
-    fn max_token(&self) -> T {
-        self.span_map
-            .values()
-            .max()
-            .copied()
-            .unwrap_or(T::from_u8(u8::MAX).unwrap())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vocab::{ByteTokenTable, TokenVocabIndex};
 
     #[test]
     fn test_tokens_iter() {
         type T = u32;
 
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table: ByteTokenTable<T> = Default::default();
 
         let vocab = ByteSpanTokenMapVocab::<T>::default();
 

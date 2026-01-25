@@ -3,7 +3,7 @@
 use crate::decoders::TokenDecoder;
 use crate::decoders::pair_decoder::PairExpansionDecoder;
 use crate::types::{PairTokenMap, TokenType};
-use crate::vocab::byte_table::ByteTable;
+use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use std::sync::Arc;
 
@@ -14,7 +14,7 @@ use std::sync::Arc;
 #[derive(Default, Debug, Clone)]
 pub struct PairTokenMapVocab<T: TokenType> {
     /// Byte/token mapping table.
-    byte_table: Arc<ByteTable<T>>,
+    byte_table: Arc<ByteTokenTable<T>>,
 
     /// Map of ``{ (T, T) -> T }``.
     pairs: PairTokenMap<T>,
@@ -27,7 +27,7 @@ impl<T: TokenType> PairTokenMapVocab<T> {
         pairs: PairTokenMap<T>,
     ) -> Self
     where
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         Self {
             byte_table: byte_table.into(),
@@ -36,7 +36,7 @@ impl<T: TokenType> PairTokenMapVocab<T> {
     }
 
     /// Get the byte/token mapping table.
-    pub fn byte_table(&self) -> &Arc<ByteTable<T>> {
+    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
         &self.byte_table
     }
 
@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn test_tokens_sorted() {
         type T = u32;
-        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
         let mut vocab = PairTokenMapVocab::<T> {
             pairs: PairTokenMap::default(),

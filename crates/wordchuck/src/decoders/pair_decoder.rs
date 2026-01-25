@@ -3,14 +3,14 @@
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{PairTokenMap, TokenToPairMap, TokenType};
-use crate::vocab::{ByteTable, TokenVocabIndex};
+use crate::vocab::{ByteTokenTable, TokenVocabIndex};
 use std::sync::Arc;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
 pub struct PairExpansionDecoder<T: TokenType> {
     /// Byte/token mapping table.
-    byte_table: Arc<ByteTable<T>>,
+    byte_table: Arc<ByteTokenTable<T>>,
 
     /// Token to pair mapping.
     token_map: TokenToPairMap<T>,
@@ -23,7 +23,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
         token_map: TokenToPairMap<T>,
     ) -> Self
     where
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         Self {
             byte_table: byte_table.into(),
@@ -38,7 +38,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
         pair_map: &PairTokenMap<T>,
     ) -> Self
     where
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         let token_map = pair_map
             .iter()
@@ -48,7 +48,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
     }
 
     /// Get the byte table.
-    pub fn byte_table(&self) -> &Arc<ByteTable<T>> {
+    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
         &self.byte_table
     }
 }
@@ -87,7 +87,7 @@ mod tests {
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_table::ByteTable;
+    use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -111,7 +111,7 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer
             .train(byte_table.clone())
