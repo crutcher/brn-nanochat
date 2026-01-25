@@ -1,6 +1,6 @@
 //! Exact Match Union Patterns
 
-use crate::regex::re_wrapper::{RegexWrapper, RegexWrapperPattern};
+use crate::regex::regex_wrapper::{RegexWrapper, RegexWrapperPattern};
 
 /// Create a union pattern of exact matches.
 ///

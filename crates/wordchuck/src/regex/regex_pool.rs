@@ -1,7 +1,7 @@
 //! # Thread Regex Pool
 #![allow(unused)]
-use crate::regex::re_supplier::RegexSupplier;
-use crate::regex::re_wrapper::RegexWrapper;
+use crate::regex::regex_supplier::RegexSupplier;
+use crate::regex::regex_wrapper::RegexWrapper;
 use ahash::AHashMap;
 use alloc::sync::Arc;
 use core::num::NonZero;
@@ -73,7 +73,7 @@ impl RegexSupplier for RegexWrapperPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::regex::re_wrapper::RegexWrapperPattern;
+    use crate::regex::regex_wrapper::RegexWrapperPattern;
 
     #[test]
     fn test_regex_pool() {
