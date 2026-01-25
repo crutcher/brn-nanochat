@@ -38,6 +38,45 @@ impl<'a, T: TokenType> IntoIterator for &'a SpanTokenVocab<T> {
     }
 }
 
+/// Read the ``{ u8 -> T }`` mapping from a ``{ Vec<u8> -> T }`` mapping.
+pub fn byte_map_from_span_map<T: TokenType>(span_map: &SpanTokenMap<T>) -> AHashMap<u8, T> {
+    span_map
+        .iter()
+        .filter_map(|(span, &token)| {
+            if span.len() == 1 {
+                Some((span[0], token))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Validate that a [`ByteTokenTable`] and [`SpanTokenVocab`] are compatible.
+pub fn try_validate_span_map<T>(
+    byte_table: &ByteTokenTable<T>,
+    span_map: &SpanTokenMap<T>,
+) -> anyhow::Result<()>
+where
+    T: TokenType,
+{
+    for (span, token) in byte_table.to_span_pairs() {
+        let b = span[0];
+
+        if let Some(&map_token) = span_map.get(&span)
+            && token != map_token
+        {
+            anyhow::bail!(
+                "ByteTable disagrees with span_map for {b:0x?}: {:?} != {:?}",
+                token,
+                map_token
+            );
+        }
+    }
+
+    Ok(())
+}
+
 impl<T: TokenType> SpanTokenVocab<T> {
     /// Build vocabulary from just a [`ByteTokenTable`].
     ///
@@ -61,18 +100,21 @@ impl<T: TokenType> SpanTokenVocab<T> {
     /// # Panics
     /// If the [`ByteTokenTable`] mapping is not 1:1.
     pub fn from_span_map(span_map: SpanTokenMap<T>) -> Self {
-        let byte_to_token = (0..256)
-            .map(|ord| {
-                let byte = ord as u8;
-                if let Some(&token) = span_map.get(&vec![byte]) {
-                    token
-                } else {
-                    T::from_usize(ord).unwrap()
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut byte_map: AHashMap<u8, T> = byte_map_from_span_map(&span_map);
+        for ord in 0..256 {
+            let b = ord as u8;
+            let token = T::from_usize(ord).unwrap();
+            if !byte_map.contains_key(&b) {
+                byte_map.insert(b, token);
+            }
+        }
 
-        let byte_table = Arc::new(ByteTokenTable::from_byte_to_token(&byte_to_token));
+        let mut ord_table: Vec<(u8, T)> = byte_map.into_iter().collect();
+        ord_table.sort_by_key(|&(k, _)| k);
+        let byte_to_token: Vec<T> = ord_table.into_iter().map(|(_, v)| v).collect();
+
+        let byte_table: Arc<ByteTokenTable<T>> =
+            ByteTokenTable::from_byte_to_token(&byte_to_token).into();
 
         Self::init(byte_table, span_map).unwrap()
     }
@@ -97,22 +139,19 @@ impl<T: TokenType> SpanTokenVocab<T> {
         B: Into<Arc<ByteTokenTable<T>>>,
     {
         let byte_table = byte_table.into();
-        for (span, token) in byte_table.to_span_pairs() {
-            if let Some(previous) = span_map.insert(span, token)
-                && previous != token
-            {
-                anyhow::bail!(
-                    "ByteTable disagrees with span_map: {:?} != {:?}",
-                    previous,
-                    token
-                );
-            }
-        }
+        try_validate_span_map(&byte_table, &span_map)?;
+
+        span_map.extend(byte_table.to_span_pairs());
 
         Ok(Self {
             byte_table,
             span_map,
         })
+    }
+
+    /// Get the byte/token mapping table.
+    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
+        &self.byte_table
     }
 
     /// Get the span => token map.
