@@ -186,7 +186,11 @@ impl<T: TokenType> SpanTokenVocab<T> {
         &self,
         chunk: &[u8],
     ) -> Option<T> {
-        self.span_map.get(chunk).copied()
+        if chunk.len() == 1 {
+            Some(self.byte_table.get_token(chunk[0]))
+        } else {
+            self.span_map.get(chunk).copied()
+        }
     }
 
     /// Build a binary pair map from the word vocabulary.
@@ -202,14 +206,21 @@ impl<T: TokenType> SpanTokenVocab<T> {
             .collect();
 
         for token in self.unordered_tokens_iter() {
-            let word = token_to_span[&token];
+            let span = token_to_span[&token];
+            if span.len() <= 1 {
+                continue;
+            }
+            for p in 1..span.len() {
+                let pre = &span[..p];
+                let post = &span[p..];
 
-            let k = word.len();
-            for p in 1..k {
-                if let Some(a) = self.lookup_token(&word[..p])
-                    && let Some(b) = self.lookup_token(&word[p..])
-                    && a < token
-                    && b < token
+                if let Some(a) = self.lookup_token(pre)
+                    && let Some(b) = self.lookup_token(post)
+                /*
+                && a < token
+                && b < token
+
+                 */
                 {
                     pairs.insert((a, b), token);
                 }
