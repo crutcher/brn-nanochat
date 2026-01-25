@@ -338,7 +338,8 @@ where
 
         pairs.shrink_to_fit();
 
-        let pair_vocab: PairTokenMapVocab<T> = PairTokenMapVocab::new(byte_table, pairs);
+        let pair_vocab: PairTokenMapVocab<T> =
+            PairTokenMapVocab::<T>::init(byte_table, pairs).unwrap();
 
         let vocab = UnifiedTokenVocab::<T>::new(self.options.pattern).with_pair_vocab(pair_vocab);
 
@@ -350,6 +351,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::decoders::DictionaryDecoder;
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
@@ -401,15 +403,15 @@ mod tests {
 
         let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_table.clone()).unwrap().into();
+        let vocab: UnifiedTokenVocab<T> = trainer.train(byte_table.clone()).unwrap();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone().into());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
         assert_eq!(encoder.max_token(), 292);
 
-        let decoder = encoder.to_decoder();
+        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

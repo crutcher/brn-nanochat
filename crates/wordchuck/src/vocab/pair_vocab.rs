@@ -5,7 +5,50 @@ use crate::decoders::pair_decoder::PairExpansionDecoder;
 use crate::types::{PairTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
+use ahash::AHashSet;
 use std::sync::Arc;
+
+/// Validate that a [`ByteTokenTable`] and [`PairTokenMap`] are compatible.
+///
+/// - for every ``(a, b) -> t`` entry:
+///   - the parents ``(a, b)``:
+///     - both have lower ranks than ``t``,
+///     - are either in the `byte_table`, or are targets in the map, not both.
+///   - the target ``t`` is not in the `byte_table`.
+pub fn try_validate_pair_map<T: TokenType>(
+    byte_table: &ByteTokenTable<T>,
+    pairs: &PairTokenMap<T>,
+) -> anyhow::Result<()> {
+    let pair_targets: AHashSet<T> = pairs.values().copied().collect();
+
+    for t in &pair_targets {
+        if let Some(b) = byte_table.get_byte(*t) {
+            anyhow::bail!("Target token in pair map {t:?} also mapped to byte {b:0x?}");
+        }
+    }
+
+    for (&pair, &t) in pairs.iter() {
+        if pair.0 >= t || pair.1 >= t {
+            anyhow::bail!("Illegal pair order: {pair:?} -> {t:?}");
+        }
+
+        for pt in [pair.0, pair.1] {
+            let is_pair_target = pair_targets.contains(&pt);
+            let byte_target = byte_table.get_byte(pt);
+
+            if is_pair_target && let Some(b) = byte_target {
+                anyhow::bail!(
+                    "Pair {pair:?} -> {t:?} parent {pt:?} is a pair target and byte target: {b:0x?}"
+                );
+            }
+            if !is_pair_target && byte_target.is_none() {
+                anyhow::bail!("Pair {pair:?} -> {t:?} parent {pt:?} is not defined");
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /// Pair ``(T, T) -> T`` Vocabulary.
 ///
@@ -21,18 +64,17 @@ pub struct PairTokenMapVocab<T: TokenType> {
 }
 
 impl<T: TokenType> PairTokenMapVocab<T> {
-    /// Create a new vocab.
-    pub fn new<B>(
+    /// Initialize a [`PairTokenMapVocab`].
+    pub fn init<B>(
         byte_table: B,
         pairs: PairTokenMap<T>,
-    ) -> Self
+    ) -> anyhow::Result<Self>
     where
         B: Into<Arc<ByteTokenTable<T>>>,
     {
-        Self {
-            byte_table: byte_table.into(),
-            pairs,
-        }
+        let byte_table = byte_table.into();
+        try_validate_pair_map(&byte_table, &pairs)?;
+        Ok(Self { byte_table, pairs })
     }
 
     /// Get the byte/token mapping table.

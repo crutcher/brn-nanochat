@@ -8,12 +8,12 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::RegexWrapperPattern;
-use wordchuck::types::ByteSpanTokenMap;
+use wordchuck::types::SpanTokenMap;
 use wordchuck::vocab::io::tiktoken_io::load_span_map_from_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT2_R50K_WORD_PATTERN;
 use wordchuck::vocab::public::openai::resources::OA_GPT2_R50K_BASE_TIKTOKEN;
 use wordchuck::vocab::public::openai::specials::oa_gpt2_r50k_specials;
-use wordchuck::vocab::{ByteSpanTokenMapVocab, UnifiedTokenVocab};
+use wordchuck::vocab::{SpanTokenVocab, UnifiedTokenVocab};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]
@@ -73,14 +73,14 @@ fn run_load(
     let specials = oa_gpt2_r50k_specials();
     type T = u16;
     let span_map = load_span_map_from_tiktoken_path(tokenizer_file)?;
-    let word_vocab = ByteSpanTokenMapVocab::from_span_map(span_map);
+    let word_vocab = SpanTokenVocab::from_span_map(span_map);
     let pair_vocab = word_vocab.to_pair_vocab();
 
     let specials_vocab = Some(
         specials
             .iter()
             .map(|(s, t)| (s.as_bytes().to_vec(), *t as T))
-            .collect::<ByteSpanTokenMap<T>>()
+            .collect::<SpanTokenMap<T>>()
             .into(),
     );
 

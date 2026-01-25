@@ -9,10 +9,11 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
+use wordchuck::types::SpanTokenMap;
 use wordchuck::vocab::byte_table::ByteTokenTable;
 use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+use wordchuck::vocab::{SpanTokenVocab, TokenVocabIndex, UnifiedTokenVocab};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]
@@ -117,14 +118,27 @@ fn main() -> anyhow::Result<()> {
     let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
     println!("- train");
-    let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-        .train(byte_table.clone())
-        .expect("training failed")
-        .into();
+    let vocab: UnifiedTokenVocab<T> = trainer.train(byte_table.clone()).expect("training failed");
 
     let training_duration = std::time::Instant::now().duration_since(t0);
     println!("- training_duration: {:.2?}", training_duration);
     println!("- vocab_size: {:?}", vocab.max_token());
+
+    // Rebuild the vocab:
+    // 1. build a span vocab from the pair table.
+    //    - the pair table has only one parent per target token.
+    // 2. build a pair vocab from the span vocab.
+    //    - this table has all pairs which will build a given token.
+    // 3. build a unified vocab from the pair vocab and span vocab.
+
+    let span_map: SpanTokenMap<T> = vocab.pair_vocab.to_span_pairs().collect();
+    let span_vocab = SpanTokenVocab::<T>::init(byte_table, span_map).unwrap();
+    let pair_vocab = span_vocab.to_pair_vocab();
+
+    let vocab: Arc<UnifiedTokenVocab<T>> = vocab
+        .with_word_vocab(span_vocab)
+        .with_pair_vocab(pair_vocab)
+        .into();
 
     if let Some(path) = args.tiktoken_save_path {
         save_span_map_to_tiktoken_path(vocab.word_vocab.span_map(), &path)?;

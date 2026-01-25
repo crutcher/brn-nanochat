@@ -1,6 +1,6 @@
 //! # Tiktoken Vocabulary IO
 
-use crate::types::{ByteSpanTokenMap, TokenType};
+use crate::types::{SpanTokenMap, TokenType};
 use ahash::AHashMap;
 use anyhow::Context;
 use base64::Engine;
@@ -8,11 +8,11 @@ use base64::prelude::BASE64_STANDARD;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
-/// Load a [`ByteSpanTokenMap`] from a tiktoken vocab file.
+/// Load a [`SpanTokenMap`] from a tiktoken vocab file.
 ///
 /// # Arguments
 /// * `path` - the path to the vocabulary file.
-pub fn load_span_map_from_tiktoken_path<T, P>(path: P) -> anyhow::Result<ByteSpanTokenMap<T>>
+pub fn load_span_map_from_tiktoken_path<T, P>(path: P) -> anyhow::Result<SpanTokenMap<T>>
 where
     T: TokenType,
     P: AsRef<Path>,
@@ -23,12 +23,12 @@ where
     load_span_map_from_tiktoken_reader(reader)
 }
 
-/// Update a [`ByteSpanTokenMap`] from a tiktoken vocab [`BufRead`] stream.
+/// Update a [`SpanTokenMap`] from a tiktoken vocab [`BufRead`] stream.
 ///
 /// # Arguments
 /// * `span_map` - the vocabulary to extend.
 /// * `reader` - the line reader.
-pub fn load_span_map_from_tiktoken_reader<T, R>(reader: R) -> anyhow::Result<ByteSpanTokenMap<T>>
+pub fn load_span_map_from_tiktoken_reader<T, R>(reader: R) -> anyhow::Result<SpanTokenMap<T>>
 where
     T: TokenType,
     R: BufRead,
@@ -55,13 +55,13 @@ where
     Ok(vocab)
 }
 
-/// Save a [`ByteSpanTokenMap`] to a tiktoken vocab file.
+/// Save a [`SpanTokenMap`] to a tiktoken vocab file.
 ///
 /// # Arguments
 /// * `span_map` - the vocabulary to save.
 /// * `path` - the path to save the vocabulary to.
 pub fn save_span_map_to_tiktoken_path<T: TokenType, P: AsRef<Path>>(
-    span_map: &ByteSpanTokenMap<T>,
+    span_map: &SpanTokenMap<T>,
     path: P,
 ) -> anyhow::Result<()> {
     let file = std::fs::File::create(path)?;
@@ -70,9 +70,9 @@ pub fn save_span_map_to_tiktoken_path<T: TokenType, P: AsRef<Path>>(
     save_span_map_to_tiktoken_writer(span_map, &mut writer)
 }
 
-/// Save a [`ByteSpanTokenMap`] to a [`Write`] writer.
+/// Save a [`SpanTokenMap`] to a [`Write`] writer.
 pub fn save_span_map_to_tiktoken_writer<T, W>(
-    span_map: &ByteSpanTokenMap<T>,
+    span_map: &SpanTokenMap<T>,
     writer: &mut W,
 ) -> anyhow::Result<()>
 where

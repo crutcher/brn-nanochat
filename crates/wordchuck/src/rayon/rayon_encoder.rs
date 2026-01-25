@@ -80,7 +80,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::decoders::TokenDecoder;
+    use crate::decoders::{DictionaryDecoder, TokenDecoder};
     use crate::encoders::{TokenEncoder, UnifiedVocabEncoder};
     use crate::rayon::rayon_encoder::ParallelRayonEncoder;
     use crate::training::BinaryPairVocabTrainerOptions;
@@ -119,7 +119,7 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.into());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone().into());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
@@ -129,7 +129,7 @@ mod tests {
 
         assert_eq!(encoder.max_token(), 292);
 
-        let decoder = encoder.inner.to_decoder();
+        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
