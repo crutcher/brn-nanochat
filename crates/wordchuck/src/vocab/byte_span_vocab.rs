@@ -155,7 +155,7 @@ impl<T: TokenType> ByteSpanTokenMapVocab<T> {
 
     /// Build a binary pair map from the word vocabulary.
     pub fn to_pair_vocab(&self) -> PairTokenMapVocab<T> {
-        let byte_table: ByteTable<T> = Default::default();
+        let byte_table = self.byte_table.clone();
 
         let mut pairs = AHashMap::default();
 
