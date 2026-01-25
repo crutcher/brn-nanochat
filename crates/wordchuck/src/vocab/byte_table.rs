@@ -11,7 +11,7 @@ use core::fmt::Debug;
 /// The token values are not required to be dense, or in the range ``0..=255``.
 /// This is required to be a bijection (255 distinct tokens).
 #[derive(Clone, PartialEq)]
-pub struct ByteTable<T: TokenType> {
+pub struct ByteTokenTable<T: TokenType> {
     /// Hash map from token to byte ordinal value.
     token_to_byte: AHashMap<T, u8>,
 
@@ -19,7 +19,7 @@ pub struct ByteTable<T: TokenType> {
     byte_to_token: [T; 256],
 }
 
-impl<T: TokenType> Debug for ByteTable<T> {
+impl<T: TokenType> Debug for ByteTokenTable<T> {
     fn fmt(
         &self,
         f: &mut core::fmt::Formatter<'_>,
@@ -31,7 +31,7 @@ impl<T: TokenType> Debug for ByteTable<T> {
     }
 }
 
-impl<T: TokenType> Default for ByteTable<T> {
+impl<T: TokenType> Default for ByteTokenTable<T> {
     fn default() -> Self {
         let byte_to_token = (0..256)
             .map(|i| T::from_usize(i).unwrap())
@@ -40,7 +40,7 @@ impl<T: TokenType> Default for ByteTable<T> {
     }
 }
 
-impl<T: TokenType> ByteTable<T> {
+impl<T: TokenType> ByteTokenTable<T> {
     /// Build a `ByteTable` from a byte-ord => token table.
     ///
     /// # Panics
@@ -131,7 +131,7 @@ impl<T: TokenType> ByteTable<T> {
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for ByteTable<T> {
+impl<T: TokenType> TokenVocabIndex<T> for ByteTokenTable<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.byte_to_token.iter().copied()
     }
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn test_byte_table_default() {
         type T = u32;
-        let table: ByteTable<T> = ByteTable::default();
+        let table: ByteTokenTable<T> = ByteTokenTable::default();
 
         for idx in 0..256 {
             let byte = idx as u8;
@@ -163,7 +163,7 @@ mod tests {
             .map(|i| T::from_usize(i).unwrap() + 100)
             .collect::<Vec<_>>();
 
-        let table: ByteTable<T> = ByteTable::from_byte_to_token(&byte_to_token);
+        let table: ByteTokenTable<T> = ByteTokenTable::from_byte_to_token(&byte_to_token);
 
         assert_eq!(table.get_token(0_u8), 100);
         assert_eq!(table.get_token(255_u8), 355);

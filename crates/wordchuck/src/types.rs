@@ -44,11 +44,6 @@ impl<T> TokenType for T where
 {
 }
 
-/// Returns true if the token is a byte token.
-pub fn is_byte_token<T: TokenType>(token: T) -> bool {
-    token < T::from_usize(crate::util::validators::U8_SIZE).unwrap()
-}
-
 /// A pair of tokens.
 pub type Pair<T> = (T, T);
 
@@ -147,21 +142,5 @@ mod tests {
 
         let _: IsStringChunk<String>;
         let _: IsStringChunk<CompactString>;
-    }
-
-    #[test]
-    fn test_is_byte_token() {
-        assert!(is_byte_token(0_u16));
-        assert!(is_byte_token(0_u32));
-        assert!(is_byte_token(0_u64));
-        assert!(is_byte_token(0_usize));
-
-        assert!(is_byte_token(255_u16));
-        assert!(is_byte_token(255_u32));
-        assert!(is_byte_token(255_u64));
-        assert!(is_byte_token(255_usize));
-
-        assert!(!is_byte_token(256_u16));
-        assert!(!is_byte_token(256_u32));
     }
 }

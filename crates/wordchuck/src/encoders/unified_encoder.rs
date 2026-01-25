@@ -4,6 +4,7 @@ use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::segmentation::text_segmentor::{TextSegmentor, WordRef};
 use crate::types::TokenType;
+use crate::vocab::ByteTokenTable;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
@@ -15,7 +16,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
     /// Data for the encoders.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
-    byte_table: [T; 256],
+    byte_table: Arc<ByteTokenTable<T>>,
     segmentor: TextSegmentor,
 }
 
@@ -24,18 +25,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
     pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         let segmentor = data.segmentation.clone().into();
 
-        let mut byte_table: [T; 256] = (0..=255)
-            .map(|b| T::from_u8(b).unwrap())
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        // If there are byte table overrides, apply them.
-        data.word_vocab.span_map().iter().for_each(|(bs, &token)| {
-            if bs.len() == 1 {
-                byte_table[bs[0] as usize] = token;
-            }
-        });
+        let byte_table = data.pair_vocab.byte_table().clone();
 
         Self {
             data,
@@ -99,7 +89,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         // Reuse the output buffer as our working memory.
         // Append the byte-tokens to the buffer.
         let start = tokens.len();
-        tokens.extend(chunk.iter().map(|&b| self.byte_table[b as usize]));
+        tokens.extend(chunk.iter().map(|&b| self.byte_table.get_token(b)));
 
         // Incrementally shrink the working memory (the new buffer end)
         // Until we can no longer find pairs to merge.
@@ -140,7 +130,7 @@ mod tests {
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
-    use crate::vocab::byte_table::ByteTable;
+    use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use alloc::sync::Arc;
     use compact_str::CompactString;
@@ -162,7 +152,7 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
         let mut vocab = trainer.train(byte_table.clone()).unwrap();
 

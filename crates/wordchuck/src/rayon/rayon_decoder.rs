@@ -87,7 +87,7 @@ mod tests {
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_table::ByteTable;
+    use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -112,7 +112,7 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer
             .train(byte_table.clone())

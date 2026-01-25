@@ -7,7 +7,7 @@ use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CountType, Pair, PairTokenMap, StringChunkType, TokenType};
 use crate::util::validators;
 use crate::util::validators::U8_SIZE;
-use crate::vocab::byte_table::ByteTable;
+use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 use ahash::{AHashMap, AHashSet};
@@ -205,7 +205,7 @@ where
     where
         T: TokenType,
         C: CountType,
-        B: Into<Arc<ByteTable<T>>>,
+        B: Into<Arc<ByteTokenTable<T>>>,
     {
         let byte_table = byte_table.into();
 
@@ -356,7 +356,7 @@ mod tests {
     use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
-    use crate::vocab::byte_table::ByteTable;
+    use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -399,7 +399,7 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_table.clone()).unwrap().into();
 

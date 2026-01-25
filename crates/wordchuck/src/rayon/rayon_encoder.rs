@@ -85,7 +85,7 @@ mod tests {
     use crate::rayon::rayon_encoder::ParallelRayonEncoder;
     use crate::training::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_table::ByteTable;
+    use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
     use compact_str::CompactString;
@@ -109,7 +109,7 @@ mod tests {
 
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: Arc<ByteTable<T>> = Arc::new(Default::default());
+        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
         let mut vocab: UnifiedTokenVocab<T> = trainer
             .train(byte_table.clone())

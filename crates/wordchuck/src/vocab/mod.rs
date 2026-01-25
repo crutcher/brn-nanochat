@@ -11,6 +11,7 @@ pub mod unified_vocab;
 pub mod vocab_index;
 
 pub use byte_span_vocab::ByteSpanTokenMapVocab;
-pub use byte_table::ByteTable;
+pub use byte_table::ByteTokenTable;
+pub use pair_vocab::PairTokenMapVocab;
 pub use unified_vocab::UnifiedTokenVocab;
 pub use vocab_index::TokenVocabIndex;
