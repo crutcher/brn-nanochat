@@ -41,13 +41,13 @@
 
 pub mod exact_match_union;
 #[cfg(feature = "std")]
-pub mod re_pool;
+pub mod regex_pool;
 
-pub mod re_supplier;
-pub mod re_wrapper;
+pub mod regex_supplier;
+pub mod regex_wrapper;
 
-pub use re_supplier::{RegexSupplier, RegexSupplierHandle};
-pub use re_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};
+pub use regex_supplier::{RegexSupplier, RegexSupplierHandle};
+pub use regex_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};
 
 /// Build a regex supplier for (potentially) parallel execution.
 ///
@@ -61,7 +61,7 @@ where
     let regex = regex.into();
 
     #[cfg(feature = "std")]
-    return alloc::sync::Arc::new(re_pool::RegexWrapperPool::new(regex));
+    return alloc::sync::Arc::new(regex_pool::RegexWrapperPool::new(regex));
 
     #[cfg(not(feature = "std"))]
     return regex;
