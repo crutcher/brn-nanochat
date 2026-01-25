@@ -98,7 +98,7 @@ pub type PairTokenMap<T> = ahash::AHashMap<Pair<T>, T>;
 pub type TokenToPairMap<T> = ahash::AHashMap<T, Pair<T>>;
 
 /// Byte vector to T map.
-pub type ByteSpanTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
+pub type SpanTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
 
 /// T to byte vector map.
 pub type TokenToWordMap<T> = ahash::AHashMap<T, Vec<u8>>;

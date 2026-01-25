@@ -1,14 +1,13 @@
 //! # Unified Token Vocabulary
 
-use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::regex::RegexWrapperPattern;
 use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::TokenType;
-use crate::vocab::byte_span_vocab::ByteSpanTokenMapVocab;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
+use crate::vocab::span_vocab::SpanTokenVocab;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 
 /// Unified token vocabulary.
 #[derive(Clone)]
@@ -17,7 +16,7 @@ pub struct UnifiedTokenVocab<T: TokenType> {
     pub segmentation: SegmentationConfig<T>,
 
     /// ``{ Vec<u8> -> T }`` vocabulary.
-    pub word_vocab: ByteSpanTokenMapVocab<T>,
+    pub word_vocab: SpanTokenVocab<T>,
 
     /// ``{ (T, T) -> T }`` vocabulary.
     pub pair_vocab: PairTokenMapVocab<T>,
@@ -78,7 +77,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Replace the word vocabulary.
     pub fn with_word_vocab(
         self,
-        word_vocab: ByteSpanTokenMapVocab<T>,
+        word_vocab: SpanTokenVocab<T>,
     ) -> Self {
         Self { word_vocab, ..self }
     }
@@ -108,23 +107,12 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
             .map(|(chunk, token)| (token, chunk))
             .collect()
     }
-
-    /// Compile the unified vocabulary into a dictionary decoders.
-    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
-        DictionaryDecoder::new(self.compiled_dictionary())
-    }
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for UnifiedTokenVocab<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        let mut tokens = self.pair_vocab.unordered_tokens_iter().collect::<Vec<_>>();
-
+        let mut tokens: AHashSet<T> = self.pair_vocab.unordered_tokens_iter().collect();
         tokens.extend(self.word_vocab.unordered_tokens_iter());
-
         tokens.into_iter()
-    }
-
-    fn max_token(&self) -> T {
-        self.pair_vocab.max_token().max(self.word_vocab.max_token())
     }
 }

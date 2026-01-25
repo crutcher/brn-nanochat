@@ -1,6 +1,5 @@
 //! # Encoder for [`UnifiedTokenVocab`].
 
-use crate::decoders::dictionary_decoder::DictionaryDecoder;
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::segmentation::text_segmentor::{TextSegmentor, WordRef};
 use crate::types::TokenType;
@@ -32,11 +31,6 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
             segmentor,
             byte_table,
         }
-    }
-
-    /// Build a [`DictionaryDecoder`] from this [`UnifiedVocabEncoder`].
-    pub fn to_decoder(&self) -> DictionaryDecoder<T> {
-        self.data.to_decoder()
     }
 }
 
@@ -124,6 +118,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::decoders::DictionaryDecoder;
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
@@ -160,13 +155,13 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(Arc::new(vocab));
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone().into());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
         assert_eq!(encoder.max_token(), 292);
 
-        let decoder = encoder.to_decoder();
+        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
