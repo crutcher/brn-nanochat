@@ -1,4 +1,5 @@
 use arrow::array::StringArray;
+use arrow::datatypes::ArrowNativeType;
 use clap::Parser;
 use nanochat_data::dataset::DatasetCacheConfig;
 use similar::{ChangeTag, TextDiff};
@@ -8,13 +9,12 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::RegexWrapperPattern;
-use wordchuck::segmentation::TextSegmentor;
-use wordchuck::types::SpanTokenMap;
+use wordchuck::segmentation::{SegmentationConfig, TextSegmentor};
+use wordchuck::vocab::UnifiedTokenVocab;
 use wordchuck::vocab::io::tiktoken_io::load_span_map_from_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT2_R50K_WORD_PATTERN;
 use wordchuck::vocab::public::openai::resources::OA_GPT2_R50K_BASE_TIKTOKEN;
 use wordchuck::vocab::public::openai::specials::oa_gpt2_r50k_specials;
-use wordchuck::vocab::{SpanTokenVocab, UnifiedTokenVocab};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]
@@ -71,30 +71,23 @@ fn run_load(
 
     let r50k_tiktoken = OA_GPT2_R50K_BASE_TIKTOKEN;
 
-    let specials = oa_gpt2_r50k_specials();
     type T = u16;
-    let span_map = load_span_map_from_tiktoken_path(tokenizer_file)?;
-    let word_vocab = SpanTokenVocab::from_span_map(span_map);
-    let pair_vocab = word_vocab.to_pair_vocab();
 
-    let specials_vocab = Some(
-        specials
+    let segmentation = SegmentationConfig::<T>::from_pattern(pattern.clone()).with_special_words(
+        oa_gpt2_r50k_specials()
             .iter()
-            .map(|(s, t)| (s.as_bytes().to_vec(), *t as T))
-            .collect::<SpanTokenMap<T>>()
-            .into(),
+            .map(|(s, t)| (s, T::from_usize(*t).unwrap())),
     );
 
-    let vocab: Arc<UnifiedTokenVocab<T>> = UnifiedTokenVocab::new(pattern)
-        .with_word_vocab(word_vocab)
-        .with_pair_vocab(pair_vocab)
-        .with_specials(specials_vocab)
-        .into();
+    let span_map = load_span_map_from_tiktoken_path(tokenizer_file)?;
+
+    let vocab: Arc<UnifiedTokenVocab<T>> =
+        UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();
 
     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
     let encoder = ParallelRayonEncoder::new(encoder);
 
-    let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+    let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
     let decoder = ParallelRayonDecoder::new(decoder);
 
     let shards: Vec<usize> = vec![0];

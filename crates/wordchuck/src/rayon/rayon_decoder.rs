@@ -121,8 +121,7 @@ mod tests {
 
         let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
 
-        let decoder =
-            ParallelRayonDecoder::new(DictionaryDecoder::new(vocab.compiled_dictionary()));
+        let decoder = ParallelRayonDecoder::new(DictionaryDecoder::new(vocab.unified_dictionary()));
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

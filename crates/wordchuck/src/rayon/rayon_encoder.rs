@@ -111,15 +111,15 @@ mod tests {
 
         let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
-        let mut vocab: UnifiedTokenVocab<T> = trainer
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer
             .train(byte_table.clone())
-            .expect("training vocab should succeed");
-
-        vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
+            .expect("training vocab should succeed")
+            .with_special_words(vec![("<|HI|>", 3000)])
+            .into();
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone().into());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
@@ -127,9 +127,9 @@ mod tests {
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
-        assert_eq!(encoder.max_token(), 292);
+        assert_eq!(encoder.max_token(), 3000);
 
-        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

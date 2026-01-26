@@ -49,6 +49,22 @@ impl<T: TokenType> SpecialWordsTokenVocab<T> {
         self.span_map.insert(word.as_bytes().to_vec(), token);
     }
 
+    /// Extend the vocabulary with the given special words.
+    pub fn with_special_words<W, S>(
+        self,
+        special_words: W,
+    ) -> Self
+    where
+        W: IntoIterator<Item = (S, T)>,
+        S: AsRef<str>,
+    {
+        let mut vocab = self;
+        for (word, token) in special_words {
+            vocab.add_str_word(word.as_ref(), token);
+        }
+        vocab
+    }
+
     /// Return the associated token for the word, if any.
     pub fn lookup_token(
         &self,
