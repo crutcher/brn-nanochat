@@ -128,12 +128,12 @@ fn main() -> anyhow::Result<()> {
     println!("- vocab_size: {:?}", vocab.max_token());
 
     if let Some(path) = args.tiktoken_save_path {
-        save_span_map_to_tiktoken_path(vocab.word_vocab.span_map(), &path)?;
+        save_span_map_to_tiktoken_path(vocab.span_vocab.span_map(), &path)?;
         println!("- tiktoken vocab: {path:?}");
     }
 
     if args.time_encode_decode {
-        let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(vocab.clone());
         let encoder = ParallelRayonEncoder::new(encoder);
 
         let decoder = DictionaryDecoder::new(vocab.unified_dictionary());

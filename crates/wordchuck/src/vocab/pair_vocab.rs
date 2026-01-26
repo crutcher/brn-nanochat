@@ -2,7 +2,7 @@
 
 use crate::decoders::TokenDecoder;
 use crate::decoders::pair_decoder::PairExpansionDecoder;
-use crate::types::{PairTokenMap, TokenType};
+use crate::types::{Pair, PairTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::AHashSet;
@@ -105,6 +105,14 @@ impl<T: TokenType> PairTokenMapVocab<T> {
                 .values()
                 .map(move |&t| (decoder.try_decode_to_bytes([t]).unwrap(), t)),
         )
+    }
+
+    /// Looks up a pair.
+    pub fn lookup_pair(
+        &self,
+        pair: &Pair<T>,
+    ) -> Option<&T> {
+        self.pairs.get(pair)
     }
 }
 

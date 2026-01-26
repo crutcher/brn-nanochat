@@ -83,7 +83,7 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
 
         let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
         check_is_send(&decoder);

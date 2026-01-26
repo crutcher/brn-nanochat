@@ -54,11 +54,11 @@ where
         self.inner.special_vocab()
     }
 
-    fn split_words<'a>(
+    fn split_spans<'a>(
         &self,
         text: &'a str,
     ) -> Vec<SpanRef<'a>> {
-        self.inner.split_words(text)
+        self.inner.split_spans(text)
     }
 
     fn encode_append_span(
@@ -119,7 +119,7 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

@@ -118,7 +118,7 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
 
         let decoder =
             PairExpansionDecoder::from_pair_map(byte_table.clone(), &vocab.pair_vocab.pairs());

@@ -64,7 +64,7 @@ impl TextSegmentor {
 
     /// Create a new text segmentor with the given configuration.
     pub fn from_config<T: TokenType>(config: SegmentationConfig<T>) -> Self {
-        let word_sup = maybe_parallel_regex_supplier(config.word_pattern);
+        let word_sup = maybe_parallel_regex_supplier(config.pattern);
         let specials = if config.specials.is_empty() {
             None
         } else {
