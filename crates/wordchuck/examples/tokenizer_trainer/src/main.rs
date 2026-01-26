@@ -2,6 +2,7 @@ use arrow::array::{Array, StringArray};
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
 use nanochat_data::dataset::DatasetCacheConfig;
+use similar::{ChangeTag, TextDiff};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -239,12 +240,26 @@ fn main() -> anyhow::Result<()> {
             sample_batches
                 .iter()
                 .zip(token_batches.iter())
-                .map(|(_sample, batch)| {
+                .map(|(sample, batch)| {
                     let t0 = std::time::Instant::now();
-                    let _decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
+                    let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
                     let t1 = std::time::Instant::now();
 
-                    // assert_eq!(sample, &decoded_sample);
+                    for (s, d) in sample.iter().zip(decoded_sample.iter()) {
+                        if s != d {
+                            let diff = TextDiff::from_lines(s, d);
+
+                            for change in diff.iter_all_changes() {
+                                let sign = match change.tag() {
+                                    ChangeTag::Delete => "-",
+                                    ChangeTag::Insert => "+",
+                                    ChangeTag::Equal => " ",
+                                };
+                                print!("{}{}", sign, change);
+                            }
+                            panic!("MISMATCH");
+                        }
+                    }
 
                     let delay = t1.duration_since(t0);
                     delay.as_nanos() as u64

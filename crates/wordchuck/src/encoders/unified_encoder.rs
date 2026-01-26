@@ -90,18 +90,21 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         // Define PAIR_RANKS as `tokens[end..]`
         // - there are `(end - start) - 1` items in PAIR_RANKS.
         // - PAIR_RANKS[i] := tokens[end + i]
-        // - PAIR_RANKS[i] = pairs.get(&(CURRENT[i-1], CURRENT[i]))
+        // - PAIR_RANKS[i] = pairs.get(&(CURRENT[i], CURRENT[i + 1]))
 
-        tokens.reserve((end - start) - 1);
+        // tokens.reserve((end - start) - 1);
 
-        let get_pair_rank = |tok: &mut Vec<T>, i: usize| match self
-            .data
-            .pair_vocab
-            .pairs()
-            .get(&(tok[start + i], tok[start + i + 1]))
-        {
-            Some(&token) => token,
-            None => T::max_value(),
+        let get_pair_rank = {
+            #[inline(always)]
+            |tok: &mut [T], i: usize| match self
+                .data
+                .pair_vocab
+                .pairs()
+                .get(&(tok[start + i], tok[start + i + 1]))
+            {
+                Some(&token) => token,
+                None => T::max_value(),
+            }
         };
 
         for i in 1..(end - start) {
@@ -121,53 +124,35 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
             })
             .min()
         {
+            // At this point, i selects CURRENT[i], PAIR_RANKS[i] such that:
+            // - PAIR_RANKS[i] != max_value
+            // - PAIR_RANKS[i] is smallest
+
+            // We need to merge CURRENT[i..=i+1] and PAIR_RANKS[i..=i+1]
+
+            // Set CURRENT[i] to the new target rank.
             tokens[start + i] = t;
-            // The remove order matters; as it invalidates `end`.
 
-            // If *both* are going to be dropped;
-            // it would be faster to do two overlapping slice moves,
-            // followed by a resize.
-
-            if false {
-                // The block copy mechanism.
-                if end + i + 1 < tokens.len() {
-                    // Yes. This is nuts.
-                    // This is inner-loop micro-optimization.
-                    //
-                    // We need to drop 2 elements, and this dance exists
-                    // to avoid the overlapping memcopy for one of the removes.
-                    let a = start + i + 2;
-                    let b = end + i + 1;
-                    tokens.copy_within(a..b, start + i + 1);
-                    tokens.drain(end + i..end + i + 2);
-                } else {
-                    // Drop the following token entry.
-                    tokens.remove(start + i + 1);
-                }
-            } else {
-                // The double remove mechanism.
-
-                // If there is a following PAIR_RANKS entry, drop it.
-                if end + i + 1 < tokens.len() {
-                    tokens.remove(end + i + 1);
-                }
-
-                // Drop the following token entry.
-                tokens.remove(start + i + 1);
+            if i > 0 {
+                // If there is a preceding token, recompute PAIR_RANKS[i-1].
+                tokens[end + i - 1] = get_pair_rank(tokens, i - 1);
             }
+
+            // Drop PAIR_RANKS[i] and CURRENT[i+1].
+            // Order matters here for the indices.
+            tokens.remove(end + i);
+            tokens.remove(start + i + 1);
 
             end -= 1;
 
-            if i > 0 {
-                tokens[end + i - 1] = get_pair_rank(tokens, i - 1);
-            }
             if end + i < tokens.len() {
+                // If there is a following token, recompute PAIR_RANKS[i].
                 tokens[end + i] = get_pair_rank(tokens, i);
             }
         }
 
         // Drop the PAIR_RANKS buffer.
-        tokens.resize(end, T::max_value());
+        tokens.truncate(end);
     }
 }
 
