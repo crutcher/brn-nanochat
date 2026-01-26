@@ -33,10 +33,10 @@
 //!
 //! The chosen solution to this is the combination of:
 //! * [`RegexSupplier`] / [`RegexSupplierHandle`]
-//! * [`maybe_parallel_regex_supplier`].
+//! * [`regex_pool_supplier`].
 //!
 //! Users of a [`RegexWrapper`] that *may* be under heavy thread contention should use
-//! [`maybe_parallel_regex_supplier`]; which in some build environments will provide
+//! [`regex_pool_supplier`]; which in some build environments will provide
 //! a thread local clone regex supplier, and in some, a simple clone implementation.
 
 pub mod exact_match_union;
@@ -49,23 +49,20 @@ pub mod regex_wrapper;
 pub use regex_supplier::{RegexSupplier, RegexSupplierHandle};
 pub use regex_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};
 
+/// Build a [`RegexSupplierHandle`].
+pub fn default_regex_supplier(regex: RegexWrapperHandle) -> RegexSupplierHandle {
+    regex
+}
+
 /// Build a regex supplier for (potentially) parallel execution.
 ///
 /// Users of a [`RegexWrapper`] that *may* be under heavy thread contention should use
-/// [`maybe_parallel_regex_supplier`]; which in some build environments will provide
+/// [`regex_pool_supplier`]; which in some build environments will provide
 /// a thread local clone regex supplier, and in some, a simple clone implementation.
-pub fn maybe_parallel_regex_supplier<R>(regex: R) -> RegexSupplierHandle
-where
-    R: Into<RegexWrapperHandle>,
-{
-    /*
-    let regex = regex.into();
-
+pub fn regex_pool_supplier(regex: RegexWrapperHandle) -> RegexSupplierHandle {
     #[cfg(feature = "std")]
     return alloc::sync::Arc::new(regex_pool::RegexWrapperPool::new(regex));
 
     #[cfg(not(feature = "std"))]
-
-     */
-    regex.into()
+    regex
 }

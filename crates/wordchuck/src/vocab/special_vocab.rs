@@ -40,6 +40,11 @@ impl<T: TokenType> SpecialWordsTokenVocab<T> {
         &self.span_map
     }
 
+    /// Get an iterator over the span slices.
+    pub fn spans(&self) -> impl Iterator<Item = &[u8]> {
+        self.span_map.keys().map(|chunk| chunk.as_slice())
+    }
+
     /// Add a word to the vocab.
     pub fn add_str_word(
         &mut self,
@@ -74,7 +79,7 @@ impl<T: TokenType> SpecialWordsTokenVocab<T> {
     }
 
     /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
-    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
         self.span_map
             .iter()
             .map(|(chunk, &token)| (chunk.clone(), token))

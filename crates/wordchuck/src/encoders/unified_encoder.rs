@@ -1,6 +1,7 @@
 //! # Encoder for [`UnifiedTokenVocab`].
 
 use crate::encoders::token_encoder::TokenEncoder;
+use crate::regex::{RegexSupplierHandle, RegexWrapperHandle};
 use crate::segmentation::text_segmentor::{SpanRef, TextSegmentor};
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
@@ -20,8 +21,15 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
 
 impl<T: TokenType> UnifiedVocabEncoder<T> {
     /// Construct an encoder from data.
-    pub fn init(data: Arc<UnifiedTokenVocab<T>>) -> Self {
-        let segmentor = data.segmentation.clone().into();
+    pub fn init<F>(
+        data: Arc<UnifiedTokenVocab<T>>,
+        re_factory: F,
+    ) -> Self
+    where
+        F: Fn(RegexWrapperHandle) -> RegexSupplierHandle,
+    {
+        let segmentor = TextSegmentor::from_config(data.segmentation.clone(), re_factory);
+
         Self { data, segmentor }
     }
 
@@ -66,7 +74,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         self.data.segmentation.pattern()
     }
 
-    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
+    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T> {
         self.data.segmentation.special_vocab()
     }
 
@@ -167,6 +175,7 @@ mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
+    use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::byte_table::ByteTokenTable;
@@ -204,7 +213,7 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

@@ -8,7 +8,7 @@ use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
-use wordchuck::regex::RegexWrapperPattern;
+use wordchuck::regex::{RegexWrapperPattern, regex_pool_supplier};
 use wordchuck::segmentation::{SegmentationConfig, TextSegmentor};
 use wordchuck::vocab::UnifiedTokenVocab;
 use wordchuck::vocab::io::tiktoken_io::load_span_map_from_tiktoken_path;
@@ -71,7 +71,7 @@ fn run_load(
 
     let r50k_tiktoken = OA_GPT2_R50K_BASE_TIKTOKEN;
 
-    type T = u16;
+    type T = u32;
 
     let segmentation = SegmentationConfig::<T>::from_pattern(pattern.clone()).with_special_words(
         oa_gpt2_r50k_specials()
@@ -84,7 +84,8 @@ fn run_load(
     let vocab: Arc<UnifiedTokenVocab<T>> =
         UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();
 
-    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(vocab.clone());
+    let encoder: UnifiedVocabEncoder<T> =
+        UnifiedVocabEncoder::<T>::init(vocab.clone(), regex_pool_supplier);
     let encoder = ParallelRayonEncoder::new(encoder);
 
     let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
@@ -181,7 +182,8 @@ fn run_load(
     let num_batches1 = token_batches.len();
     println!("Timing Decode:");
 
-    let segmentor: TextSegmentor = vocab.segmentation.clone().into();
+    let segmentor: TextSegmentor =
+        TextSegmentor::from_config(vocab.segmentation.clone(), regex_pool_supplier);
 
     let batch_times_ns = sample_batches
         .iter()

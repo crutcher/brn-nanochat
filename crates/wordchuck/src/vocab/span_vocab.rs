@@ -60,7 +60,7 @@ pub fn try_validate_span_map<T>(
 where
     T: TokenType,
 {
-    for (span, token) in byte_table.to_span_pairs() {
+    for (span, token) in byte_table.span_pairs() {
         let b = span[0];
 
         if let Some(&map_token) = span_map.get(&span)
@@ -87,7 +87,7 @@ impl<T: TokenType> SpanTokenVocab<T> {
     {
         let byte_table = byte_table.into();
 
-        let span_map: SpanTokenMap<T> = byte_table.to_span_pairs().collect();
+        let span_map: SpanTokenMap<T> = byte_table.span_pairs().collect();
 
         Self::init(byte_table, span_map).unwrap()
     }
@@ -122,7 +122,7 @@ impl<T: TokenType> SpanTokenVocab<T> {
     /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
     pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
         let byte_table: Arc<ByteTokenTable<T>> = pair_vocab.byte_table().clone();
-        let span_map: SpanTokenMap<T> = pair_vocab.to_span_pairs().collect();
+        let span_map: SpanTokenMap<T> = pair_vocab.span_pairs().collect();
 
         Self::init(byte_table, span_map).unwrap()
     }
@@ -141,7 +141,7 @@ impl<T: TokenType> SpanTokenVocab<T> {
         let byte_table = byte_table.into();
         try_validate_span_map(&byte_table, &span_map)?;
 
-        span_map.extend(byte_table.to_span_pairs());
+        span_map.extend(byte_table.span_pairs());
 
         Ok(Self {
             byte_table,
@@ -160,7 +160,7 @@ impl<T: TokenType> SpanTokenVocab<T> {
     }
 
     /// Iterate over the span => token pairs.
-    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
         self.span_map
             .iter()
             .map(|(chunk, &token)| (chunk.clone(), token))

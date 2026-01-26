@@ -50,7 +50,7 @@ where
         self.inner.pattern()
     }
 
-    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
+    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T> {
         self.inner.special_vocab()
     }
 
@@ -83,6 +83,7 @@ mod tests {
     use crate::decoders::{DictionaryDecoder, TokenDecoder};
     use crate::encoders::{TokenEncoder, UnifiedVocabEncoder};
     use crate::rayon::rayon_encoder::ParallelRayonEncoder;
+    use crate::regex::default_regex_supplier;
     use crate::training::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::byte_table::ByteTokenTable;
@@ -119,7 +120,7 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

@@ -85,6 +85,7 @@ mod tests {
     use crate::decoders::DictionaryDecoder;
     use crate::encoders::UnifiedVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
+    use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::byte_table::ByteTokenTable;
@@ -119,7 +120,7 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 
         let decoder = ParallelRayonDecoder::new(DictionaryDecoder::new(vocab.unified_dictionary()));
         check_is_send(&decoder);

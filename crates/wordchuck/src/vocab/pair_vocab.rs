@@ -97,10 +97,10 @@ impl<T: TokenType> PairTokenMapVocab<T> {
     /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
     ///
     /// This includes the pairs from the `ByteTable`.
-    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
         let decoder = PairExpansionDecoder::from_pair_map(self.byte_table().clone(), self.pairs());
 
-        self.byte_table.to_span_pairs().chain(
+        self.byte_table.span_pairs().chain(
             self.pairs
                 .values()
                 .map(move |&t| (decoder.try_decode_to_bytes([t]).unwrap(), t)),

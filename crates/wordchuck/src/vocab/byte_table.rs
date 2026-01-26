@@ -132,7 +132,7 @@ impl<T: TokenType> ByteTokenTable<T> {
     }
 
     /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
-    pub fn to_span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
         self.byte_to_token
             .iter()
             .enumerate()

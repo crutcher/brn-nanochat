@@ -154,9 +154,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::regex::{RegexWrapperPattern, maybe_parallel_regex_supplier};
+    use crate::regex::RegexWrapperPattern;
     use crate::training::token_span_buffer::TokenSpanBuf;
     use crate::types::{CountType, StringChunkType};
+    use std::sync::Arc;
 
     const PATTERN: &str = r"\w+";
 
@@ -167,10 +168,8 @@ mod tests {
 
     #[test]
     fn test_word_counter() {
-        let mut wc: TextSpanCounter<String, u64> = TextSpanCounter::new(
-            maybe_parallel_regex_supplier(get_regex()),
-            TextSpanCounterOptions::default(),
-        );
+        let mut wc: TextSpanCounter<String, u64> =
+            TextSpanCounter::new(Arc::new(get_regex()), TextSpanCounterOptions::default());
 
         let samples = vec!["Hello world", "Foo world bar world"];
         wc.update_from_samples(samples.iter());
@@ -205,10 +204,8 @@ mod tests {
 
         let byte_table: ByteTokenTable<T> = Default::default();
 
-        let mut word_counts = TextSpanCounter::<K, C>::new(
-            maybe_parallel_regex_supplier(get_regex()),
-            TextSpanCounterOptions::default(),
-        );
+        let mut word_counts =
+            TextSpanCounter::<K, C>::new(Arc::new(get_regex()), TextSpanCounterOptions::default());
 
         let samples = vec!["Hello world", "Foo world bar world"];
 

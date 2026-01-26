@@ -9,6 +9,7 @@ use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
+use wordchuck::regex::default_regex_supplier;
 use wordchuck::training::BinaryPairVocabTrainerOptions;
 use wordchuck::vocab::byte_table::ByteTokenTable;
 use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
@@ -133,7 +134,8 @@ fn main() -> anyhow::Result<()> {
     }
 
     if args.time_encode_decode {
-        let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(vocab.clone());
+        let encoder: UnifiedVocabEncoder<T> =
+            UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         let encoder = ParallelRayonEncoder::new(encoder);
 
         let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
