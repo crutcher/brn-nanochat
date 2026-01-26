@@ -10,7 +10,7 @@ use core::ops::Range;
 
 /// Word Reference for [`TextSegmentor`].
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum WordRef<'a> {
+pub enum SpanRef<'a> {
     /// A normal word reference.
     Normal(&'a str),
 
@@ -18,12 +18,12 @@ pub enum WordRef<'a> {
     Special(&'a str),
 }
 
-impl<'a> WordRef<'a> {
+impl<'a> SpanRef<'a> {
     /// Get the inner string slice.
     pub fn as_str(&self) -> &'a str {
         match self {
-            WordRef::Normal(s) => s,
-            WordRef::Special(s) => s,
+            SpanRef::Normal(s) => s,
+            SpanRef::Special(s) => s,
         }
     }
 }
@@ -108,29 +108,29 @@ impl TextSegmentor {
             .map(|m| m.range())
     }
 
-    /// Split a chunk of text into [`WordRef::Normal`].
+    /// Split a chunk of text into [`SpanRef::Normal`].
     ///
     /// Append to the `words` buffer.
     fn split_append_normal_words<'a>(
         &self,
         text: &'a str,
-        words: &mut Vec<WordRef<'a>>,
+        words: &mut Vec<SpanRef<'a>>,
     ) {
         words.extend(
             self.word_re_supplier
                 .get_regex()
                 .find_iter(text)
-                .map(|m| WordRef::Normal(m.as_str())),
+                .map(|m| SpanRef::Normal(m.as_str())),
         )
     }
 
     /// Split a chunk of text into `Vec<WordRef>`.
     ///
     /// Append to the `words` buffer.
-    pub fn split_append_words<'a>(
+    pub fn split_append_spans<'a>(
         &self,
         text: &'a str,
-        words: &mut Vec<WordRef<'a>>,
+        words: &mut Vec<SpanRef<'a>>,
     ) {
         let mut current = text;
 
@@ -138,7 +138,7 @@ impl TextSegmentor {
             let pre = &current[..range.start];
             self.split_append_normal_words(pre, words);
 
-            words.push(WordRef::Special(&current[range.clone()]));
+            words.push(SpanRef::Special(&current[range.clone()]));
 
             current = &current[range.end..];
         }
@@ -152,14 +152,14 @@ impl TextSegmentor {
     ///
     /// # Returns
     /// A `Vec<WordRef>` containing the `WordRef`s to `text`..
-    pub fn split_words<'a>(
+    pub fn split_spans<'a>(
         &self,
         text: &'a str,
-    ) -> Vec<WordRef<'a>> {
+    ) -> Vec<SpanRef<'a>> {
         let capacity = text.len() as f64 / (EXPECTED_BYTES_PER_TOKEN * 0.5);
         let mut words = Vec::with_capacity(capacity as usize);
 
-        self.split_append_words(text, &mut words);
+        self.split_append_spans(text, &mut words);
         words
     }
 
@@ -170,7 +170,7 @@ impl TextSegmentor {
     ) -> String {
         let text = text.as_ref();
         let mut words = Vec::new();
-        self.split_append_words(text, &mut words);
+        self.split_append_spans(text, &mut words);
         words.into_iter().map(|w| w.as_str()).collect()
     }
 }
@@ -190,14 +190,14 @@ mod tests {
         let buf = "hello<|FNORD|> wor<|NORP|>ld!";
 
         assert_eq!(
-            &segmentor.split_words(buf),
+            &segmentor.split_spans(buf),
             &vec![
-                WordRef::Normal(&buf[..5]),
-                WordRef::Special(&buf[5..14]),
-                WordRef::Normal(&buf[14..18]),
-                WordRef::Special(&buf[18..26]),
-                WordRef::Normal(&buf[26..28]),
-                WordRef::Normal(&buf[28..]),
+                SpanRef::Normal(&buf[..5]),
+                SpanRef::Special(&buf[5..14]),
+                SpanRef::Normal(&buf[14..18]),
+                SpanRef::Special(&buf[18..26]),
+                SpanRef::Normal(&buf[26..28]),
+                SpanRef::Normal(&buf[28..]),
             ]
         );
     }

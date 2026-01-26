@@ -1,7 +1,7 @@
 //! # Encoder for [`UnifiedTokenVocab`].
 
 use crate::encoders::token_encoder::TokenEncoder;
-use crate::segmentation::text_segmentor::{TextSegmentor, WordRef};
+use crate::segmentation::text_segmentor::{SpanRef, TextSegmentor};
 use crate::types::TokenType;
 use crate::vocab::ByteTokenTable;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
@@ -26,6 +26,9 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
 
         let byte_table = data.pair_vocab.byte_table().clone();
 
+        // FIXME: this should be a property of the data.
+        assert_eq!(&data.pair_vocab.byte_table(), &data.word_vocab.byte_table());
+
         Self {
             data,
             segmentor,
@@ -38,6 +41,7 @@ impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.data.unordered_tokens_iter()
     }
+
     fn max_token(&self) -> T {
         self.data.max_token()
     }
@@ -55,8 +59,8 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     fn split_words<'a>(
         &self,
         text: &'a str,
-    ) -> Vec<WordRef<'a>> {
-        self.segmentor.split_words(text)
+    ) -> Vec<SpanRef<'a>> {
+        self.segmentor.split_spans(text)
     }
 
     /// Encode a word chunk into token IDs.
@@ -84,7 +88,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 
         // Define CURRENT as `tokens[start..end]`.
         // - CURRENT[i] := tokens[start + i]
-        tokens.extend(span.iter().map(|&b| self.byte_table.get_token(b)));
+        self.byte_table.append_tokens(span, tokens);
         let mut end = tokens.len();
 
         // Define PAIR_RANKS as `tokens[end..]`
@@ -92,10 +96,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         // - PAIR_RANKS[i] := tokens[end + i]
         // - PAIR_RANKS[i] = pairs.get(&(CURRENT[i], CURRENT[i + 1]))
 
-        // tokens.reserve((end - start) - 1);
-
         let get_pair_rank = {
-            #[inline(always)]
             |tok: &mut [T], i: usize| match self
                 .data
                 .pair_vocab

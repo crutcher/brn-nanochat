@@ -114,6 +114,15 @@ impl<T: TokenType> ByteTokenTable<T> {
         self.byte_to_token[byte as usize]
     }
 
+    /// Append the translated byte tokens to a target buffer.
+    pub fn append_tokens(
+        &self,
+        bytes: &[u8],
+        tokens: &mut Vec<T>,
+    ) {
+        tokens.extend(bytes.iter().map(|&b| self.get_token(b)));
+    }
+
     /// Get the byte corresponding to a given token, if any.
     pub fn get_byte(
         &self,
