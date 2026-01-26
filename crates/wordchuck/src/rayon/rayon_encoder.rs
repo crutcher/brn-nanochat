@@ -1,7 +1,7 @@
 //! # Parallel Encoder
 
 use crate::encoders::TokenEncoder;
-use crate::segmentation::text_segmentor::WordRef;
+use crate::segmentation::text_segmentor::SpanRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
@@ -57,7 +57,7 @@ where
     fn split_words<'a>(
         &self,
         text: &'a str,
-    ) -> Vec<WordRef<'a>> {
+    ) -> Vec<SpanRef<'a>> {
         self.inner.split_words(text)
     }
 

@@ -1,6 +1,6 @@
 //! # Token Encoder Trait
 
-use crate::segmentation::text_segmentor::WordRef;
+use crate::segmentation::text_segmentor::SpanRef;
 use crate::types::TokenType;
 use crate::vocab::TokenVocabIndex;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
@@ -18,7 +18,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn split_words<'a>(
         &self,
         text: &'a str,
-    ) -> Vec<WordRef<'a>>;
+    ) -> Vec<SpanRef<'a>>;
 
     /// Encode a span appending to a target buffer.
     fn encode_append_span(
@@ -35,8 +35,8 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         tokens: &mut Vec<T>,
     ) {
         self.split_words(text).into_iter().for_each(|wr| match wr {
-            WordRef::Normal(w) => self.encode_append_span(w.as_bytes(), tokens),
-            WordRef::Special(s) => {
+            SpanRef::Normal(w) => self.encode_append_span(w.as_bytes(), tokens),
+            SpanRef::Special(s) => {
                 tokens.push(
                     self.special_vocab()
                         .unwrap()

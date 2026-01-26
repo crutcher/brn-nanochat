@@ -58,11 +58,14 @@ pub fn maybe_parallel_regex_supplier<R>(regex: R) -> RegexSupplierHandle
 where
     R: Into<RegexWrapperHandle>,
 {
+    /*
     let regex = regex.into();
 
     #[cfg(feature = "std")]
     return alloc::sync::Arc::new(regex_pool::RegexWrapperPool::new(regex));
 
     #[cfg(not(feature = "std"))]
-    return regex;
+
+     */
+    regex.into()
 }
