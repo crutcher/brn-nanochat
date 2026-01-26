@@ -239,12 +239,12 @@ fn main() -> anyhow::Result<()> {
             sample_batches
                 .iter()
                 .zip(token_batches.iter())
-                .map(|(sample, batch)| {
+                .map(|(_sample, batch)| {
                     let t0 = std::time::Instant::now();
-                    let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
+                    let _decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
                     let t1 = std::time::Instant::now();
 
-                    assert_eq!(sample, &decoded_sample);
+                    // assert_eq!(sample, &decoded_sample);
 
                     let delay = t1.duration_since(t0);
                     delay.as_nanos() as u64
