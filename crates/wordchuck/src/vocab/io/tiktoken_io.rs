@@ -5,6 +5,7 @@ use ahash::AHashMap;
 use anyhow::Context;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
+use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
@@ -17,7 +18,7 @@ where
     T: TokenType,
     P: AsRef<Path>,
 {
-    let file = std::fs::File::open(path)?;
+    let file = File::open(path)?;
     let reader = BufReader::new(file);
 
     load_span_map_from_tiktoken_reader(reader)
@@ -43,13 +44,11 @@ where
         let parts = s.splitn(2, ' ').collect::<Vec<&str>>();
         assert_eq!(parts.len(), 2);
 
-        let chunk = parts[0];
-        let chunk = BASE64_STANDARD.decode(chunk)?;
+        let span = BASE64_STANDARD.decode(parts[0])?;
 
-        let token: u64 = parts[1].parse()?;
-        let token = T::from_u64(token).context("token out of range")?;
+        let token = T::from_u64(parts[1].parse()?).context("token out of range")?;
 
-        vocab.insert(chunk, token);
+        vocab.insert(span, token);
     }
 
     Ok(vocab)
