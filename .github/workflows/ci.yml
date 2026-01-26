@@ -44,5 +44,8 @@ jobs:
       - name: Test
         run: cargo test --workspace --exclude nanochat
 
+      - name: Test Training
+        run: cargo test -p wordchuck --features training
+
       - name: no_std Test
         run: cargo test -p wordchuck --no-default-features --tests

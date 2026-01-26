@@ -20,8 +20,6 @@ pub trait TokenType:
     + ToPrimitive
     + UpperBounded
     + Ord
-    + serde::Serialize
-    + for<'de> serde::Deserialize<'de>
 {
 }
 
@@ -39,8 +37,6 @@ impl<T> TokenType for T where
         + ToPrimitive
         + UpperBounded
         + Ord
-        + serde::Serialize
-        + for<'de> serde::Deserialize<'de>
 {
 }
 
