@@ -1,11 +1,13 @@
 //! # Unified Token Vocabulary
 
 use crate::segmentation::segmentation_config::SegmentationConfig;
-use crate::types::{SpanTokenMap, TokenType};
+use crate::types::{Pair, SpanTokenMap, TokenType};
+use crate::vocab::ByteTokenTable;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::span_vocab::SpanTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::{AHashMap, AHashSet};
+use std::sync::Arc;
 
 /// Unified token vocabulary.
 #[derive(Clone)]
@@ -14,7 +16,7 @@ pub struct UnifiedTokenVocab<T: TokenType> {
     pub segmentation: SegmentationConfig<T>,
 
     /// ``{ Vec<u8> -> T }`` vocabulary.
-    pub word_vocab: SpanTokenVocab<T>,
+    pub span_vocab: SpanTokenVocab<T>,
 
     /// ``{ (T, T) -> T }`` vocabulary.
     pub pair_vocab: PairTokenMapVocab<T>,
@@ -68,9 +70,14 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
         Self {
             segmentation,
-            word_vocab,
+            span_vocab: word_vocab,
             pair_vocab,
         }
+    }
+
+    /// Get the byte table for the word vocabulary.
+    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
+        self.span_vocab.byte_table()
     }
 
     /// Extend the vocabulary with the given special words.
@@ -92,7 +99,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     pub fn unified_dictionary(&self) -> AHashMap<T, Vec<u8>> {
         let mut tmp = AHashMap::default();
 
-        self.word_vocab.iter().for_each(|(chunk, &token)| {
+        self.span_vocab.iter().for_each(|(chunk, &token)| {
             tmp.insert(chunk.clone(), token);
         });
 
@@ -113,11 +120,45 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
             .map(|(chunk, token)| (token, chunk))
             .collect()
     }
+
+    /// Looks up a token in the vocabulary using the provided byte slice.
+    ///
+    /// # Arguments
+    ///
+    /// * `span` - A byte slice (`&[u8]`) representing the token to be looked up in the vocabulary.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<T>` - Returns `Some(T)` if the token is found in the vocabulary,
+    ///   where `T` is the type of the value associated with the token. Returns
+    ///   `None` if the token is not found.
+    pub fn lookup_token(
+        &self,
+        span: &[u8],
+    ) -> Option<T> {
+        self.span_vocab.lookup_token(span)
+    }
+
+    /// Looks up a given pair in the pair vocabulary and retrieves its associated data, if present.
+    ///
+    /// # Arguments
+    ///
+    /// * `pair` - A reference to the `Pair<T>` to be looked up in the pair vocabulary.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<&T>` - Returns `Some(&T)` if the pair is found in the pair vocabulary, otherwise returns `None`.
+    pub fn lookup_pair(
+        &self,
+        pair: &Pair<T>,
+    ) -> Option<&T> {
+        self.pair_vocab.lookup_pair(pair)
+    }
 }
 
 impl<T: TokenType> TokenVocabIndex<T> for UnifiedTokenVocab<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.word_vocab
+        self.span_vocab
             .unordered_tokens_iter()
             .chain(self.segmentation.specials.unordered_tokens_iter())
     }

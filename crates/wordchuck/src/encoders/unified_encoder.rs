@@ -3,7 +3,6 @@
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::segmentation::text_segmentor::{SpanRef, TextSegmentor};
 use crate::types::TokenType;
-use crate::vocab::ByteTokenTable;
 use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
@@ -15,25 +14,40 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
     /// Data for the encoders.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
-    byte_table: Arc<ByteTokenTable<T>>,
-    segmentor: TextSegmentor,
+    /// Text Segmentor.
+    pub segmentor: TextSegmentor,
 }
 
 impl<T: TokenType> UnifiedVocabEncoder<T> {
     /// Construct an encoder from data.
-    pub fn new(data: Arc<UnifiedTokenVocab<T>>) -> Self {
+    pub fn init(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         let segmentor = data.segmentation.clone().into();
+        Self { data, segmentor }
+    }
 
-        let byte_table = data.pair_vocab.byte_table().clone();
+    /// Compiler Hint.
+    fn lookup_token(
+        &self,
+        span: &[u8],
+    ) -> Option<T> {
+        self.data.lookup_token(span)
+    }
 
-        // FIXME: this should be a property of the data.
-        assert_eq!(&data.pair_vocab.byte_table(), &data.word_vocab.byte_table());
+    /// Compiler Hint.
+    fn lookup_pair(
+        &self,
+        pair: &(T, T),
+    ) -> Option<&T> {
+        self.data.lookup_pair(pair)
+    }
 
-        Self {
-            data,
-            segmentor,
-            byte_table,
-        }
+    /// Compiler Hint.
+    fn append_tokens(
+        &self,
+        span: &[u8],
+        tokens: &mut Vec<T>,
+    ) {
+        self.data.byte_table().append_tokens(span, tokens);
     }
 }
 
@@ -56,28 +70,20 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         self.data.segmentation.special_vocab()
     }
 
-    fn split_words<'a>(
+    fn split_spans<'a>(
         &self,
         text: &'a str,
     ) -> Vec<SpanRef<'a>> {
         self.segmentor.split_spans(text)
     }
 
-    /// Encode a word chunk into token IDs.
     fn encode_append_span(
         &self,
         span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        // NOTE: You may think that a bypass for single-byte words
-        // would speed things up here, before the hash lookup.
-        // On real sample data, it appears to incur a small *penalty*.
-
         // Correctness-wise - Some words may not exist in the pair mappings.
-        //
-        // Speed-wise - This is a wash; the hash is slow enough that the
-        // cache hits don't speed us up.
-        if let Some(token) = self.data.word_vocab.lookup_token(span) {
+        if let Some(token) = self.lookup_token(span) {
             tokens.push(token);
             return;
         }
@@ -88,7 +94,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 
         // Define CURRENT as `tokens[start..end]`.
         // - CURRENT[i] := tokens[start + i]
-        self.byte_table.append_tokens(span, tokens);
+        self.append_tokens(span, tokens);
         let mut end = tokens.len();
 
         // Define PAIR_RANKS as `tokens[end..]`
@@ -97,14 +103,12 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         // - PAIR_RANKS[i] = pairs.get(&(CURRENT[i], CURRENT[i + 1]))
 
         let get_pair_rank = {
-            |tok: &mut [T], i: usize| match self
-                .data
-                .pair_vocab
-                .pairs()
-                .get(&(tok[start + i], tok[start + i + 1]))
-            {
-                Some(&token) => token,
-                None => T::max_value(),
+            |tok: &mut [T], i: usize| {
+                let pair = &(tok[start + i], tok[start + i + 1]);
+                match self.lookup_pair(pair) {
+                    Some(&token) => token,
+                    None => T::max_value(),
+                }
             }
         };
 
@@ -196,11 +200,11 @@ mod tests {
         seg.add_str_word("<|HI|>", 3000);
 
         let vocab: Arc<UnifiedTokenVocab<T>> =
-            UnifiedTokenVocab::init(seg, vocab.word_vocab, vocab.pair_vocab).into();
+            UnifiedTokenVocab::init(seg, vocab.span_vocab, vocab.pair_vocab).into();
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

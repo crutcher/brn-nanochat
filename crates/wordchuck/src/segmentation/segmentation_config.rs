@@ -7,7 +7,7 @@ use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 #[derive(Debug, Clone)]
 pub struct SegmentationConfig<T: TokenType> {
     /// Regex pattern for word splitting.
-    pub word_pattern: RegexWrapperPattern,
+    pub pattern: RegexWrapperPattern,
 
     /// Special tokens vocabulary.
     pub specials: SpecialWordsTokenVocab<T>,
@@ -25,20 +25,17 @@ impl<T: TokenType> SegmentationConfig<T> {
     /// Will contain an empty list of specials.
     pub fn from_pattern(word_pattern: RegexWrapperPattern) -> Self {
         Self {
-            word_pattern,
+            pattern: word_pattern,
             specials: SpecialWordsTokenVocab::default(),
         }
     }
 
-    /// Set the word pattern for the text segmentor configuration.
-    pub fn with_word_pattern(
+    /// Set the split pattern for the text segmentor configuration.
+    pub fn with_pattern(
         self,
-        word_pattern: RegexWrapperPattern,
+        pattern: RegexWrapperPattern,
     ) -> Self {
-        Self {
-            word_pattern,
-            ..self
-        }
+        Self { pattern, ..self }
     }
 
     /// Replace special tokens vocabulary.
@@ -79,7 +76,7 @@ impl<T: TokenType> SegmentationConfig<T> {
 
     /// Get the word pattern for the text segmentor configuration.
     pub fn pattern(&self) -> String {
-        self.word_pattern.as_str().to_string()
+        self.pattern.as_str().to_string()
     }
 
     /// Get the special tokens vocabulary for the text segmentor configuration.

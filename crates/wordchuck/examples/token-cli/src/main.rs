@@ -84,7 +84,7 @@ fn run_load(
     let vocab: Arc<UnifiedTokenVocab<T>> =
         UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();
 
-    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
+    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(vocab.clone());
     let encoder = ParallelRayonEncoder::new(encoder);
 
     let decoder = DictionaryDecoder::new(vocab.unified_dictionary());

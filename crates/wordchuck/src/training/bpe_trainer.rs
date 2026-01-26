@@ -441,7 +441,7 @@ mod tests {
 
         let vocab: UnifiedTokenVocab<T> = trainer.train(byte_table.clone()).unwrap();
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone().into());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone().into());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

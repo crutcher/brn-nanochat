@@ -15,7 +15,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>>;
 
     /// Split text using the attached pattern and specials.
-    fn split_words<'a>(
+    fn split_spans<'a>(
         &self,
         text: &'a str,
     ) -> Vec<SpanRef<'a>>;
@@ -34,7 +34,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         text: &str,
         tokens: &mut Vec<T>,
     ) {
-        self.split_words(text).into_iter().for_each(|wr| match wr {
+        self.split_spans(text).into_iter().for_each(|wr| match wr {
             SpanRef::Normal(w) => self.encode_append_span(w.as_bytes(), tokens),
             SpanRef::Special(s) => {
                 tokens.push(
