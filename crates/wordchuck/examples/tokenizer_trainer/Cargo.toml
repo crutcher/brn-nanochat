@@ -17,5 +17,7 @@ wordchuck = { path = "../..", features = ["rayon"] }
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 
+similar = "2.7.0"
+
 parquet = { workspace = true, features = ["arrow"] }
 arrow = { workspace = true }

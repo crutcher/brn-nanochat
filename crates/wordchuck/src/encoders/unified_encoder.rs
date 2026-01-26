@@ -78,39 +78,81 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
             return;
         }
 
-        // Reuse the output buffer as our working memory.
-        // Append the byte-tokens to the buffer.
+        // We reuse the output buffer as our working memory.
+        // - `start` is the first index of the working memory buffer.
         let start = tokens.len();
+
+        // Define CURRENT as `tokens[start..end]`.
+        // - CURRENT[i] := tokens[start + i]
         tokens.extend(span.iter().map(|&b| self.byte_table.get_token(b)));
+        let mut end = tokens.len();
 
-        // Incrementally shrink the working memory (the new buffer end)
-        // Until we can no longer find pairs to merge.
-        let stop = start + 2;
-        while tokens.len() >= stop {
-            // Find the lowest ranked merge available.
-            if let Some((token, idx)) = tokens[start..]
-                .windows(2)
-                .enumerate()
-                .filter_map(|(idx, w)| {
-                    self.data
-                        .pair_vocab
-                        .pairs()
-                        .get(&(w[0], w[1]))
-                        .map(|&token| (token, idx))
-                })
-                .min()
+        // Define PAIR_RANKS as `tokens[end..]`
+        // - there are `(end - start) - 1` items in PAIR_RANKS.
+        // - PAIR_RANKS[i] := tokens[end + i]
+        // - PAIR_RANKS[i] = pairs.get(&(CURRENT[i], CURRENT[i + 1]))
+
+        // tokens.reserve((end - start) - 1);
+
+        let get_pair_rank = {
+            #[inline(always)]
+            |tok: &mut [T], i: usize| match self
+                .data
+                .pair_vocab
+                .pairs()
+                .get(&(tok[start + i], tok[start + i + 1]))
             {
-                // Adjust the window index.
-                let idx = start + idx;
+                Some(&token) => token,
+                None => T::max_value(),
+            }
+        };
 
-                // buf[idx..=idx+1] (a, b) -> buf[idx] t
-                tokens[idx] = token;
-                tokens.remove(idx + 1);
-            } else {
-                // No more merges possible
-                break;
+        for i in 1..(end - start) {
+            let rank = get_pair_rank(tokens, i - 1);
+            tokens.push(rank);
+        }
+
+        while let Some((t, i)) = tokens[end..]
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &t)| {
+                if t == T::max_value() {
+                    None
+                } else {
+                    Some((t, i))
+                }
+            })
+            .min()
+        {
+            // At this point, i selects CURRENT[i], PAIR_RANKS[i] such that:
+            // - PAIR_RANKS[i] != max_value
+            // - PAIR_RANKS[i] is smallest
+
+            // We need to merge CURRENT[i..=i+1] and PAIR_RANKS[i..=i+1]
+
+            // Set CURRENT[i] to the new target rank.
+            tokens[start + i] = t;
+
+            if i > 0 {
+                // If there is a preceding token, recompute PAIR_RANKS[i-1].
+                tokens[end + i - 1] = get_pair_rank(tokens, i - 1);
+            }
+
+            // Drop PAIR_RANKS[i] and CURRENT[i+1].
+            // Order matters here for the indices.
+            tokens.remove(end + i);
+            tokens.remove(start + i + 1);
+
+            end -= 1;
+
+            if end + i < tokens.len() {
+                // If there is a following token, recompute PAIR_RANKS[i].
+                tokens[end + i] = get_pair_rank(tokens, i);
             }
         }
+
+        // Drop the PAIR_RANKS buffer.
+        tokens.truncate(end);
     }
 }
 
