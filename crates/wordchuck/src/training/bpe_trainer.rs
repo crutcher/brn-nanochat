@@ -11,6 +11,7 @@ use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 use ahash::{AHashMap, AHashSet};
+use compact_str::CompactString;
 use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
 use std::sync::Arc;
@@ -128,7 +129,7 @@ impl<T: TokenType, C: CountType> Ord for MergeJob<T, C> {
 /// # Parameters
 /// * `K` - the type used to store strings in the word counts.
 /// * `C` - the type used to store counts in the word counts.
-pub struct BinaryPairVocabTrainer<K = String, C = u32>
+pub struct BinaryPairVocabTrainer<K = CompactString, C = u32>
 where
     K: StringChunkType,
     C: CountType,

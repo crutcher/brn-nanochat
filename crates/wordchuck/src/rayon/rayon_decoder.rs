@@ -86,22 +86,18 @@ mod tests {
     use crate::encoders::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::regex::default_regex_supplier;
-    use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
+    use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
+    use crate::vocab::UnifiedTokenVocab;
     use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::unified_vocab::UnifiedTokenVocab;
+    use crate::vocab::tooling::testing::build_test_vocab;
     use alloc::sync::Arc;
-    use compact_str::CompactString;
     use num_traits::FromPrimitive;
 
     #[test]
     fn test_decoder() {
         type T = u16;
-        type C = u32;
-        type K = CompactString;
-
-        let options = BinaryPairVocabTrainerOptions::new(OA_GPT3_CL100K_WORD_PATTERN, 1000);
 
         let samples = vec![
             "hello world",
@@ -109,16 +105,12 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let mut trainer = options.init::<K, C>();
-
-        trainer.update_from_samples(samples.iter());
-
         let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
-
-        let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-            .train(byte_table.clone())
-            .expect("training vocab should succeed")
-            .into();
+        let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(
+            byte_table.clone(),
+            SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN),
+        )
+        .into();
 
         let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 

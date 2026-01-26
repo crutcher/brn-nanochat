@@ -12,7 +12,7 @@ workspace = true
 [dependencies]
 burn = { workspace = true, features = ["network"] }
 nanochat-data = { path = "../../../nanochat-data" }
-wordchuck = { path = "../..", features = ["rayon"] }
+wordchuck = { path = "../..", features = ["rayon", "training"] }
 
 edit-distance = { workspace = true }
 rayon = { workspace = true }
