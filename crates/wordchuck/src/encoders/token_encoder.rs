@@ -12,7 +12,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
     fn pattern(&self) -> String;
 
     /// Return the special vocabulary, if any.
-    fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>>;
+    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T>;
 
     /// Split text using the attached pattern and specials.
     fn split_spans<'a>(
@@ -37,12 +37,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         self.split_spans(text).into_iter().for_each(|wr| match wr {
             SpanRef::Normal(w) => self.encode_append_span(w.as_bytes(), tokens),
             SpanRef::Special(s) => {
-                tokens.push(
-                    self.special_vocab()
-                        .unwrap()
-                        .lookup_token(s.as_bytes())
-                        .unwrap(),
-                );
+                tokens.push(self.special_vocab().lookup_token(s.as_bytes()).unwrap());
             }
         });
     }

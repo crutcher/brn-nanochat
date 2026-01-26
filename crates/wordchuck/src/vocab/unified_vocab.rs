@@ -37,10 +37,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         segmentation: SegmentationConfig<T>,
         pair_vocab: PairTokenMapVocab<T>,
     ) -> Self {
-        let word_vocab = pair_vocab
-            .to_span_pairs()
-            .collect::<SpanTokenMap<T>>()
-            .into();
+        let word_vocab = pair_vocab.span_pairs().collect::<SpanTokenMap<T>>().into();
         Self::from_span_vocab(segmentation, word_vocab)
     }
 
@@ -103,17 +100,15 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
             tmp.insert(chunk.clone(), token);
         });
 
-        for (span, token) in self.pair_vocab.to_span_pairs() {
+        for (span, token) in self.pair_vocab.span_pairs() {
             if tmp.contains_key(&span) {
                 continue;
             }
             tmp.insert(span, token);
         }
 
-        if let Some(specials) = &self.segmentation.special_vocab() {
-            for (chunk, &t) in specials.span_map().iter() {
-                tmp.insert(chunk.clone(), t);
-            }
+        for (span, t) in self.segmentation.special_vocab().span_pairs() {
+            tmp.insert(span, t);
         }
 
         tmp.into_iter()

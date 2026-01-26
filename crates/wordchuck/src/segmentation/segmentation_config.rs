@@ -23,19 +23,28 @@ impl<T: TokenType> SegmentationConfig<T> {
     /// Create a new text segmentor configuration with the given word pattern.
     ///
     /// Will contain an empty list of specials.
-    pub fn from_pattern(word_pattern: RegexWrapperPattern) -> Self {
+    pub fn from_pattern<P>(pattern: P) -> Self
+    where
+        P: Into<RegexWrapperPattern>,
+    {
         Self {
-            pattern: word_pattern,
+            pattern: pattern.into(),
             specials: SpecialWordsTokenVocab::default(),
         }
     }
 
     /// Set the split pattern for the text segmentor configuration.
-    pub fn with_pattern(
+    pub fn with_pattern<P>(
         self,
-        pattern: RegexWrapperPattern,
-    ) -> Self {
-        Self { pattern, ..self }
+        pattern: P,
+    ) -> Self
+    where
+        P: Into<RegexWrapperPattern>,
+    {
+        Self {
+            pattern: pattern.into(),
+            ..self
+        }
     }
 
     /// Replace special tokens vocabulary.
@@ -80,11 +89,7 @@ impl<T: TokenType> SegmentationConfig<T> {
     }
 
     /// Get the special tokens vocabulary for the text segmentor configuration.
-    pub fn special_vocab(&self) -> Option<&SpecialWordsTokenVocab<T>> {
-        if self.specials.is_empty() {
-            None
-        } else {
-            Some(&self.specials)
-        }
+    pub fn special_vocab(&self) -> &SpecialWordsTokenVocab<T> {
+        &self.specials
     }
 }

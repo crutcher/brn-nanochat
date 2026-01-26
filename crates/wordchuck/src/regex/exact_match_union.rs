@@ -1,6 +1,6 @@
 //! Exact Match Union Patterns
 
-use crate::regex::regex_wrapper::{RegexWrapper, RegexWrapperPattern};
+use crate::regex::regex_wrapper::RegexWrapperPattern;
 
 /// Create a union pattern of exact matches.
 ///
@@ -13,16 +13,10 @@ pub fn exact_match_union_regex_pattern<S: AsRef<str>>(alts: &[S]) -> RegexWrappe
     RegexWrapperPattern::Basic(format!("({})", parts.join("|")))
 }
 
-/// Create a union pattern of exact matches, compiled into a [`RegexWrapper`].
-///
-/// See: [`exact_match_union_regex_pattern`]
-pub fn exact_match_union_regex_wrapper<S: AsRef<str>>(alts: &[S]) -> RegexWrapper {
-    exact_match_union_regex_pattern(alts).compile().unwrap()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::regex::RegexWrapper;
 
     #[test]
     fn test_fixed_alternative_list() {
@@ -31,7 +25,9 @@ mod tests {
         let pattern = exact_match_union_regex_pattern(&alternatives);
         assert_eq!(pattern.as_str(), r"(apple|\[x\]|boat)");
 
-        let re = exact_match_union_regex_wrapper(&alternatives);
+        let re: RegexWrapper = exact_match_union_regex_pattern(&alternatives)
+            .compile()
+            .unwrap();
 
         let text = "apple 123 [x] xyz boat";
         assert_eq!(re.find_iter(text).count(), 3);

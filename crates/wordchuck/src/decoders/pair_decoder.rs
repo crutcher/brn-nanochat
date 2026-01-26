@@ -85,6 +85,7 @@ mod tests {
     use super::*;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
+    use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::byte_table::ByteTokenTable;
@@ -118,7 +119,7 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 
         let decoder =
             PairExpansionDecoder::from_pair_map(byte_table.clone(), &vocab.pair_vocab.pairs());

@@ -391,6 +391,7 @@ mod tests {
     use crate::decoders::token_decoder::TokenDecoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
+    use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::TokenVocabIndex;
@@ -441,7 +442,7 @@ mod tests {
 
         let vocab: UnifiedTokenVocab<T> = trainer.train(byte_table.clone()).unwrap();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone().into());
+        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone().into(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

@@ -16,6 +16,7 @@
 //! use wordchuck::encoders::UnifiedVocabEncoder;
 //! use wordchuck::decoders::DictionaryDecoder;
 //! use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
+//! use wordchuck::regex::default_regex_supplier;
 //! use std::sync::Arc;
 //!
 //! fn example<I, S>(
@@ -61,7 +62,9 @@
 //!         println!("- tiktoken vocab: {path:?}");
 //!     }
 //!
-//!     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(vocab.clone());
+//!     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(
+//!         vocab.clone(),
+//!         default_regex_supplier);
 //!     let encoder = ParallelRayonEncoder::new(encoder);
 //!
 //!     let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
