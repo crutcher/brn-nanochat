@@ -18,6 +18,16 @@ pub enum WordRef<'a> {
     Special(&'a str),
 }
 
+impl<'a> WordRef<'a> {
+    /// Get the inner string slice.
+    pub fn as_str(&self) -> &'a str {
+        match self {
+            WordRef::Normal(s) => s,
+            WordRef::Special(s) => s,
+        }
+    }
+}
+
 impl<T: TokenType> From<SegmentationConfig<T>> for TextSegmentor {
     fn from(config: SegmentationConfig<T>) -> Self {
         Self::from_config(config)
@@ -151,6 +161,17 @@ impl TextSegmentor {
 
         self.split_append_words(text, &mut words);
         words
+    }
+
+    /// Rewrite text by segmenting and de-segmenting it.
+    pub fn rewrite<S: AsRef<str>>(
+        &self,
+        text: S,
+    ) -> String {
+        let text = text.as_ref();
+        let mut words = Vec::new();
+        self.split_append_words(text, &mut words);
+        words.into_iter().map(|w| w.as_str()).collect()
     }
 }
 

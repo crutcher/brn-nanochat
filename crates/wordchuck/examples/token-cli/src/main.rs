@@ -8,6 +8,7 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::RegexWrapperPattern;
+use wordchuck::segmentation::TextSegmentor;
 use wordchuck::types::SpanTokenMap;
 use wordchuck::vocab::io::tiktoken_io::load_span_map_from_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT2_R50K_WORD_PATTERN;
@@ -186,6 +187,8 @@ fn run_load(
     let num_batches1 = token_batches.len();
     println!("Timing Decode:");
 
+    let segmentor: TextSegmentor = vocab.segmentation.clone().into();
+
     let batch_times_ns = sample_batches
         .iter()
         .zip(token_batches.iter())
@@ -194,7 +197,11 @@ fn run_load(
             let decoded_sample = decoder.try_decode_batch_to_strings(batch).unwrap();
             let t1 = std::time::Instant::now();
 
-            let score = batch_score(&decoded_sample, sample);
+            let expected = sample
+                .iter()
+                .map(|s| segmentor.rewrite(s))
+                .collect::<Vec<_>>();
+            let score = batch_score(&decoded_sample, &expected);
             println!("- sample score: {:}", score);
 
             let delay = t1.duration_since(t0);
