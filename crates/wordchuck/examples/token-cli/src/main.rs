@@ -6,7 +6,7 @@ use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
 use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
-use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
+use wordchuck::encoders::{MergeHeapVocabEncoder, TokenEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::{RegexWrapperPattern, regex_pool_supplier};
 use wordchuck::segmentation::{SegmentationConfig, TextSegmentor};
@@ -84,11 +84,11 @@ fn run_load(
     let vocab: Arc<UnifiedTokenVocab<T>> =
         UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();
 
-    let encoder: UnifiedVocabEncoder<T> =
-        UnifiedVocabEncoder::<T>::init(vocab.clone(), regex_pool_supplier);
+    let encoder: MergeHeapVocabEncoder<T> =
+        MergeHeapVocabEncoder::<T>::init(vocab.clone(), regex_pool_supplier);
     let encoder = ParallelRayonEncoder::new(encoder);
 
-    let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
+    let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
     let decoder = ParallelRayonDecoder::new(decoder);
 
     let shards: Vec<usize> = vec![0];

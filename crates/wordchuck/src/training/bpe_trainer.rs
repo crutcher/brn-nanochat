@@ -389,8 +389,8 @@ where
 mod tests {
     use crate::decoders::DictionaryDecoder;
     use crate::decoders::token_decoder::TokenDecoder;
+    use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
@@ -440,15 +440,15 @@ mod tests {
 
         let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
-        let vocab: UnifiedTokenVocab<T> = trainer.train(byte_table.clone()).unwrap();
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_table.clone()).unwrap().into();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone().into(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
         assert_eq!(encoder.max_token(), 292);
 
-        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
+        let decoder = DictionaryDecoder::from_unified_vocab(vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

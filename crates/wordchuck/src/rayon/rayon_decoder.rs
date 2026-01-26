@@ -83,7 +83,7 @@ where
 mod tests {
     use super::*;
     use crate::decoders::DictionaryDecoder;
-    use crate::encoders::UnifiedVocabEncoder;
+    use crate::encoders::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
@@ -120,9 +120,9 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 
-        let decoder = ParallelRayonDecoder::new(DictionaryDecoder::new(vocab.unified_dictionary()));
+        let decoder = ParallelRayonDecoder::new(DictionaryDecoder::from_unified_vocab(vocab));
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

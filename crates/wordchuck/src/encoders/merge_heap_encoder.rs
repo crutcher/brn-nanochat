@@ -11,7 +11,7 @@ use alloc::sync::Arc;
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
-pub struct UnifiedVocabEncoder<T: TokenType> {
+pub struct MergeHeapVocabEncoder<T: TokenType> {
     /// Data for the encoders.
     pub data: Arc<UnifiedTokenVocab<T>>,
 
@@ -19,7 +19,7 @@ pub struct UnifiedVocabEncoder<T: TokenType> {
     pub segmentor: TextSegmentor,
 }
 
-impl<T: TokenType> UnifiedVocabEncoder<T> {
+impl<T: TokenType> MergeHeapVocabEncoder<T> {
     /// Construct an encoder from data.
     pub fn init<F>(
         data: Arc<UnifiedTokenVocab<T>>,
@@ -59,7 +59,7 @@ impl<T: TokenType> UnifiedVocabEncoder<T> {
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
+impl<T: TokenType> TokenVocabIndex<T> for MergeHeapVocabEncoder<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
         self.data.unordered_tokens_iter()
     }
@@ -69,7 +69,7 @@ impl<T: TokenType> TokenVocabIndex<T> for UnifiedVocabEncoder<T> {
     }
 }
 
-impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
+impl<T: TokenType> TokenEncoder<T> for MergeHeapVocabEncoder<T> {
     fn pattern(&self) -> String {
         self.data.segmentation.pattern()
     }
@@ -173,8 +173,8 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
 mod tests {
     use crate::decoders::DictionaryDecoder;
     use crate::decoders::token_decoder::TokenDecoder;
+    use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
@@ -213,13 +213,13 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
         assert_eq!(encoder.max_token(), 3000);
 
-        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
+        let decoder = DictionaryDecoder::from_unified_vocab(vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

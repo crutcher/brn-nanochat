@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
-use wordchuck::encoders::{TokenEncoder, UnifiedVocabEncoder};
+use wordchuck::encoders::{MergeHeapVocabEncoder, TokenEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::default_regex_supplier;
 use wordchuck::training::BinaryPairVocabTrainerOptions;
@@ -134,11 +134,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     if args.time_encode_decode {
-        let encoder: UnifiedVocabEncoder<T> =
-            UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder: MergeHeapVocabEncoder<T> =
+            MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         let encoder = ParallelRayonEncoder::new(encoder);
 
-        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
+        let decoder = DictionaryDecoder::from_unified_vocab(vocab);
         let decoder = ParallelRayonDecoder::new(decoder);
 
         let mut samples = Vec::new();

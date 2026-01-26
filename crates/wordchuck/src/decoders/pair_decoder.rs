@@ -2,8 +2,8 @@
 
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
-use crate::types::{PairTokenMap, TokenToPairMap, TokenType};
-use crate::vocab::{ByteTokenTable, TokenVocabIndex};
+use crate::types::{TokenToPairMap, TokenType};
+use crate::vocab::{ByteTokenTable, PairTokenMapVocab, TokenVocabIndex};
 use std::sync::Arc;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
@@ -31,20 +31,14 @@ impl<T: TokenType> PairExpansionDecoder<T> {
         }
     }
 
-    /// Build a [`PairExpansionDecoder`] from this [`TokenDecoder`].
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(merge_map)))]
-    pub fn from_pair_map<B>(
-        byte_table: B,
-        pair_map: &PairTokenMap<T>,
-    ) -> Self
-    where
-        B: Into<Arc<ByteTokenTable<T>>>,
-    {
-        let token_map = pair_map
+    /// Build a [`PairExpansionDecoder`] from this [`PairTokenMapVocab`].
+    pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
+        let token_map = pair_vocab
+            .pairs()
             .iter()
             .map(|(&pair, &token)| (token, pair))
             .collect();
-        Self::new(byte_table, token_map)
+        Self::new(pair_vocab.byte_table().clone(), token_map)
     }
 
     /// Get the byte table.
@@ -83,8 +77,8 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
@@ -119,10 +113,9 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 
-        let decoder =
-            PairExpansionDecoder::from_pair_map(byte_table.clone(), &vocab.pair_vocab.pairs());
+        let decoder = PairExpansionDecoder::from_pair_vocab(&vocab.pair_vocab);
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
