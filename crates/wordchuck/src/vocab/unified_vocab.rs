@@ -1,11 +1,9 @@
 //! # Unified Token Vocabulary
 
-use crate::regex::RegexWrapperPattern;
 use crate::segmentation::segmentation_config::SegmentationConfig;
-use crate::types::TokenType;
+use crate::types::{SpanTokenMap, TokenType};
 use crate::vocab::pair_vocab::PairTokenMapVocab;
 use crate::vocab::span_vocab::SpanTokenVocab;
-use crate::vocab::special_vocab::SpecialWordsTokenVocab;
 use crate::vocab::vocab_index::TokenVocabIndex;
 use ahash::{AHashMap, AHashSet};
 
@@ -23,67 +21,75 @@ pub struct UnifiedTokenVocab<T: TokenType> {
 }
 
 impl<T: TokenType> UnifiedTokenVocab<T> {
-    /// Create a new default token vocabulary.
-    ///
-    /// # Arguments
-    /// * `word_pattern`: Regex pattern for word splitting.
-    pub fn new(word_pattern: RegexWrapperPattern) -> Self {
-        let segmentation = SegmentationConfig::from_pattern(word_pattern);
+    /// Build a new [`UnifiedTokenVocab`] from a [`SpanTokenVocab`].
+    pub fn from_span_vocab(
+        segmentation: SegmentationConfig<T>,
+        span_vocab: SpanTokenVocab<T>,
+    ) -> Self {
+        let pair_vocab = span_vocab.to_pair_vocab();
+        Self::init(segmentation, span_vocab, pair_vocab)
+    }
+
+    /// Build a new [`UnifiedTokenVocab`] from a [`PairTokenMapVocab`].
+    pub fn from_pair_vocab(
+        segmentation: SegmentationConfig<T>,
+        pair_vocab: PairTokenMapVocab<T>,
+    ) -> Self {
+        let word_vocab = pair_vocab
+            .to_span_pairs()
+            .collect::<SpanTokenMap<T>>()
+            .into();
+        Self::from_span_vocab(segmentation, word_vocab)
+    }
+
+    /// Initialize a [`UnifiedTokenVocab`].
+    pub fn init(
+        segmentation: SegmentationConfig<T>,
+        word_vocab: SpanTokenVocab<T>,
+        pair_vocab: PairTokenMapVocab<T>,
+    ) -> Self {
+        assert_eq!(word_vocab.byte_table(), pair_vocab.byte_table());
+
+        let tokens = word_vocab.unordered_tokens_iter().collect::<AHashSet<_>>();
+        for ((a, b), c) in pair_vocab.pairs() {
+            for t in [a, b, c].iter() {
+                assert!(
+                    tokens.contains(t),
+                    "pair token {t:?} not found in word vocab"
+                );
+            }
+        }
+        for t in segmentation.specials.unordered_tokens_iter() {
+            assert!(
+                !tokens.contains(&t),
+                "special token {t:?} found in word vocab"
+            );
+        }
 
         Self {
             segmentation,
-            word_vocab: Default::default(),
-            pair_vocab: Default::default(),
+            word_vocab,
+            pair_vocab,
         }
     }
 
-    /// Mutable reference to the special tokens vocabulary.
-    ///
-    /// Will create the vocabulary if it doesn't exist.
-    pub fn specials_vocab_mut(&mut self) -> &mut SpecialWordsTokenVocab<T> {
-        &mut self.segmentation.specials
-    }
-
-    /// Replace the word-split regex pattern.
-    pub fn with_word_pattern(
+    /// Extend the vocabulary with the given special words.
+    pub fn with_special_words<W, S>(
         self,
-        word_pattern: RegexWrapperPattern,
-    ) -> Self {
+        special_words: W,
+    ) -> Self
+    where
+        W: IntoIterator<Item = (S, T)>,
+        S: AsRef<str>,
+    {
         Self {
-            segmentation: self.segmentation.with_word_pattern(word_pattern),
+            segmentation: self.segmentation.with_special_words(special_words),
             ..self
         }
-    }
-
-    /// Replace special tokens vocabulary.
-    pub fn with_specials(
-        self,
-        specials: Option<SpecialWordsTokenVocab<T>>,
-    ) -> Self {
-        Self {
-            segmentation: self.segmentation.with_specials(specials),
-            ..self
-        }
-    }
-
-    /// Replace the binary-pair vocabulary.
-    pub fn with_pair_vocab(
-        self,
-        pair_vocab: PairTokenMapVocab<T>,
-    ) -> Self {
-        Self { pair_vocab, ..self }
-    }
-
-    /// Replace the word vocabulary.
-    pub fn with_word_vocab(
-        self,
-        word_vocab: SpanTokenVocab<T>,
-    ) -> Self {
-        Self { word_vocab, ..self }
     }
 
     /// Compiled expansion dictionary.
-    pub fn compiled_dictionary(&self) -> AHashMap<T, Vec<u8>> {
+    pub fn unified_dictionary(&self) -> AHashMap<T, Vec<u8>> {
         let mut tmp = AHashMap::default();
 
         self.word_vocab.iter().for_each(|(chunk, &token)| {
@@ -111,8 +117,8 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
 impl<T: TokenType> TokenVocabIndex<T> for UnifiedTokenVocab<T> {
     fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        let mut tokens: AHashSet<T> = self.pair_vocab.unordered_tokens_iter().collect();
-        tokens.extend(self.word_vocab.unordered_tokens_iter());
-        tokens.into_iter()
+        self.word_vocab
+            .unordered_tokens_iter()
+            .chain(self.segmentation.specials.unordered_tokens_iter())
     }
 }

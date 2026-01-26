@@ -140,6 +140,16 @@ where
     pub span_counter: TextSpanCounter<K, C>,
 }
 
+/// Basic binary pair train results.
+#[derive(Debug, Clone)]
+pub struct TrainResults<T: TokenType> {
+    /// The trained vocab's word split pattern.
+    pub pattern: RegexWrapperPattern,
+
+    /// The trained vocab's byte/token mapping table.
+    pub pair_vocab: PairTokenMapVocab<T>,
+}
+
 impl<K, C> BinaryPairVocabTrainer<K, C>
 where
     K: StringChunkType,
@@ -194,14 +204,11 @@ where
     ///
     /// # Arguments
     /// * `byte_table` - the byte/token mapping table to use for training.
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(skip(self, words, word_counts))
-    )]
-    pub fn train<T, B>(
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_table)))]
+    fn train_basic_pairs<T, B>(
         self,
         byte_table: B,
-    ) -> anyhow::Result<UnifiedTokenVocab<T>>
+    ) -> anyhow::Result<TrainResults<T>>
     where
         T: TokenType,
         C: CountType,
@@ -339,13 +346,42 @@ where
         pairs.shrink_to_fit();
 
         let pair_vocab: PairTokenMapVocab<T> =
-            PairTokenMapVocab::<T>::init(byte_table, pairs).unwrap();
-
-        let vocab = UnifiedTokenVocab::<T>::new(self.options.pattern).with_pair_vocab(pair_vocab);
+            PairTokenMapVocab::<T>::init(byte_table.clone(), pairs).unwrap();
 
         log::info!("Finished training: {} merges completed", merges_done);
+        Ok(TrainResults {
+            pattern: self.options.pattern,
+            pair_vocab,
+        })
+    }
 
-        Ok(vocab)
+    /// Trains [`UnifiedTokenVocab<T>`].
+    ///
+    /// The resulting vocab will contain:
+    /// * the trainer's word split pattern,
+    /// * a ``{(T, T) -> T}`` pair map vocab with the learned binary pair merges,
+    /// * a ``{Vec<u8> -> T}`` word map that is empty.
+    ///
+    /// # Parameters
+    /// * `T` - the [`TokenType`] of the trained vocab.
+    ///
+    /// # Arguments
+    /// * `byte_table` - the byte/token mapping table to use for training.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_table)))]
+    pub fn train<T, B>(
+        self,
+        byte_table: B,
+    ) -> anyhow::Result<UnifiedTokenVocab<T>>
+    where
+        T: TokenType,
+        C: CountType,
+        B: Into<Arc<ByteTokenTable<T>>>,
+    {
+        let results = self.train_basic_pairs(byte_table)?;
+        Ok(UnifiedTokenVocab::from_pair_vocab(
+            results.pattern.into(),
+            results.pair_vocab,
+        ))
     }
 }
 
@@ -411,7 +447,7 @@ mod tests {
 
         assert_eq!(encoder.max_token(), 292);
 
-        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 

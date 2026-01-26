@@ -64,7 +64,7 @@
 //!     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
 //!     let encoder = ParallelRayonEncoder::new(encoder);
 //!
-//!     let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+//!     let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
 //!     let decoder = ParallelRayonDecoder::new(decoder);
 //! }
 //! ```

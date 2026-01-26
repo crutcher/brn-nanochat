@@ -165,9 +165,9 @@ mod tests {
     use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::TokenVocabIndex;
     use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
+    use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
     use alloc::sync::Arc;
     use compact_str::CompactString;
 
@@ -190,19 +190,23 @@ mod tests {
 
         let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
 
-        let mut vocab = trainer.train(byte_table.clone()).unwrap();
+        let vocab = trainer.train(byte_table.clone()).unwrap();
 
-        vocab.specials_vocab_mut().add_str_word("<|HI|>", 3000);
+        let mut seg = vocab.segmentation.clone();
+        seg.add_str_word("<|HI|>", 3000);
+
+        let vocab: Arc<UnifiedTokenVocab<T>> =
+            UnifiedTokenVocab::init(seg, vocab.word_vocab, vocab.pair_vocab).into();
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone().into());
+        let encoder = UnifiedVocabEncoder::<T>::new(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 
-        assert_eq!(encoder.max_token(), 292);
+        assert_eq!(encoder.max_token(), 3000);
 
-        let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
