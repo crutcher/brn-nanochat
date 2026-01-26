@@ -2,7 +2,7 @@
 
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::regex::{RegexSupplierHandle, RegexWrapperHandle};
-use crate::segmentation::text_segmentor::{SpanRef, TextSegmentor};
+use crate::segmentation::text_segmentor::TextSegmentor;
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
@@ -15,7 +15,7 @@ pub struct MergeHeapVocabEncoder<T: TokenType> {
     pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Text Segmentor.
-    pub segmentor: TextSegmentor,
+    pub segmentor: Arc<TextSegmentor>,
 }
 
 impl<T: TokenType> MergeHeapVocabEncoder<T> {
@@ -27,13 +27,13 @@ impl<T: TokenType> MergeHeapVocabEncoder<T> {
     where
         F: Fn(RegexWrapperHandle) -> RegexSupplierHandle,
     {
-        let segmentor = TextSegmentor::from_config(data.segmentation.clone(), re_factory);
+        let segmentor = TextSegmentor::from_config(data.segmentation.clone(), re_factory).into();
 
         Self { data, segmentor }
     }
 
     /// Compiler Hint.
-    fn lookup_token(
+    fn lookup_normal_token(
         &self,
         span: &[u8],
     ) -> Option<T> {
@@ -59,28 +59,22 @@ impl<T: TokenType> MergeHeapVocabEncoder<T> {
 }
 
 impl<T: TokenType> TokenEncoder<T> for MergeHeapVocabEncoder<T> {
-    fn pattern(&self) -> String {
-        self.data.segmentation.pattern()
+    fn segmentor(&self) -> &Arc<TextSegmentor> {
+        &self.segmentor
     }
 
     fn special_vocab(&self) -> &SpecialVocab<T> {
         self.data.segmentation.special_vocab()
     }
 
-    fn split_spans<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<SpanRef<'a>> {
-        self.segmentor.split_spans(text)
-    }
-
-    fn encode_append_span(
+    fn encode_append_span_normal(
         &self,
         span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        // Correctness-wise - Some words may not exist in the pair mappings.
-        if let Some(token) = self.lookup_token(span) {
+        if let Some(token) = self.lookup_normal_token(span) {
+            // 1. Faster;
+            // 2. Correct-or: Some words may not exist in the pair mappings.
             tokens.push(token);
             return;
         }

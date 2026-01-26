@@ -1,9 +1,10 @@
 //! # Parallel Encoder
 
 use crate::encoders::TokenEncoder;
-use crate::segmentation::text_segmentor::SpanRef;
+use crate::segmentation::TextSegmentor;
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;
+use std::sync::Arc;
 
 /// Batch-Level Parallel Encoder Wrapper.
 ///
@@ -35,27 +36,20 @@ where
     T: TokenType,
     D: TokenEncoder<T>,
 {
-    fn pattern(&self) -> String {
-        self.inner.pattern()
+    fn segmentor(&self) -> &Arc<TextSegmentor> {
+        self.inner.segmentor()
     }
 
     fn special_vocab(&self) -> &SpecialVocab<T> {
         self.inner.special_vocab()
     }
 
-    fn split_spans<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<SpanRef<'a>> {
-        self.inner.split_spans(text)
-    }
-
-    fn encode_append_span(
+    fn encode_append_span_normal(
         &self,
         span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        self.inner.encode_append_span(span, tokens)
+        self.inner.encode_append_span_normal(span, tokens)
     }
 
     fn encode_batch(
