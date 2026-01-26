@@ -7446,6 +7446,7 @@ dependencies = [
  "nanochat-data",
  "parquet",
  "rayon",
+ "similar",
  "wordchuck",
 ]
 

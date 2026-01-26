@@ -1,7 +1,7 @@
 use arrow::array::StringArray;
 use clap::Parser;
-use edit_distance::edit_distance;
 use nanochat_data::dataset::DatasetCacheConfig;
+use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
 use std::time::Duration;
 use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
@@ -203,8 +203,21 @@ fn run_load(
                 .map(|s| String::from_utf8_lossy(segmentor.rewrite(s).as_bytes()).to_string())
                 .collect::<Vec<_>>();
 
-            let score = batch_score(&decoded_sample, &expected);
-            println!("- sample score: {:}", score);
+            for (s, d) in expected.iter().zip(decoded_sample.iter()) {
+                if s != d {
+                    let diff = TextDiff::from_lines(s, d);
+
+                    for change in diff.iter_all_changes() {
+                        let sign = match change.tag() {
+                            ChangeTag::Delete => "-",
+                            ChangeTag::Insert => "+",
+                            ChangeTag::Equal => " ",
+                        };
+                        print!("{}{}", sign, change);
+                    }
+                    panic!("MISMATCH");
+                }
+            }
 
             let delay = t1.duration_since(t0);
             delay.as_nanos() as u64
@@ -221,6 +234,7 @@ fn run_load(
     Ok(())
 }
 
+/*
 pub fn batch_score(
     actual: &[String],
     expected: &[String],
@@ -250,5 +264,6 @@ pub fn edit_score(
     let distance = edit_distance(actual, expected);
     let size = expected.len();
 
-    (size as isize - distance as isize).abs() as f64 / ((size + 1) as f64)
+    (size as isize - distance as isize).abs() as f64 / (size as f64)
 }
+*/
