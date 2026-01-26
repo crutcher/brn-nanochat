@@ -1,6 +1,6 @@
 //! # Byte Decoder
 //!
-//! Mainly used for testing.
+//! Mainly used for utility.
 
 use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;

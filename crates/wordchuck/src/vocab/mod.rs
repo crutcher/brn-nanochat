@@ -6,8 +6,8 @@ pub mod pair_vocab;
 pub mod public;
 pub mod span_vocab;
 pub mod special_vocab;
-pub mod tooling;
 pub mod unified_vocab;
+pub mod utility;
 pub mod vocab_index;
 
 pub use byte_table::ByteTokenTable;

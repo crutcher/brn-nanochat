@@ -1,7 +1,7 @@
 //! # Pair Map ``{ (T, T) -> T }`` Token Vocabulary
 
 use crate::decoders::TokenDecoder;
-use crate::decoders::pair_decoder::PairExpansionDecoder;
+use crate::decoders::utility::pair_decoder::PairExpansionDecoder;
 use crate::types::{Pair, PairTokenMap, TokenType};
 use crate::vocab::byte_table::ByteTokenTable;
 use crate::vocab::vocab_index::TokenVocabIndex;

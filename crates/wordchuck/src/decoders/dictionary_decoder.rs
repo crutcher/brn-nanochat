@@ -63,7 +63,7 @@ mod tests {
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::byte_table::ByteTokenTable;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::tooling::testing::build_test_vocab;
+    use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
 
     #[test]

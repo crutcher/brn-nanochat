@@ -75,7 +75,7 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoders::byte_decoder::ByteDecoder;
+    use crate::decoders::utility::byte_decoder::ByteDecoder;
     use num_traits::FromPrimitive;
 
     #[test]
