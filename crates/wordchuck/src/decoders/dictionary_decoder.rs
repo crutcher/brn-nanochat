@@ -3,7 +3,7 @@
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenToWordMap, TokenType};
-use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+use crate::vocab::UnifiedTokenVocab;
 
 /// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -26,12 +26,6 @@ impl<T: TokenType> DictionaryDecoder<T> {
     /// Creates a new Decoder.
     pub fn init(token_to_word: TokenToWordMap<T>) -> Self {
         Self { token_to_word }
-    }
-}
-
-impl<T: TokenType> TokenVocabIndex<T> for DictionaryDecoder<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.token_to_word.keys().copied()
     }
 }
 
@@ -61,7 +55,7 @@ mod tests {
     use crate::regex::default_regex_supplier;
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_table::ByteTokenTable;
+    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
@@ -76,19 +70,17 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
         let segmentation = SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN);
 
         let vocab: Arc<UnifiedTokenVocab<T>> =
-            build_test_vocab(byte_table.clone(), segmentation).into();
+            build_test_vocab(byte_vocab.clone(), segmentation).into();
 
         let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 
         let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
         check_is_send(&decoder);
         check_is_sync(&decoder);
-
-        assert_eq!(decoder.max_token(), vocab.max_token());
 
         for sample in samples {
             let tokens = encoder.encode(sample);

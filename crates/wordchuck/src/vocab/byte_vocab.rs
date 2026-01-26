@@ -1,7 +1,7 @@
 //! # Byte/Token Mapping Table
 
 use crate::types::TokenType;
-use crate::vocab::TokenVocabIndex;
+use crate::vocab::TokenVocab;
 use ahash::AHashMap;
 use core::fmt::Debug;
 
@@ -11,7 +11,7 @@ use core::fmt::Debug;
 /// The token values are not required to be dense, or in the range ``0..=255``.
 /// This is required to be a bijection (255 distinct tokens).
 #[derive(Clone, PartialEq)]
-pub struct ByteTokenTable<T: TokenType> {
+pub struct ByteVocab<T: TokenType> {
     /// Hash map from token to byte ordinal value.
     token_to_byte: AHashMap<T, u8>,
 
@@ -19,7 +19,7 @@ pub struct ByteTokenTable<T: TokenType> {
     byte_to_token: [T; 256],
 }
 
-impl<T: TokenType> Debug for ByteTokenTable<T> {
+impl<T: TokenType> Debug for ByteVocab<T> {
     fn fmt(
         &self,
         f: &mut core::fmt::Formatter<'_>,
@@ -31,7 +31,7 @@ impl<T: TokenType> Debug for ByteTokenTable<T> {
     }
 }
 
-impl<T: TokenType> Default for ByteTokenTable<T> {
+impl<T: TokenType> Default for ByteVocab<T> {
     fn default() -> Self {
         let byte_to_token = (0..256)
             .map(|i| T::from_usize(i).unwrap())
@@ -40,7 +40,7 @@ impl<T: TokenType> Default for ByteTokenTable<T> {
     }
 }
 
-impl<T: TokenType> ByteTokenTable<T> {
+impl<T: TokenType> ByteVocab<T> {
     /// Build a `ByteTable` from a byte-ord => token table.
     ///
     /// # Panics
@@ -130,19 +130,18 @@ impl<T: TokenType> ByteTokenTable<T> {
     ) -> Option<u8> {
         self.token_to_byte.get(&token).copied()
     }
+}
 
-    /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
-    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+impl<T: TokenType> TokenVocab<T> for ByteVocab<T> {
+    fn unordered_tokens(&self) -> impl Iterator<Item = T> {
+        self.byte_to_token.iter().copied()
+    }
+
+    fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
         self.byte_to_token
             .iter()
             .enumerate()
             .map(|(idx, &token)| (vec![idx as u8], token))
-    }
-}
-
-impl<T: TokenType> TokenVocabIndex<T> for ByteTokenTable<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.byte_to_token.iter().copied()
     }
 }
 
@@ -152,9 +151,9 @@ mod tests {
     use num_traits::FromPrimitive;
 
     #[test]
-    fn test_byte_table_default() {
+    fn test_byte_vocab_default() {
         type T = u32;
-        let table: ByteTokenTable<T> = ByteTokenTable::default();
+        let table: ByteVocab<T> = ByteVocab::default();
 
         for idx in 0..256 {
             let byte = idx as u8;
@@ -166,13 +165,13 @@ mod tests {
     }
 
     #[test]
-    fn test_byte_table() {
+    fn test_byte_vocab() {
         type T = u32;
         let byte_to_token: Vec<T> = (0..256)
             .map(|i| T::from_usize(i).unwrap() + 100)
             .collect::<Vec<_>>();
 
-        let table: ByteTokenTable<T> = ByteTokenTable::from_byte_to_token(&byte_to_token);
+        let table: ByteVocab<T> = ByteVocab::from_byte_to_token(&byte_to_token);
 
         assert_eq!(table.get_token(0_u8), 100);
         assert_eq!(table.get_token(255_u8), 355);

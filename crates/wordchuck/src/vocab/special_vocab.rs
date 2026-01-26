@@ -1,25 +1,25 @@
 //! # Special Words Vocabulary
 
 use crate::types::{SpanTokenMap, TokenType};
-use crate::vocab::TokenVocabIndex;
+use crate::vocab::TokenVocab;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 ///
 /// This contains no byte:token mappings, or pair mergers.
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct SpecialWordsTokenVocab<T: TokenType> {
+pub struct SpecialVocab<T: TokenType> {
     /// The regex pattern used for text spl
     /// Map of ``{ Vec<u8> -> T }``.
     span_map: SpanTokenMap<T>,
 }
 
-impl<T: TokenType> From<SpanTokenMap<T>> for SpecialWordsTokenVocab<T> {
+impl<T: TokenType> From<SpanTokenMap<T>> for SpecialVocab<T> {
     fn from(span_map: SpanTokenMap<T>) -> Self {
         Self::new(span_map)
     }
 }
 
-impl<T: TokenType> SpecialWordsTokenVocab<T> {
+impl<T: TokenType> SpecialVocab<T> {
     /// Create a new special words vocab.
     pub fn new(span_map: SpanTokenMap<T>) -> Self {
         Self { span_map }
@@ -77,17 +77,16 @@ impl<T: TokenType> SpecialWordsTokenVocab<T> {
     ) -> Option<T> {
         self.span_map.get(chunk).copied()
     }
+}
 
-    /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
-    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+impl<T: TokenType> TokenVocab<T> for SpecialVocab<T> {
+    fn unordered_tokens(&self) -> impl Iterator<Item = T> {
+        self.span_map.values().copied()
+    }
+
+    fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
         self.span_map
             .iter()
             .map(|(chunk, &token)| (chunk.clone(), token))
-    }
-}
-
-impl<T: TokenType> TokenVocabIndex<T> for SpecialWordsTokenVocab<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.span_map.values().copied()
     }
 }

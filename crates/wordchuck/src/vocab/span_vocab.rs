@@ -1,34 +1,34 @@
 //! # Word Map ``{ Vec<u8> -> T }`` Token Vocabulary
 
 use crate::types::{SpanTokenMap, TokenType};
-use crate::vocab::{ByteTokenTable, PairTokenMapVocab, TokenVocabIndex};
+use crate::vocab::{ByteVocab, PairMapVocab, TokenVocab};
 use ahash::AHashMap;
 use alloc::sync::Arc;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SpanTokenVocab<T: TokenType> {
+pub struct SpanMapVocab<T: TokenType> {
     /// The byte/token mapping table.
-    byte_table: Arc<ByteTokenTable<T>>,
+    byte_vocab: Arc<ByteVocab<T>>,
 
     /// The regex pattern used for text spl
     /// Map of ``{ Vec<u8> -> T }``.
     span_map: SpanTokenMap<T>,
 }
 
-impl<T: TokenType> Default for SpanTokenVocab<T> {
+impl<T: TokenType> Default for SpanMapVocab<T> {
     fn default() -> Self {
-        SpanTokenVocab::from_byte_table(Arc::new(ByteTokenTable::default()))
+        SpanMapVocab::from_byte_vocab(Arc::new(ByteVocab::default()))
     }
 }
 
-impl<T: TokenType> From<SpanTokenMap<T>> for SpanTokenVocab<T> {
+impl<T: TokenType> From<SpanTokenMap<T>> for SpanMapVocab<T> {
     fn from(span_map: SpanTokenMap<T>) -> Self {
         Self::from_span_map(span_map)
     }
 }
 
-impl<'a, T: TokenType> IntoIterator for &'a SpanTokenVocab<T> {
+impl<'a, T: TokenType> IntoIterator for &'a SpanMapVocab<T> {
     type Item = (&'a Vec<u8>, &'a T);
 
     type IntoIter = std::collections::hash_map::Iter<'a, Vec<u8>, T>;
@@ -52,15 +52,15 @@ pub fn byte_map_from_span_map<T: TokenType>(span_map: &SpanTokenMap<T>) -> AHash
         .collect()
 }
 
-/// Validate that a [`ByteTokenTable`] and [`SpanTokenVocab`] are compatible.
+/// Validate that a [`ByteVocab`] and [`SpanMapVocab`] are compatible.
 pub fn try_validate_span_map<T>(
-    byte_table: &ByteTokenTable<T>,
+    byte_vocab: &ByteVocab<T>,
     span_map: &SpanTokenMap<T>,
 ) -> anyhow::Result<()>
 where
     T: TokenType,
 {
-    for (span, token) in byte_table.span_pairs() {
+    for (span, token) in byte_vocab.span_pairs() {
         let b = span[0];
 
         if let Some(&map_token) = span_map.get(&span)
@@ -77,28 +77,28 @@ where
     Ok(())
 }
 
-impl<T: TokenType> SpanTokenVocab<T> {
-    /// Build vocabulary from just a [`ByteTokenTable`].
+impl<T: TokenType> SpanMapVocab<T> {
+    /// Build vocabulary from just a [`ByteVocab`].
     ///
     /// Will have 255 span entries, each 1-byte long.
-    pub fn from_byte_table<B>(byte_table: B) -> Self
+    pub fn from_byte_vocab<B>(byte_vocab: B) -> Self
     where
-        B: Into<Arc<ByteTokenTable<T>>>,
+        B: Into<Arc<ByteVocab<T>>>,
     {
-        let byte_table = byte_table.into();
+        let byte_vocab = byte_vocab.into();
 
-        let span_map: SpanTokenMap<T> = byte_table.span_pairs().collect();
+        let span_map: SpanTokenMap<T> = byte_vocab.span_pairs().collect();
 
-        Self::init(byte_table, span_map).unwrap()
+        Self::init(byte_vocab, span_map).unwrap()
     }
 
     /// Build a [`Self`] from a [`SpanTokenMap`].
     ///
-    /// The [`ByteTokenTable`] will be inferred from the [`SpanTokenMap`],
+    /// The [`ByteVocab`] will be inferred from the [`SpanTokenMap`],
     /// and the default ordinal byte to token mappings.
     ///
     /// # Panics
-    /// If the [`ByteTokenTable`] mapping is not 1:1.
+    /// If the [`ByteVocab`] mapping is not 1:1.
     pub fn from_span_map(span_map: SpanTokenMap<T>) -> Self {
         let mut byte_map: AHashMap<u8, T> = byte_map_from_span_map(&span_map);
         for ord in 0..256 {
@@ -113,57 +113,49 @@ impl<T: TokenType> SpanTokenVocab<T> {
         ord_table.sort_by_key(|&(k, _)| k);
         let byte_to_token: Vec<T> = ord_table.into_iter().map(|(_, v)| v).collect();
 
-        let byte_table: Arc<ByteTokenTable<T>> =
-            ByteTokenTable::from_byte_to_token(&byte_to_token).into();
+        let byte_vocab: Arc<ByteVocab<T>> = ByteVocab::from_byte_to_token(&byte_to_token).into();
 
-        Self::init(byte_table, span_map).unwrap()
+        Self::init(byte_vocab, span_map).unwrap()
     }
 
-    /// Build word vocabulary from a [`PairTokenMapVocab<T>`].
-    pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
-        let byte_table: Arc<ByteTokenTable<T>> = pair_vocab.byte_table().clone();
+    /// Build word vocabulary from a [`PairMapVocab<T>`].
+    pub fn from_pair_vocab(pair_vocab: &PairMapVocab<T>) -> Self {
+        let byte_vocab: Arc<ByteVocab<T>> = pair_vocab.byte_vocab().clone();
         let span_map: SpanTokenMap<T> = pair_vocab.span_pairs().collect();
 
-        Self::init(byte_table, span_map).unwrap()
+        Self::init(byte_vocab, span_map).unwrap()
     }
 
-    /// Initialize a [`SpanTokenVocab`].
+    /// Initialize a [`SpanMapVocab`].
     ///
     /// The span map will be the union of the span map,
-    /// and all overrides from the `byte_table`.
+    /// and all overrides from the `byte_vocab`.
     pub fn init<B>(
-        byte_table: B,
+        byte_vocab: B,
         mut span_map: SpanTokenMap<T>,
     ) -> anyhow::Result<Self>
     where
-        B: Into<Arc<ByteTokenTable<T>>>,
+        B: Into<Arc<ByteVocab<T>>>,
     {
-        let byte_table = byte_table.into();
-        try_validate_span_map(&byte_table, &span_map)?;
+        let byte_vocab = byte_vocab.into();
+        try_validate_span_map(&byte_vocab, &span_map)?;
 
-        span_map.extend(byte_table.span_pairs());
+        span_map.extend(byte_vocab.span_pairs());
 
         Ok(Self {
-            byte_table,
+            byte_vocab,
             span_map,
         })
     }
 
     /// Get the byte/token mapping table.
-    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
-        &self.byte_table
+    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+        &self.byte_vocab
     }
 
     /// Get the span => token map.
     pub fn span_map(&self) -> &SpanTokenMap<T> {
         &self.span_map
-    }
-
-    /// Iterate over the span => token pairs.
-    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
-        self.span_map
-            .iter()
-            .map(|(chunk, &token)| (chunk.clone(), token))
     }
 
     /// The number of words in the vocabulary.
@@ -187,15 +179,15 @@ impl<T: TokenType> SpanTokenVocab<T> {
         chunk: &[u8],
     ) -> Option<T> {
         if chunk.len() == 1 {
-            Some(self.byte_table.get_token(chunk[0]))
+            Some(self.byte_vocab.get_token(chunk[0]))
         } else {
             self.span_map.get(chunk).copied()
         }
     }
 
     /// Build a binary pair map from the word vocabulary.
-    pub fn to_pair_vocab(&self) -> PairTokenMapVocab<T> {
-        let byte_table = self.byte_table.clone();
+    pub fn to_pair_vocab(&self) -> PairMapVocab<T> {
+        let byte_vocab = self.byte_vocab.clone();
 
         let mut pairs = AHashMap::default();
 
@@ -205,7 +197,7 @@ impl<T: TokenType> SpanTokenVocab<T> {
             .map(|(chunk, &token)| (token, chunk.as_ref()))
             .collect();
 
-        for token in self.unordered_tokens_iter() {
+        for token in self.unordered_tokens() {
             let span = token_to_span[&token];
             if span.len() <= 1 {
                 continue;
@@ -227,31 +219,37 @@ impl<T: TokenType> SpanTokenVocab<T> {
             }
         }
 
-        PairTokenMapVocab::<T>::init(byte_table, pairs).unwrap()
+        PairMapVocab::<T>::init(byte_vocab, pairs).unwrap()
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for SpanTokenVocab<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+impl<T: TokenType> TokenVocab<T> for SpanMapVocab<T> {
+    fn unordered_tokens(&self) -> impl Iterator<Item = T> {
         self.span_map.values().copied()
+    }
+
+    fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        self.span_map
+            .iter()
+            .map(|(chunk, &token)| (chunk.clone(), token))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vocab::{ByteTokenTable, TokenVocabIndex};
+    use crate::vocab::{ByteVocab, TokenVocab};
 
     #[test]
     fn test_tokens_iter() {
         type T = u32;
 
-        let byte_table: ByteTokenTable<T> = Default::default();
+        let byte_vocab: ByteVocab<T> = Default::default();
 
-        let vocab = SpanTokenVocab::<T>::default();
+        let vocab = SpanMapVocab::<T>::default();
 
-        assert_eq!(vocab.max_token(), byte_table.max_token());
-        assert_eq!(&vocab.sorted_tokens(), &byte_table.sorted_tokens());
+        assert_eq!(vocab.max_token(), byte_vocab.max_token());
+        assert_eq!(&vocab.sorted_tokens(), &byte_vocab.sorted_tokens());
 
         let mut span_map = vocab.span_map().clone();
 
@@ -259,13 +257,13 @@ mod tests {
         span_map.insert("banana".as_bytes().to_vec(), 301);
         span_map.insert("pear".as_bytes().to_vec(), 302);
 
-        let vocab = SpanTokenVocab::from(span_map);
+        let vocab = SpanMapVocab::from(span_map);
 
         assert_eq!(vocab.max_token(), 302);
 
         assert_eq!(
             &vocab.sorted_tokens(),
-            &byte_table
+            &byte_vocab
                 .sorted_tokens()
                 .into_iter()
                 .chain([300_u32, 301, 302].into_iter())
@@ -281,7 +279,7 @@ mod tests {
         span_map.insert("apple".as_bytes().to_vec(), 300);
         span_map.insert("a".as_bytes().to_vec(), 301);
 
-        let vocab = SpanTokenVocab::<T>::from_span_map(span_map);
+        let vocab = SpanMapVocab::<T>::from_span_map(span_map);
 
         assert_eq!(vocab.lookup_token(b"apple"), Some(300));
         assert_eq!(vocab.lookup_token(b"a"), Some(301));
@@ -297,7 +295,7 @@ mod tests {
         span_map.insert("ate".as_bytes().to_vec(), 301);
         span_map.insert("cat".as_bytes().to_vec(), 302);
 
-        let vocab = SpanTokenVocab::from(span_map);
+        let vocab = SpanMapVocab::from(span_map);
 
         let pair_vocab = vocab.to_pair_vocab();
         assert_eq!(

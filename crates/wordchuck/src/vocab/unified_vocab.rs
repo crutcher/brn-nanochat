@@ -2,10 +2,10 @@
 
 use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::{Pair, SpanTokenMap, TokenType};
-use crate::vocab::ByteTokenTable;
-use crate::vocab::pair_vocab::PairTokenMapVocab;
-use crate::vocab::span_vocab::SpanTokenVocab;
-use crate::vocab::vocab_index::TokenVocabIndex;
+use crate::vocab::ByteVocab;
+use crate::vocab::pair_vocab::PairMapVocab;
+use crate::vocab::span_vocab::SpanMapVocab;
+use crate::vocab::token_vocab::TokenVocab;
 use ahash::{AHashMap, AHashSet};
 use std::sync::Arc;
 
@@ -16,26 +16,26 @@ pub struct UnifiedTokenVocab<T: TokenType> {
     pub segmentation: SegmentationConfig<T>,
 
     /// ``{ Vec<u8> -> T }`` vocabulary.
-    pub span_vocab: SpanTokenVocab<T>,
+    pub span_vocab: SpanMapVocab<T>,
 
     /// ``{ (T, T) -> T }`` vocabulary.
-    pub pair_vocab: PairTokenMapVocab<T>,
+    pub pair_vocab: PairMapVocab<T>,
 }
 
 impl<T: TokenType> UnifiedTokenVocab<T> {
-    /// Build a new [`UnifiedTokenVocab`] from a [`SpanTokenVocab`].
+    /// Build a new [`UnifiedTokenVocab`] from a [`SpanMapVocab`].
     pub fn from_span_vocab(
         segmentation: SegmentationConfig<T>,
-        span_vocab: SpanTokenVocab<T>,
+        span_vocab: SpanMapVocab<T>,
     ) -> Self {
         let pair_vocab = span_vocab.to_pair_vocab();
         Self::init(segmentation, span_vocab, pair_vocab)
     }
 
-    /// Build a new [`UnifiedTokenVocab`] from a [`PairTokenMapVocab`].
+    /// Build a new [`UnifiedTokenVocab`] from a [`PairMapVocab`].
     pub fn from_pair_vocab(
         segmentation: SegmentationConfig<T>,
-        pair_vocab: PairTokenMapVocab<T>,
+        pair_vocab: PairMapVocab<T>,
     ) -> Self {
         let word_vocab = pair_vocab.span_pairs().collect::<SpanTokenMap<T>>().into();
         Self::from_span_vocab(segmentation, word_vocab)
@@ -44,12 +44,12 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Initialize a [`UnifiedTokenVocab`].
     pub fn init(
         segmentation: SegmentationConfig<T>,
-        word_vocab: SpanTokenVocab<T>,
-        pair_vocab: PairTokenMapVocab<T>,
+        word_vocab: SpanMapVocab<T>,
+        pair_vocab: PairMapVocab<T>,
     ) -> Self {
-        assert_eq!(word_vocab.byte_table(), pair_vocab.byte_table());
+        assert_eq!(word_vocab.byte_vocab(), pair_vocab.byte_vocab());
 
-        let tokens = word_vocab.unordered_tokens_iter().collect::<AHashSet<_>>();
+        let tokens = word_vocab.unordered_tokens().collect::<AHashSet<_>>();
         for ((a, b), c) in pair_vocab.pairs() {
             for t in [a, b, c].iter() {
                 assert!(
@@ -58,7 +58,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
                 );
             }
         }
-        for t in segmentation.specials.unordered_tokens_iter() {
+        for t in segmentation.specials.unordered_tokens() {
             assert!(
                 !tokens.contains(&t),
                 "special token {t:?} found in word vocab"
@@ -73,8 +73,8 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Get the byte table for the word vocabulary.
-    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
-        self.span_vocab.byte_table()
+    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+        self.span_vocab.byte_vocab()
     }
 
     /// Extend the vocabulary with the given special words.
@@ -151,10 +151,14 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for UnifiedTokenVocab<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
+impl<T: TokenType> TokenVocab<T> for UnifiedTokenVocab<T> {
+    fn unordered_tokens(&self) -> impl Iterator<Item = T> {
         self.span_vocab
-            .unordered_tokens_iter()
-            .chain(self.segmentation.specials.unordered_tokens_iter())
+            .unordered_tokens()
+            .chain(self.segmentation.specials.unordered_tokens())
+    }
+
+    fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        self.span_vocab.span_pairs()
     }
 }

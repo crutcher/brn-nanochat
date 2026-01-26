@@ -1,7 +1,7 @@
 //! # Token Span Buffer
 
 use crate::types::{Pair, TokenType};
-use crate::vocab::byte_table::ByteTokenTable;
+use crate::vocab::byte_vocab::ByteVocab;
 use core::hash::Hash;
 
 /// A mutable span of tokens (a chunk or "word").
@@ -33,16 +33,16 @@ impl<T: TokenType> TokenSpanBuf<T> {
     ///
     /// # Arguments
     /// * `bytes` - the bytes to translate to byte-level tokens.
-    /// * `byte_table` - the translation for the byte tokens.
+    /// * `byte_vocab` - the translation for the byte tokens.
     pub fn from_bytes<B: AsRef<[u8]>>(
         bytes: B,
-        byte_table: &ByteTokenTable<T>,
+        byte_vocab: &ByteVocab<T>,
     ) -> Self {
         Self {
             tokens: bytes
                 .as_ref()
                 .iter()
-                .map(|&b| byte_table.get_token(b))
+                .map(|&b| byte_vocab.get_token(b))
                 .collect(),
         }
     }
@@ -51,12 +51,12 @@ impl<T: TokenType> TokenSpanBuf<T> {
     ///
     /// # Arguments
     /// * `text` - the text to turn into UTF-8 bytes, and translate to byte-level tokens.
-    /// * `byte_table` - the translation for the byte tokens.
+    /// * `byte_vocab` - the translation for the byte tokens.
     pub fn from_string<S: AsRef<str>>(
         text: S,
-        byte_table: &ByteTokenTable<T>,
+        byte_vocab: &ByteVocab<T>,
     ) -> Self {
-        Self::from_bytes(text.as_ref().as_bytes(), byte_table)
+        Self::from_bytes(text.as_ref().as_bytes(), byte_vocab)
     }
 
     /// View the tokens as a slice.
@@ -196,18 +196,18 @@ mod tests {
     fn test_span_from_str() {
         type T = u32;
 
-        let byte_table: ByteTokenTable<T> = Default::default();
+        let byte_vocab: ByteVocab<T> = Default::default();
 
-        let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &byte_table);
+        let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &byte_vocab);
         assert_eq!(span.tokens(), &[104, 101, 108, 108, 111]);
 
-        let shifted_tokens = byte_table
+        let shifted_tokens = byte_vocab
             .byte_to_token()
             .iter()
             .map(|&token| token + 10)
             .collect::<Vec<_>>();
 
-        let shift_table: ByteTokenTable<T> = ByteTokenTable::from_byte_to_token(&shifted_tokens);
+        let shift_table: ByteVocab<T> = ByteVocab::from_byte_to_token(&shifted_tokens);
 
         let span: TokenSpanBuf<T> = TokenSpanBuf::from_string("hello", &shift_table);
         assert_eq!(span.tokens(), &[114, 111, 118, 118, 121]);

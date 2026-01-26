@@ -2,12 +2,12 @@
 
 use crate::segmentation::SegmentationConfig;
 use crate::types::{SpanTokenMap, TokenType};
-use crate::vocab::{ByteTokenTable, SpanTokenVocab, UnifiedTokenVocab};
+use crate::vocab::{ByteVocab, SpanMapVocab, UnifiedTokenVocab};
 use std::sync::Arc;
 
 /// Create a test [`UnifiedTokenVocab`].
 pub fn build_test_vocab<T: TokenType, C>(
-    byte_table: Arc<ByteTokenTable<T>>,
+    byte_vocab: Arc<ByteVocab<T>>,
     segmentation: C,
 ) -> UnifiedTokenVocab<T>
 where
@@ -39,7 +39,7 @@ where
         .map(|(k, v)| (k.as_bytes().to_vec(), T::from_usize(v).unwrap())),
     );
 
-    let span_vocab = SpanTokenVocab::init(byte_table, span_map).unwrap();
+    let span_vocab = SpanMapVocab::init(byte_vocab, span_map).unwrap();
 
     UnifiedTokenVocab::from_span_vocab(segmentation.into(), span_vocab)
 }

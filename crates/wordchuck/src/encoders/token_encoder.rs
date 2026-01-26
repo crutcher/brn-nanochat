@@ -2,17 +2,16 @@
 
 use crate::segmentation::text_segmentor::SpanRef;
 use crate::types::TokenType;
-use crate::vocab::TokenVocabIndex;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
-use crate::vocab::special_vocab::SpecialWordsTokenVocab;
+use crate::vocab::special_vocab::SpecialVocab;
 
 /// A trait for token encoders.
-pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
+pub trait TokenEncoder<T: TokenType>: Send + Sync {
     /// Return the regex pattern used for text splitting.
     fn pattern(&self) -> String;
 
     /// Return the special vocabulary, if any.
-    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T>;
+    fn special_vocab(&self) -> &SpecialVocab<T>;
 
     /// Split text using the attached pattern and specials.
     fn split_spans<'a>(

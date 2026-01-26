@@ -3,25 +3,25 @@
 use crate::decoders::TokenDecoder;
 use crate::decoders::utility::pair_decoder::PairExpansionDecoder;
 use crate::types::{Pair, PairTokenMap, TokenType};
-use crate::vocab::byte_table::ByteTokenTable;
-use crate::vocab::vocab_index::TokenVocabIndex;
+use crate::vocab::byte_vocab::ByteVocab;
+use crate::vocab::token_vocab::TokenVocab;
 use ahash::AHashSet;
 use std::sync::Arc;
 
-/// Validate that a [`ByteTokenTable`] and [`PairTokenMap`] are compatible.
+/// Validate that a [`ByteVocab`] and [`PairTokenMap`] are compatible.
 ///
 /// - for every ``(a, b) -> t`` entry:
 ///   - the parents ``(a, b)``:
-///     - are either in the `byte_table`, or are targets in the map, not both.
-///   - the target ``t`` is not in the `byte_table`.
+///     - are either in the `byte_vocab`, or are targets in the map, not both.
+///   - the target ``t`` is not in the `byte_vocab`.
 pub fn try_validate_pair_map<T: TokenType>(
-    byte_table: &ByteTokenTable<T>,
+    byte_vocab: &ByteVocab<T>,
     pairs: &PairTokenMap<T>,
 ) -> anyhow::Result<()> {
     let pair_targets: AHashSet<T> = pairs.values().copied().collect();
 
     for t in &pair_targets {
-        if let Some(b) = byte_table.get_byte(*t) {
+        if let Some(b) = byte_vocab.get_byte(*t) {
             anyhow::bail!("Target token in pair map {t:?} also mapped to byte {b:0x?}");
         }
     }
@@ -35,7 +35,7 @@ pub fn try_validate_pair_map<T: TokenType>(
 
         for pt in [pair.0, pair.1] {
             let is_pair_target = pair_targets.contains(&pt);
-            let byte_target = byte_table.get_byte(pt);
+            let byte_target = byte_vocab.get_byte(pt);
 
             if is_pair_target && let Some(b) = byte_target {
                 anyhow::bail!(
@@ -56,31 +56,31 @@ pub fn try_validate_pair_map<T: TokenType>(
 /// - Grounded in a `ByteTable<T>` for byte-to-token mapping.
 /// - Collection of ``(T, T) -> T`` pairs.
 #[derive(Default, Debug, Clone)]
-pub struct PairTokenMapVocab<T: TokenType> {
+pub struct PairMapVocab<T: TokenType> {
     /// Byte/token mapping table.
-    byte_table: Arc<ByteTokenTable<T>>,
+    byte_vocab: Arc<ByteVocab<T>>,
 
     /// Map of ``{ (T, T) -> T }``.
     pairs: PairTokenMap<T>,
 }
 
-impl<T: TokenType> PairTokenMapVocab<T> {
-    /// Initialize a [`PairTokenMapVocab`].
+impl<T: TokenType> PairMapVocab<T> {
+    /// Initialize a [`PairMapVocab`].
     pub fn init<B>(
-        byte_table: B,
+        byte_vocab: B,
         pairs: PairTokenMap<T>,
     ) -> anyhow::Result<Self>
     where
-        B: Into<Arc<ByteTokenTable<T>>>,
+        B: Into<Arc<ByteVocab<T>>>,
     {
-        let byte_table = byte_table.into();
-        try_validate_pair_map(&byte_table, &pairs)?;
-        Ok(Self { byte_table, pairs })
+        let byte_vocab = byte_vocab.into();
+        try_validate_pair_map(&byte_vocab, &pairs)?;
+        Ok(Self { byte_vocab, pairs })
     }
 
     /// Get the byte/token mapping table.
-    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
-        &self.byte_table
+    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+        &self.byte_vocab
     }
 
     /// Get the map of pairs.
@@ -91,20 +91,7 @@ impl<T: TokenType> PairTokenMapVocab<T> {
     /// Get the number of tokens in the vocabulary.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.byte_table.len() + self.pairs.len()
-    }
-
-    /// Generate all ``(Vec<u8>, T)`` pairs in the vocabulary.
-    ///
-    /// This includes the pairs from the `ByteTable`.
-    pub fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
-        let decoder = PairExpansionDecoder::from_pair_vocab(self);
-
-        self.byte_table.span_pairs().chain(
-            self.pairs
-                .values()
-                .map(move |&t| (decoder.try_decode_to_bytes([t]).unwrap(), t)),
-        )
+        self.byte_vocab.len() + self.pairs.len()
     }
 
     /// Looks up a pair.
@@ -116,11 +103,21 @@ impl<T: TokenType> PairTokenMapVocab<T> {
     }
 }
 
-impl<T: TokenType> TokenVocabIndex<T> for PairTokenMapVocab<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.byte_table
-            .unordered_tokens_iter()
+impl<T: TokenType> TokenVocab<T> for PairMapVocab<T> {
+    fn unordered_tokens(&self) -> impl Iterator<Item = T> {
+        self.byte_vocab
+            .unordered_tokens()
             .chain(self.pairs.values().copied())
+    }
+
+    fn span_pairs(&self) -> impl Iterator<Item = (Vec<u8>, T)> {
+        let decoder = PairExpansionDecoder::from_pair_vocab(self);
+
+        self.byte_vocab.span_pairs().chain(
+            self.pairs
+                .values()
+                .map(move |&t| (decoder.try_decode_to_bytes([t]).unwrap(), t)),
+        )
     }
 }
 
@@ -131,16 +128,16 @@ mod tests {
     #[test]
     fn test_tokens_sorted() {
         type T = u32;
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
 
-        let mut vocab = PairTokenMapVocab::<T> {
+        let mut vocab = PairMapVocab::<T> {
             pairs: PairTokenMap::default(),
-            byte_table: byte_table.clone(),
+            byte_vocab: byte_vocab.clone(),
         };
 
         assert_eq!(vocab.max_token(), 255);
 
-        assert_eq!(&vocab.sorted_tokens(), &byte_table.sorted_tokens());
+        assert_eq!(&vocab.sorted_tokens(), &byte_vocab.sorted_tokens());
 
         vocab.pairs.insert((1, 2), 300);
         vocab.pairs.insert((3, 4), 301);
@@ -150,7 +147,7 @@ mod tests {
 
         assert_eq!(
             &vocab.sorted_tokens(),
-            &byte_table
+            &byte_vocab
                 .sorted_tokens()
                 .into_iter()
                 .chain([300_u32, 301, 302].into_iter())
