@@ -5,11 +5,11 @@ use crate::training::pair_span_index::{PairIndexMap, PairSpanIndex};
 use crate::training::text_span_counter::{TextSpanCounter, TextSpanCounterOptions};
 use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CountType, Pair, PairTokenMap, StringChunkType, TokenType};
-use crate::util::validators;
-use crate::util::validators::U8_SIZE;
-use crate::vocab::byte_table::ByteTokenTable;
-use crate::vocab::pair_vocab::PairTokenMapVocab;
-use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+use crate::vocab::byte_vocab::ByteVocab;
+use crate::vocab::pair_vocab::PairMapVocab;
+use crate::vocab::utility::validators;
+use crate::vocab::utility::validators::U8_SIZE;
+use crate::vocab::{TokenVocab, UnifiedTokenVocab};
 use ahash::{AHashMap, AHashSet};
 use compact_str::CompactString;
 use core::cmp::Ordering;
@@ -148,7 +148,7 @@ pub struct TrainResults<T: TokenType> {
     pub pattern: RegexWrapperPattern,
 
     /// The trained vocab's byte/token mapping table.
-    pub pair_vocab: PairTokenMapVocab<T>,
+    pub pair_vocab: PairMapVocab<T>,
 }
 
 impl<K, C> BinaryPairVocabTrainer<K, C>
@@ -204,18 +204,18 @@ where
     /// * `T` - the [`TokenType`] of the trained vocab.
     ///
     /// # Arguments
-    /// * `byte_table` - the byte/token mapping table to use for training.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_table)))]
+    /// * `byte_vocab` - the byte/token mapping table to use for training.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_vocab)))]
     fn train_basic_pairs<T, B>(
         self,
-        byte_table: B,
+        byte_vocab: B,
     ) -> anyhow::Result<TrainResults<T>>
     where
         T: TokenType,
         C: CountType,
-        B: Into<Arc<ByteTokenTable<T>>>,
+        B: Into<Arc<ByteVocab<T>>>,
     {
-        let byte_table = byte_table.into();
+        let byte_vocab = byte_vocab.into();
 
         validators::expect_vocab_size::<T>(self.options.vocab_size);
 
@@ -228,7 +228,7 @@ where
 
         let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) = self
             .span_counter
-            .to_text_span_counts_iter(&byte_table)
+            .to_text_span_counts_iter(&byte_vocab)
             .unzip();
 
         log::info!("Building pair index...");
@@ -260,7 +260,7 @@ where
         let mut last_log_percent = 0;
 
         // The first token we'll allocate is after all the byte tokens.
-        let mut next_token = byte_table.max_token() + T::one();
+        let mut next_token = byte_vocab.max_token() + T::one();
 
         while merges_done < num_merges {
             let Some(mut job) = heap.pop() else {
@@ -346,8 +346,8 @@ where
 
         pairs.shrink_to_fit();
 
-        let pair_vocab: PairTokenMapVocab<T> =
-            PairTokenMapVocab::<T>::init(byte_table.clone(), pairs).unwrap();
+        let pair_vocab: PairMapVocab<T> =
+            PairMapVocab::<T>::init(byte_vocab.clone(), pairs).unwrap();
 
         log::info!("Finished training: {} merges completed", merges_done);
         Ok(TrainResults {
@@ -367,18 +367,18 @@ where
     /// * `T` - the [`TokenType`] of the trained vocab.
     ///
     /// # Arguments
-    /// * `byte_table` - the byte/token mapping table to use for training.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_table)))]
+    /// * `byte_vocab` - the byte/token mapping table to use for training.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_vocab)))]
     pub fn train<T, B>(
         self,
-        byte_table: B,
+        byte_vocab: B,
     ) -> anyhow::Result<UnifiedTokenVocab<T>>
     where
         T: TokenType,
         C: CountType,
-        B: Into<Arc<ByteTokenTable<T>>>,
+        B: Into<Arc<ByteVocab<T>>>,
     {
-        let results = self.train_basic_pairs(byte_table)?;
+        let results = self.train_basic_pairs(byte_vocab)?;
         Ok(UnifiedTokenVocab::from_pair_vocab(
             results.pattern.into(),
             results.pair_vocab,
@@ -395,8 +395,7 @@ mod tests {
     use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::TokenVocabIndex;
-    use crate::vocab::byte_table::ByteTokenTable;
+    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::unified_vocab::UnifiedTokenVocab;
     use alloc::sync::Arc;
@@ -439,15 +438,13 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
 
-        let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_table.clone()).unwrap().into();
+        let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_vocab.clone()).unwrap().into();
 
         let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
-
-        assert_eq!(encoder.max_token(), 292);
 
         let decoder = DictionaryDecoder::from_unified_vocab(vocab);
         check_is_send(&decoder);

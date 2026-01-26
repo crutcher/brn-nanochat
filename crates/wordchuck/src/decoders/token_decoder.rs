@@ -2,10 +2,9 @@
 
 use crate::decoders::TokenDecodeContext;
 use crate::types::TokenType;
-use crate::vocab::TokenVocabIndex;
 
 /// Trait for token decoders.
-pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
+pub trait TokenDecoder<T: TokenType>: Send + Sync {
     /// Incrementally decodes the context.
     ///
     /// Progresses until `ctx.stack` is empty,
@@ -75,16 +74,8 @@ pub trait TokenDecoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoders::byte_decoder::ByteDecoder;
+    use crate::decoders::utility::byte_decoder::ByteDecoder;
     use num_traits::FromPrimitive;
-
-    #[test]
-    fn test_byte_decoder() {
-        type T = u32;
-        let decoder: ByteDecoder<T> = ByteDecoder::default();
-
-        assert_eq!(decoder.max_token(), 255);
-    }
 
     #[test]
     fn test_decode_context() {
@@ -96,7 +87,7 @@ mod tests {
             "hello world"
                 .as_bytes()
                 .iter()
-                .map(|&b| decoder.byte_table().get_token(b)),
+                .map(|&b| decoder.byte_vocab().get_token(b)),
         );
         tokens.extend_from_slice(&[256, 3000]);
 

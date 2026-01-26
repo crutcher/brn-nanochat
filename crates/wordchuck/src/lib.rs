@@ -14,5 +14,4 @@ pub mod encoders;
 pub mod regex;
 pub mod segmentation;
 pub mod types;
-pub mod util;
 pub mod vocab;

@@ -1,10 +1,10 @@
 //! # Parallel Encoder
 
 use crate::encoders::TokenEncoder;
-use crate::segmentation::text_segmentor::SpanRef;
+use crate::segmentation::TextSegmentor;
 use crate::types::TokenType;
-use crate::vocab::TokenVocabIndex;
-use crate::vocab::special_vocab::SpecialWordsTokenVocab;
+use crate::vocab::special_vocab::SpecialVocab;
+use std::sync::Arc;
 
 /// Batch-Level Parallel Encoder Wrapper.
 ///
@@ -31,42 +31,25 @@ where
     }
 }
 
-impl<T, D> TokenVocabIndex<T> for ParallelRayonEncoder<T, D>
-where
-    T: TokenType,
-    D: TokenEncoder<T>,
-{
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.inner.unordered_tokens_iter()
-    }
-}
-
 impl<T, D> TokenEncoder<T> for ParallelRayonEncoder<T, D>
 where
     T: TokenType,
     D: TokenEncoder<T>,
 {
-    fn pattern(&self) -> String {
-        self.inner.pattern()
+    fn segmentor(&self) -> &Arc<TextSegmentor> {
+        self.inner.segmentor()
     }
 
-    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T> {
+    fn special_vocab(&self) -> &SpecialVocab<T> {
         self.inner.special_vocab()
     }
 
-    fn split_spans<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<SpanRef<'a>> {
-        self.inner.split_spans(text)
-    }
-
-    fn encode_append_span(
+    fn encode_append_span_normal(
         &self,
         span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        self.inner.encode_append_span(span, tokens)
+        self.inner.encode_append_span_normal(span, tokens)
     }
 
     fn encode_batch(
@@ -86,10 +69,10 @@ mod tests {
     use crate::regex::default_regex_supplier;
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_table::ByteTokenTable;
+    use crate::vocab::UnifiedTokenVocab;
+    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::tooling::testing::build_test_vocab;
-    use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+    use crate::vocab::utility::testing::build_test_vocab;
     use std::sync::Arc;
 
     #[test]
@@ -102,9 +85,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
         let segmentation = SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN);
-        let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(byte_table.clone(), segmentation)
+        let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(byte_vocab.clone(), segmentation)
             .with_special_words(vec![("<|HI|>", 3000)])
             .into();
 
@@ -117,8 +100,6 @@ mod tests {
         let encoder = ParallelRayonEncoder::new(encoder);
         check_is_send(&encoder);
         check_is_sync(&encoder);
-
-        assert_eq!(encoder.max_token(), 3000);
 
         let decoder = DictionaryDecoder::from_unified_vocab(vocab);
         check_is_send(&decoder);

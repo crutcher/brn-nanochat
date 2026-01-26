@@ -2,11 +2,10 @@
 
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::regex::{RegexSupplierHandle, RegexWrapperHandle};
-use crate::segmentation::text_segmentor::{SpanRef, TextSegmentor};
+use crate::segmentation::text_segmentor::TextSegmentor;
 use crate::types::TokenType;
-use crate::vocab::special_vocab::SpecialWordsTokenVocab;
+use crate::vocab::special_vocab::SpecialVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
-use crate::vocab::vocab_index::TokenVocabIndex;
 use alloc::sync::Arc;
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
@@ -16,7 +15,7 @@ pub struct MergeHeapVocabEncoder<T: TokenType> {
     pub data: Arc<UnifiedTokenVocab<T>>,
 
     /// Text Segmentor.
-    pub segmentor: TextSegmentor,
+    pub segmentor: Arc<TextSegmentor>,
 }
 
 impl<T: TokenType> MergeHeapVocabEncoder<T> {
@@ -28,13 +27,13 @@ impl<T: TokenType> MergeHeapVocabEncoder<T> {
     where
         F: Fn(RegexWrapperHandle) -> RegexSupplierHandle,
     {
-        let segmentor = TextSegmentor::from_config(data.segmentation.clone(), re_factory);
+        let segmentor = TextSegmentor::from_config(data.segmentation.clone(), re_factory).into();
 
         Self { data, segmentor }
     }
 
     /// Compiler Hint.
-    fn lookup_token(
+    fn lookup_normal_token(
         &self,
         span: &[u8],
     ) -> Option<T> {
@@ -55,43 +54,27 @@ impl<T: TokenType> MergeHeapVocabEncoder<T> {
         span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        self.data.byte_table().append_tokens(span, tokens);
-    }
-}
-
-impl<T: TokenType> TokenVocabIndex<T> for MergeHeapVocabEncoder<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.data.unordered_tokens_iter()
-    }
-
-    fn max_token(&self) -> T {
-        self.data.max_token()
+        self.data.byte_vocab().append_tokens(span, tokens);
     }
 }
 
 impl<T: TokenType> TokenEncoder<T> for MergeHeapVocabEncoder<T> {
-    fn pattern(&self) -> String {
-        self.data.segmentation.pattern()
+    fn segmentor(&self) -> &Arc<TextSegmentor> {
+        &self.segmentor
     }
 
-    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T> {
+    fn special_vocab(&self) -> &SpecialVocab<T> {
         self.data.segmentation.special_vocab()
     }
 
-    fn split_spans<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<SpanRef<'a>> {
-        self.segmentor.split_spans(text)
-    }
-
-    fn encode_append_span(
+    fn encode_append_span_normal(
         &self,
         span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        // Correctness-wise - Some words may not exist in the pair mappings.
-        if let Some(token) = self.lookup_token(span) {
+        if let Some(token) = self.lookup_normal_token(span) {
+            // 1. Faster;
+            // 2. Correct-or: Some words may not exist in the pair mappings.
             tokens.push(token);
             return;
         }
@@ -178,10 +161,10 @@ mod tests {
     use crate::regex::default_regex_supplier;
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_table::ByteTokenTable;
+    use crate::vocab::UnifiedTokenVocab;
+    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::tooling::testing::build_test_vocab;
-    use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+    use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
 
     #[test]
@@ -194,9 +177,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
         let segmentation = SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN);
-        let vocab = build_test_vocab(byte_table.clone(), segmentation);
+        let vocab = build_test_vocab(byte_vocab.clone(), segmentation);
 
         let mut seg = vocab.segmentation.clone();
         seg.add_str_word("<|HI|>", 3000);
@@ -209,8 +192,6 @@ mod tests {
         let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
         check_is_send(&encoder);
         check_is_sync(&encoder);
-
-        assert_eq!(encoder.max_token(), 3000);
 
         let decoder = DictionaryDecoder::from_unified_vocab(vocab);
         check_is_send(&decoder);

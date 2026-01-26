@@ -1,7 +1,7 @@
 //! # Special Tokens
 
 use crate::declare_carrot_special;
-use crate::vocab::tooling::specials_tools::format_reserved_carrot;
+use crate::vocab::utility::specials_tools::format_reserved_carrot;
 
 declare_carrot_special!(
     (STARTOFTEXT, "startoftext"),

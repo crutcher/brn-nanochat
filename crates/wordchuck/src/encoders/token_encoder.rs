@@ -1,27 +1,22 @@
 //! # Token Encoder Trait
 
+use crate::segmentation::TextSegmentor;
 use crate::segmentation::text_segmentor::SpanRef;
 use crate::types::TokenType;
-use crate::vocab::TokenVocabIndex;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
-use crate::vocab::special_vocab::SpecialWordsTokenVocab;
+use crate::vocab::special_vocab::SpecialVocab;
+use std::sync::Arc;
 
 /// A trait for token encoders.
-pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
-    /// Return the regex pattern used for text splitting.
-    fn pattern(&self) -> String;
+pub trait TokenEncoder<T: TokenType>: Send + Sync {
+    /// Return the attached text segmentor.
+    fn segmentor(&self) -> &Arc<TextSegmentor>;
 
-    /// Return the special vocabulary, if any.
-    fn special_vocab(&self) -> &SpecialWordsTokenVocab<T>;
-
-    /// Split text using the attached pattern and specials.
-    fn split_spans<'a>(
-        &self,
-        text: &'a str,
-    ) -> Vec<SpanRef<'a>>;
+    /// Return the attached special vocab.
+    fn special_vocab(&self) -> &SpecialVocab<T>;
 
     /// Encode a span appending to a target buffer.
-    fn encode_append_span(
+    fn encode_append_span_normal(
         &self,
         span: &[u8],
         tokens: &mut Vec<T>,
@@ -34,12 +29,17 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         text: &str,
         tokens: &mut Vec<T>,
     ) {
-        self.split_spans(text).into_iter().for_each(|wr| match wr {
-            SpanRef::Normal(w) => self.encode_append_span(w.as_bytes(), tokens),
-            SpanRef::Special(s) => {
-                tokens.push(self.special_vocab().lookup_token(s.as_bytes()).unwrap());
-            }
-        });
+        self.segmentor()
+            .split_spans(text)
+            .into_iter()
+            .for_each(|span_ref| match span_ref {
+                SpanRef::Normal(span_str) => {
+                    self.encode_append_span_normal(span_str.as_bytes(), tokens)
+                }
+                SpanRef::Special(s) => {
+                    tokens.push(self.special_vocab().lookup_token(s.as_bytes()).unwrap());
+                }
+            });
     }
 
     /// Encode text into tokens.

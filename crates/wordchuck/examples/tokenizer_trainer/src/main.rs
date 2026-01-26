@@ -11,10 +11,10 @@ use wordchuck::encoders::{MergeHeapVocabEncoder, TokenEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::regex::default_regex_supplier;
 use wordchuck::training::BinaryPairVocabTrainerOptions;
-use wordchuck::vocab::byte_table::ByteTokenTable;
+use wordchuck::vocab::byte_vocab::ByteVocab;
 use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-use wordchuck::vocab::{TokenVocabIndex, UnifiedTokenVocab};
+use wordchuck::vocab::{TokenVocab, UnifiedTokenVocab};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]
@@ -116,11 +116,11 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+    let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
 
     println!("- train");
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-        .train(byte_table.clone())
+        .train(byte_vocab.clone())
         .expect("training failed")
         .into();
 

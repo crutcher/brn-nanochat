@@ -3,14 +3,14 @@
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenToPairMap, TokenType};
-use crate::vocab::{ByteTokenTable, PairTokenMapVocab, TokenVocabIndex};
+use crate::vocab::{ByteVocab, PairMapVocab};
 use std::sync::Arc;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
 pub struct PairExpansionDecoder<T: TokenType> {
     /// Byte/token mapping table.
-    byte_table: Arc<ByteTokenTable<T>>,
+    byte_vocab: Arc<ByteVocab<T>>,
 
     /// Token to pair mapping.
     token_map: TokenToPairMap<T>,
@@ -19,37 +19,31 @@ pub struct PairExpansionDecoder<T: TokenType> {
 impl<T: TokenType> PairExpansionDecoder<T> {
     /// Creates a new Decoder.
     pub fn new<B>(
-        byte_table: B,
+        byte_vocab: B,
         token_map: TokenToPairMap<T>,
     ) -> Self
     where
-        B: Into<Arc<ByteTokenTable<T>>>,
+        B: Into<Arc<ByteVocab<T>>>,
     {
         Self {
-            byte_table: byte_table.into(),
+            byte_vocab: byte_vocab.into(),
             token_map,
         }
     }
 
-    /// Build a [`PairExpansionDecoder`] from this [`PairTokenMapVocab`].
-    pub fn from_pair_vocab(pair_vocab: &PairTokenMapVocab<T>) -> Self {
+    /// Build a [`PairExpansionDecoder`] from this [`PairMapVocab`].
+    pub fn from_pair_vocab(pair_vocab: &PairMapVocab<T>) -> Self {
         let token_map = pair_vocab
             .pairs()
             .iter()
             .map(|(&pair, &token)| (token, pair))
             .collect();
-        Self::new(pair_vocab.byte_table().clone(), token_map)
+        Self::new(pair_vocab.byte_vocab().clone(), token_map)
     }
 
     /// Get the byte table.
-    pub fn byte_table(&self) -> &Arc<ByteTokenTable<T>> {
-        &self.byte_table
-    }
-}
-
-impl<T: TokenType> TokenVocabIndex<T> for PairExpansionDecoder<T> {
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.token_map.keys().copied()
+    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+        &self.byte_vocab
     }
 }
 
@@ -60,7 +54,7 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
         ctx: &mut TokenDecodeContext<T>,
     ) -> bool {
         while let Some(t) = ctx.stack.pop() {
-            if let Some(b) = self.byte_table.get_byte(t) {
+            if let Some(b) = self.byte_vocab.get_byte(t) {
                 ctx.buf.push(b);
             } else if let Some((a, b)) = self.token_map.get(&t) {
                 ctx.stack.push(*b);
@@ -83,9 +77,9 @@ mod tests {
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::UnifiedTokenVocab;
-    use crate::vocab::byte_table::ByteTokenTable;
+    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::tooling::testing::build_test_vocab;
+    use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
 
     #[test]
@@ -98,9 +92,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
         let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(
-            byte_table.clone(),
+            byte_vocab.clone(),
             SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN),
         )
         .into();

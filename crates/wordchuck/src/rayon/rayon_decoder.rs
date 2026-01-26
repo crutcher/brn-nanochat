@@ -2,7 +2,6 @@
 
 use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
-use crate::vocab::TokenVocabIndex;
 
 /// Batch-Level Parallel Decoder Wrapper.
 ///
@@ -26,16 +25,6 @@ where
             inner,
             _marker: std::marker::PhantomData,
         }
-    }
-}
-
-impl<T, D> TokenVocabIndex<T> for ParallelRayonDecoder<T, D>
-where
-    T: TokenType,
-    D: TokenDecoder<T>,
-{
-    fn unordered_tokens_iter(&self) -> impl Iterator<Item = T> {
-        self.inner.unordered_tokens_iter()
     }
 }
 
@@ -89,9 +78,9 @@ mod tests {
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::UnifiedTokenVocab;
-    use crate::vocab::byte_table::ByteTokenTable;
+    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::tooling::testing::build_test_vocab;
+    use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
     use num_traits::FromPrimitive;
 
@@ -105,9 +94,9 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_table: Arc<ByteTokenTable<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
         let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(
-            byte_table.clone(),
+            byte_vocab.clone(),
             SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN),
         )
         .into();
