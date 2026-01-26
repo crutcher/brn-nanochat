@@ -60,13 +60,11 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
     }
 
     /// Encode a word chunk into token IDs.
-    fn encode_append_word(
+    fn encode_append_span(
         &self,
-        word: &str,
+        span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        let chunk = word.as_bytes();
-
         // NOTE: You may think that a bypass for single-byte words
         // would speed things up here, before the hash lookup.
         // On real sample data, it appears to incur a small *penalty*.
@@ -75,7 +73,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         //
         // Speed-wise - This is a wash; the hash is slow enough that the
         // cache hits don't speed us up.
-        if let Some(token) = self.data.word_vocab.lookup_token(chunk) {
+        if let Some(token) = self.data.word_vocab.lookup_token(span) {
             tokens.push(token);
             return;
         }
@@ -83,7 +81,7 @@ impl<T: TokenType> TokenEncoder<T> for UnifiedVocabEncoder<T> {
         // Reuse the output buffer as our working memory.
         // Append the byte-tokens to the buffer.
         let start = tokens.len();
-        tokens.extend(chunk.iter().map(|&b| self.byte_table.get_token(b)));
+        tokens.extend(span.iter().map(|&b| self.byte_table.get_token(b)));
 
         // Incrementally shrink the working memory (the new buffer end)
         // Until we can no longer find pairs to merge.

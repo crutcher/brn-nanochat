@@ -20,10 +20,10 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         text: &'a str,
     ) -> Vec<WordRef<'a>>;
 
-    /// Encode a word, and append the resulting tokens to the given token buffer.
-    fn encode_append_word(
+    /// Encode a span appending to a target buffer.
+    fn encode_append_span(
         &self,
-        word: &str,
+        span: &[u8],
         tokens: &mut Vec<T>,
     );
 
@@ -35,7 +35,7 @@ pub trait TokenEncoder<T: TokenType>: TokenVocabIndex<T> + Send + Sync {
         tokens: &mut Vec<T>,
     ) {
         self.split_words(text).into_iter().for_each(|wr| match wr {
-            WordRef::Normal(w) => self.encode_append_word(w, tokens),
+            WordRef::Normal(w) => self.encode_append_span(w.as_bytes(), tokens),
             WordRef::Special(s) => {
                 tokens.push(
                     self.special_vocab()
