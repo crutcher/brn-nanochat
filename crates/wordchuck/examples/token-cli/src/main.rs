@@ -98,7 +98,7 @@ fn run_load(
     let decoder = ParallelRayonDecoder::new(decoder);
 
     let shards: Vec<usize> = vec![0];
-    let num_timing_batches = 20;
+    let num_timing_batches = 2;
     let batch_size = 512;
 
     println!("Loading Shards: {shards:?}");
@@ -140,6 +140,7 @@ fn run_load(
     println!();
     println!("Timing Config:");
     println!("- batch size: {}", batch_size);
+    println!("- num batches: {}", num_batches);
 
     println!();
     println!("Timing Encode:");
@@ -199,8 +200,9 @@ fn run_load(
 
             let expected = sample
                 .iter()
-                .map(|s| segmentor.rewrite(s))
+                .map(|s| String::from_utf8_lossy(segmentor.rewrite(s).as_bytes()).to_string())
                 .collect::<Vec<_>>();
+
             let score = batch_score(&decoded_sample, &expected);
             println!("- sample score: {:}", score);
 
@@ -230,10 +232,13 @@ pub fn score_batch(
     actual: &[String],
     expected: &[String],
 ) -> Vec<f64> {
+    use rayon::prelude::*;
     assert_eq!(actual.len(), expected.len());
     actual
         .iter()
         .zip(expected.iter())
+        .collect::<Vec<_>>()
+        .par_iter()
         .map(|(a, e)| edit_score(a, e))
         .collect::<Vec<_>>()
 }

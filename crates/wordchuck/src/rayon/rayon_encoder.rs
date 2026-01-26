@@ -61,12 +61,12 @@ where
         self.inner.split_words(text)
     }
 
-    fn encode_append_word(
+    fn encode_append_span(
         &self,
-        word: &str,
+        span: &[u8],
         tokens: &mut Vec<T>,
     ) {
-        self.inner.encode_append_word(word, tokens)
+        self.inner.encode_append_span(span, tokens)
     }
 
     fn encode_batch(
