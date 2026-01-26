@@ -13,7 +13,7 @@
 //! use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 //! use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
 //! use wordchuck::vocab::{ByteTokenTable, UnifiedTokenVocab};
-//! use wordchuck::encoders::UnifiedVocabEncoder;
+//! use wordchuck::encoders::MergeHeapVocabEncoder;
 //! use wordchuck::decoders::DictionaryDecoder;
 //! use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
 //! use wordchuck::regex::default_regex_supplier;
@@ -62,12 +62,13 @@
 //!         println!("- tiktoken vocab: {path:?}");
 //!     }
 //!
-//!     let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::init(
+//!     let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::<T>::init(
 //!         vocab.clone(),
-//!         default_regex_supplier);
+//!         default_regex_supplier
+//!     );
 //!     let encoder = ParallelRayonEncoder::new(encoder);
 //!
-//!     let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
+//!     let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
 //!     let decoder = ParallelRayonDecoder::new(decoder);
 //! }
 //! ```

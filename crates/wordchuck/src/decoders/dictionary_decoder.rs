@@ -3,7 +3,7 @@
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenToWordMap, TokenType};
-use crate::vocab::TokenVocabIndex;
+use crate::vocab::{TokenVocabIndex, UnifiedTokenVocab};
 
 /// A token dictionary [`TokenDecoder<T>`].
 #[derive(Clone)]
@@ -15,8 +15,16 @@ pub struct DictionaryDecoder<T: TokenType> {
 }
 
 impl<T: TokenType> DictionaryDecoder<T> {
+    /// Build a [`DictionaryDecoder`] from this [`UnifiedTokenVocab`].
+    pub fn from_unified_vocab<V>(unified_vocab: V) -> Self
+    where
+        V: AsRef<UnifiedTokenVocab<T>>,
+    {
+        Self::init(unified_vocab.as_ref().unified_dictionary())
+    }
+
     /// Creates a new Decoder.
-    pub fn new(token_to_word: TokenToWordMap<T>) -> Self {
+    pub fn init(token_to_word: TokenToWordMap<T>) -> Self {
         Self { token_to_word }
     }
 }
@@ -48,8 +56,8 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::encoders::unified_encoder::UnifiedVocabEncoder;
     use crate::regex::default_regex_supplier;
     use crate::training::bpe_trainer::BinaryPairVocabTrainerOptions;
     use crate::types::{check_is_send, check_is_sync};
@@ -84,9 +92,9 @@ mod tests {
             .expect("training vocab should succeed")
             .into();
 
-        let encoder = UnifiedVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
 
-        let decoder = DictionaryDecoder::new(vocab.unified_dictionary());
+        let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
         check_is_send(&decoder);
         check_is_sync(&decoder);
 
