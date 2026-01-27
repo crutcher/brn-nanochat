@@ -48,7 +48,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
 }
 
 impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, ctx)))]
     fn incremental_decode(
         &self,
         ctx: &mut TokenDecodeContext<T>,
@@ -73,7 +73,6 @@ mod tests {
     use super::*;
     use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::regex::default_regex_supplier;
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::UnifiedTokenVocab;
@@ -99,7 +98,7 @@ mod tests {
         )
         .into();
 
-        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone());
 
         let decoder = PairExpansionDecoder::from_pair_vocab(&vocab.pair_vocab);
         check_is_send(&decoder);

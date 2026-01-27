@@ -30,7 +30,7 @@ impl<T: TokenType> DictionaryDecoder<T> {
 }
 
 impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, ctx)))]
     fn incremental_decode(
         &self,
         ctx: &mut TokenDecodeContext<T>,
@@ -52,7 +52,6 @@ mod tests {
     use super::*;
     use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::regex::default_regex_supplier;
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::byte_vocab::ByteVocab;
@@ -76,7 +75,7 @@ mod tests {
         let vocab: Arc<UnifiedTokenVocab<T>> =
             build_test_vocab(byte_vocab.clone(), segmentation).into();
 
-        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone());
 
         let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
         check_is_send(&decoder);

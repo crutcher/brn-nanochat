@@ -85,7 +85,7 @@ fn run_load(
         UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();
 
     let encoder: MergeHeapVocabEncoder<T> =
-        MergeHeapVocabEncoder::<T>::init(vocab.clone(), regex_pool_supplier);
+        MergeHeapVocabEncoder::<T>::init_with_factory(vocab.clone(), regex_pool_supplier);
     let encoder = ParallelRayonEncoder::new(encoder);
 
     let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());

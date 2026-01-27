@@ -15,7 +15,6 @@
 //! use wordchuck::encoders::MergeHeapVocabEncoder;
 //! use wordchuck::decoders::DictionaryDecoder;
 //! use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
-//! use wordchuck::regex::default_regex_supplier;
 //! use std::sync::Arc;
 //!
 //! fn example<I, S>(
@@ -61,10 +60,7 @@
 //!         println!("- tiktoken vocab: {path:?}");
 //!     }
 //!
-//!     let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::<T>::init(
-//!         vocab.clone(),
-//!         default_regex_supplier
-//!     );
+//!     let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::init(vocab.clone());
 //!     let encoder = ParallelRayonEncoder::new(encoder);
 //!
 //!     let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
