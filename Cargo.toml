@@ -29,9 +29,9 @@ burn = "^0.20.0"
 bimm-contracts = "^0.19.2"
 
 tracing = "^0.1"
-log = "^0.4"
+log = { version = "^0.4", default-features = false }
 clap = "^4.5"
-anyhow = "^1.0"
+anyhow = { version = "^1.0" , default-features = false }
 shellexpand = "^3.1"
 
 num-traits = {  version = "^0.2.19", default-features = false }

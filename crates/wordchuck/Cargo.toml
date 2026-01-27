@@ -17,16 +17,30 @@ workspace = true
 
 
 [features]
-default = ["rayon"]
+default = ["std", "ahash", "rayon"]
 
 # This is only partial support for no_std.
 # It *is* tested by CI, but it isn't propagated to the dependents of this crate;
 # and some of those will require feature degradation.
-std = ["dep:base64", "num-traits/std", "dep:parking_lot"]
+std = [
+    "anyhow/std",
+    "dep:base64",
+    "dep:parking_lot",
+    "num-traits/std",
+    "log/std",
+]
 
-training = ["std", "compact_str", "dary_heap"]
+training = [
+    "compact_str",
+    "dary_heap",
+    "std",
+]
 
-rayon = ["dep:rayon", "std"]
+rayon = [
+    "dep:rayon",
+    "std"
+]
+
 tracing = ["dep:tracing"]
 
 # We can switch HashMap/HashSet implementations for the whole crate.
@@ -34,15 +48,20 @@ tracing = ["dep:tracing"]
 #
 # - mac hardware: fasster to enable ahash
 # - 2020 desktop linux: faster decode, no encode benefit.
-ahash = ["dep:ahash", "std"]
+ahash = [
+    "dep:ahash",
+    "std",
+]
 
 
 [dependencies]
-anyhow = { workspace = true }
 fancy-regex = { workspace = true }
+regex = { workspace = true }
+
+# no-default deps
+anyhow = { workspace = true }
 log = { workspace = true }
 num-traits = { workspace = true }
-regex = { workspace = true }
 
 # "std" feature deps:
 base64 = { workspace = true, optional = true }

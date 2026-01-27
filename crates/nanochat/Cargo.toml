@@ -11,7 +11,7 @@ publish = false
 burn = { workspace = true }
 bimm-contracts = { workspace = true, features = ["burn"] }
 
-anyhow = { workspace = true }
+anyhow = { workspace = true, features = ["std"]}
 
 [dev-dependencies]
 burn = { workspace = true, features = ["wgpu"] }
