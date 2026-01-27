@@ -2,6 +2,8 @@
 
 use crate::types::{CommonHashMap, TokenType};
 use crate::vocab::TokenVocab;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::fmt::Debug;
 
 /// ``0..=255`` Rank Byte/Token Bijection Table

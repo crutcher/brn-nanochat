@@ -2,6 +2,9 @@
 
 use crate::declare_carrot_special;
 use crate::vocab::utility::specials_tools::format_reserved_carrot;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 
 declare_carrot_special!(
     (STARTOFTEXT, "startoftext"),
@@ -144,6 +147,7 @@ pub fn oa_gpt5_o200k_harmony_specials() -> Vec<(String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn test_oa_gpt2_r50k_specials() {

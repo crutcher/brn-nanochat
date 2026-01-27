@@ -1,5 +1,8 @@
 //! # Special Tokens Tools
 
+use alloc::format;
+use alloc::string::String;
+
 /// Generate a "<|$name|>" string literal.
 #[macro_export]
 macro_rules! carrot_str {

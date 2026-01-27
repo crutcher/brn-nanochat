@@ -1,9 +1,10 @@
 //! # Common Types and Traits
+use alloc::vec::Vec;
+use core::fmt::{Debug, Display};
 use core::hash::Hash;
+use core::ops::{AddAssign, SubAssign};
 use num_traits::bounds::UpperBounded;
 use num_traits::{FromPrimitive, Num, ToPrimitive, Unsigned};
-use std::fmt::{Debug, Display};
-use std::ops::{AddAssign, SubAssign};
 
 /// A type that can be used as a token in a BPE-based encoders.
 pub trait TokenType:
@@ -126,11 +127,13 @@ pub(crate) fn check_is_sync<S: Sync>(_: S) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::String;
     use compact_str::CompactString;
+    use core::marker::PhantomData;
 
     #[test]
     fn test_common_token_types() {
-        struct IsToken<T: TokenType>(std::marker::PhantomData<T>);
+        struct IsToken<T: TokenType>(PhantomData<T>);
 
         let _: IsToken<u16>;
         let _: IsToken<u32>;
@@ -140,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_common_count_types() {
-        struct IsCount<T: CountType>(std::marker::PhantomData<T>);
+        struct IsCount<T: CountType>(PhantomData<T>);
 
         let _: IsCount<u16>;
         let _: IsCount<u32>;
@@ -150,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_common_string_chunk_types() {
-        struct IsStringChunk<T: StringChunkType>(std::marker::PhantomData<T>);
+        struct IsStringChunk<T: StringChunkType>(PhantomData<T>);
 
         let _: IsStringChunk<String>;
         let _: IsStringChunk<CompactString>;

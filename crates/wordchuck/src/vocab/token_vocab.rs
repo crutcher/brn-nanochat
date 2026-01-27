@@ -1,6 +1,7 @@
 //! # Token Vocabulary Index
 
 use crate::types::TokenType;
+use alloc::vec::Vec;
 
 /// Common traits for token vocabularies.
 pub trait TokenVocab<T: TokenType>: Clone + Send + Sync {

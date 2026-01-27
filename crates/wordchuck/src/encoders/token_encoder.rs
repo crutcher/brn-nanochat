@@ -5,7 +5,9 @@ use crate::segmentation::text_segmentor::SpanRef;
 use crate::types::TokenType;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use crate::vocab::special_vocab::SpecialVocab;
-use std::sync::Arc;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType>: Send + Sync {

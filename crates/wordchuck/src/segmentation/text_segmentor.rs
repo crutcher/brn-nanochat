@@ -7,6 +7,8 @@ use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::TokenType;
 use crate::vocab::TokenVocab;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::ops::Range;
 
 /// Word Reference for [`TextSegmentor`].
@@ -175,6 +177,7 @@ mod tests {
     use super::*;
     use crate::regex::default_regex_supplier;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
+    use alloc::vec;
 
     #[test]
     fn test_split_words() {

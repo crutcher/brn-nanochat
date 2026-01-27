@@ -3,6 +3,7 @@
 use crate::types::{CommonHashMap, SpanTokenMap, TokenType};
 use crate::vocab::{ByteVocab, PairMapVocab, TokenVocab};
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Debug, Clone, PartialEq)]

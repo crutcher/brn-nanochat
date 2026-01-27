@@ -3,7 +3,7 @@
 use crate::segmentation::SegmentationConfig;
 use crate::types::{SpanTokenMap, TokenType};
 use crate::vocab::{ByteVocab, SpanMapVocab, UnifiedTokenVocab};
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 /// Create a test [`UnifiedTokenVocab`].
 pub fn build_test_vocab<T: TokenType, C>(

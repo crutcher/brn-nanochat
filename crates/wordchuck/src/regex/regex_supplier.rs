@@ -1,6 +1,9 @@
 //! # Regex Supplier Trait
 
 use crate::regex::RegexWrapper;
+use alloc::fmt::Debug;
+use alloc::string::String;
+use alloc::string::ToString;
 use alloc::sync::Arc;
 
 /// Common Regex Supplier Handle Type
@@ -17,11 +20,11 @@ pub trait RegexSupplier: Sync + Send {
     }
 }
 
-impl core::fmt::Debug for dyn RegexSupplier {
+impl Debug for dyn RegexSupplier {
     fn fmt(
         &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+        f: &mut alloc::fmt::Formatter<'_>,
+    ) -> alloc::fmt::Result {
         write!(f, "RegexSupplier({})", self.get_pattern())
     }
 }

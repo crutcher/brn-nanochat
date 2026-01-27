@@ -7,6 +7,7 @@ use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
@@ -167,6 +168,7 @@ mod tests {
     use crate::vocab::utility::testing::build_test_vocab;
     use crate::vocab::{ByteVocab, UnifiedTokenVocab};
     use alloc::sync::Arc;
+    use alloc::vec;
 
     #[test]
     fn test_encoder() {

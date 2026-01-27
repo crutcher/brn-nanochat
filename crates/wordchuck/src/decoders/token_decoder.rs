@@ -3,6 +3,8 @@
 use crate::decoders::TokenDecodeContext;
 use crate::types::TokenType;
 use crate::vocab::utility::strings::string_from_lossy_utf8;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 /// Trait for token decoders.
 pub trait TokenDecoder<T: TokenType>: Send + Sync {
@@ -76,6 +78,8 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
 mod tests {
     use super::*;
     use crate::decoders::utility::byte_decoder::ByteDecoder;
+    use alloc::string::ToString;
+    use alloc::vec;
     use num_traits::FromPrimitive;
 
     #[test]

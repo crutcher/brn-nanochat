@@ -58,6 +58,7 @@ mod tests {
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
+    use alloc::vec;
 
     #[test]
     fn test_dictionary_decoder() {

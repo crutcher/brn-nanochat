@@ -41,7 +41,9 @@ rayon = [
     "std"
 ]
 
-tracing = ["dep:tracing"]
+tracing = [
+    "tracing/attributes",
+]
 
 # We can switch HashMap/HashSet implementations for the whole crate.
 # This is done in the "src/types.rs" file.

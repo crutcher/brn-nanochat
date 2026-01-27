@@ -6,7 +6,8 @@ use crate::vocab::ByteVocab;
 use crate::vocab::pair_vocab::PairMapVocab;
 use crate::vocab::span_vocab::SpanMapVocab;
 use crate::vocab::token_vocab::TokenVocab;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// Unified token vocabulary.
 #[derive(Clone)]

@@ -5,7 +5,8 @@ use crate::decoders::utility::pair_decoder::PairExpansionDecoder;
 use crate::types::{CommonHashSet, Pair, PairTokenMap, TokenType};
 use crate::vocab::byte_vocab::ByteVocab;
 use crate::vocab::token_vocab::TokenVocab;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// Validate that a [`ByteVocab`] and [`PairTokenMap`] are compatible.
 ///
@@ -117,6 +118,7 @@ impl<T: TokenType> TokenVocab<T> for PairMapVocab<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::sync::Arc;
 
     #[test]
     fn test_tokens_sorted() {

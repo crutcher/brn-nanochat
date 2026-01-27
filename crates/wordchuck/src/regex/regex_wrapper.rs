@@ -1,6 +1,8 @@
 //! # Regex Wrapper
 //! This modules provides mechanisms to mix `regex` and `fancy_regex` types.
 
+use alloc::string::String;
+use alloc::string::ToString;
 use alloc::sync::Arc;
 use core::fmt::Debug;
 
@@ -232,7 +234,7 @@ impl<'r, 'h> Iterator for MatchesWrapper<'r, 'h> {
             Self::Regex(matches) => matches.next(),
             Self::FancyRegex(matches) => matches
                 .next()
-                .map(|m| unsafe { std::mem::transmute(m.unwrap()) }),
+                .map(|m| unsafe { core::mem::transmute(m.unwrap()) }),
         }
     }
 }

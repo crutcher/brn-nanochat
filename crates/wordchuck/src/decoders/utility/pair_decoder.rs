@@ -4,7 +4,7 @@ use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenToPairMap, TokenType};
 use crate::vocab::{ByteVocab, PairMapVocab};
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
@@ -80,6 +80,7 @@ mod tests {
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
     use alloc::sync::Arc;
+    use alloc::vec;
 
     #[test]
     fn test_pair_decoder() {

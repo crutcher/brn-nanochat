@@ -1,6 +1,8 @@
 //! # String Utilities
 
 use alloc::borrow::Cow;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 /// "stable" stub for for [`String::from_utf8_lossy`].
 pub fn string_from_lossy_utf8(v: Vec<u8>) -> String {
