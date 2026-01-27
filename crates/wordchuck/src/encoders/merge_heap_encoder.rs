@@ -21,11 +21,24 @@ pub struct MergeHeapVocabEncoder<T: TokenType> {
 
 impl<T: TokenType> MergeHeapVocabEncoder<T> {
     /// Construct an encoder from data.
+    ///
+    /// ## Arguments
+    /// * `data` - The unified token vocabulary to build the encoder from.
+    ///
+    /// ## Returns
+    /// A new `MergeHeapVocabEncoder` instance.
     pub fn init(data: Arc<UnifiedTokenVocab<T>>) -> Self {
         Self::init_with_factory(data, default_regex_supplier)
     }
 
     /// Construct an encoder from data.
+    ///
+    /// ## Arguments
+    /// * `data` - The unified token vocabulary to build the encoder from.
+    /// * `re_factory` - A factory function to create regex suppliers.
+    ///
+    /// ## Returns
+    /// A new `MergeHeapVocabEncoder` instance.
     pub fn init_with_factory<F>(
         data: Arc<UnifiedTokenVocab<T>>,
         re_factory: F,

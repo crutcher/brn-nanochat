@@ -25,6 +25,12 @@ impl<T: TokenType> SegmentationConfig<T> {
     /// Create a new text segmentor configuration with the given word pattern.
     ///
     /// Will contain an empty list of specials.
+    ///
+    /// ## Arguments
+    /// * `pattern` - The word split pattern.
+    ///
+    /// ## Returns
+    /// A new `SegmentationConfig` instance.
     pub fn from_pattern<P>(pattern: P) -> Self
     where
         P: Into<RegexWrapperPattern>,
@@ -36,6 +42,12 @@ impl<T: TokenType> SegmentationConfig<T> {
     }
 
     /// Set the split pattern for the text segmentor configuration.
+    ///
+    /// ## Arguments
+    /// * `pattern` - The new word split pattern.
+    ///
+    /// ## Returns
+    /// The updated `SegmentationConfig` instance.
     pub fn with_pattern<P>(
         self,
         pattern: P,
@@ -50,6 +62,12 @@ impl<T: TokenType> SegmentationConfig<T> {
     }
 
     /// Replace special tokens vocabulary.
+    ///
+    /// ## Arguments
+    /// * `specials` - The new special tokens vocabulary.
+    ///
+    /// ## Returns
+    /// The updated `SegmentationConfig` instance.
     pub fn with_specials<S>(
         self,
         specials: S,
@@ -62,6 +80,10 @@ impl<T: TokenType> SegmentationConfig<T> {
     }
 
     /// Add a word to the specials.
+    ///
+    /// ## Arguments
+    /// * `word` - The special word string to add.
+    /// * `token` - The token value for the special word.
     pub fn add_str_word(
         &mut self,
         word: &str,
@@ -71,6 +93,12 @@ impl<T: TokenType> SegmentationConfig<T> {
     }
 
     /// Add all of the given special words to the specials.
+    ///
+    /// ## Arguments
+    /// * `special_words` - An iterator of word strings and tokens.
+    ///
+    /// ## Returns
+    /// The updated `SegmentationConfig` instance.
     pub fn with_special_words<W, S>(
         self,
         special_words: W,
@@ -86,11 +114,17 @@ impl<T: TokenType> SegmentationConfig<T> {
     }
 
     /// Get the word pattern for the text segmentor configuration.
+    ///
+    /// ## Returns
+    /// The regex pattern as a `String`.
     pub fn pattern(&self) -> String {
         self.pattern.as_str().to_string()
     }
 
     /// Get the special tokens vocabulary for the text segmentor configuration.
+    ///
+    /// ## Returns
+    /// A reference to the internal `SpecialVocab`.
     pub fn special_vocab(&self) -> &SpecialVocab<T> {
         &self.specials
     }

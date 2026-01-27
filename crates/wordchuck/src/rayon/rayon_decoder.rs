@@ -21,6 +21,12 @@ where
     D: TokenDecoder<T>,
 {
     /// Create a new parallel token decoders.
+    ///
+    /// ## Arguments
+    /// * `inner` - The token decoder to wrap.
+    ///
+    /// ## Returns
+    /// A new `ParallelRayonDecoder` instance.
     pub fn new(inner: D) -> Self {
         Self {
             inner,

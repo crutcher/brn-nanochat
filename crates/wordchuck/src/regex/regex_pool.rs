@@ -32,6 +32,12 @@ impl From<Arc<RegexWrapper>> for RegexWrapperPool {
 
 impl RegexWrapperPool {
     /// Create a new `RegexPool`
+    ///
+    /// ## Arguments
+    /// * `regex` - The regex to pool.
+    ///
+    /// ## Returns
+    /// A new `RegexWrapperPool` instance.
     pub fn new(regex: Arc<RegexWrapper>) -> Self {
         let max_pool = std::thread::available_parallelism()
             .unwrap_or(NonZero::new(128).unwrap())

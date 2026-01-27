@@ -15,6 +15,12 @@ pub struct ByteDecoder<T: TokenType> {
 
 impl<T: TokenType> ByteDecoder<T> {
     /// Create a new byte decoder.
+    ///
+    /// ## Arguments
+    /// * `byte_vocab` - The byte vocabulary mapping.
+    ///
+    /// ## Returns
+    /// A new `ByteDecoder` instance.
     pub fn new<B>(byte_vocab: B) -> Self
     where
         B: Into<Arc<ByteMapVocab<T>>>,
@@ -25,6 +31,9 @@ impl<T: TokenType> ByteDecoder<T> {
     }
 
     /// Get the byte table.
+    ///
+    /// ## Returns
+    /// A reference to the internal `ByteMapVocab`.
     pub fn byte_vocab(&self) -> &ByteMapVocab<T> {
         &self.byte_vocab
     }

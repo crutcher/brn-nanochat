@@ -16,6 +16,12 @@ pub struct DictionaryDecoder<T: TokenType> {
 
 impl<T: TokenType> DictionaryDecoder<T> {
     /// Build a [`DictionaryDecoder`] from this [`UnifiedTokenVocab`].
+    ///
+    /// ## Arguments
+    /// * `unified_vocab` - The unified token vocabulary to build the decoder from.
+    ///
+    /// ## Returns
+    /// A new `DictionaryDecoder` instance.
     pub fn from_unified_vocab<V>(unified_vocab: V) -> Self
     where
         V: AsRef<UnifiedTokenVocab<T>>,
@@ -24,6 +30,12 @@ impl<T: TokenType> DictionaryDecoder<T> {
     }
 
     /// Creates a new Decoder.
+    ///
+    /// ## Arguments
+    /// * `token_to_word` - The token to word mapping.
+    ///
+    /// ## Returns
+    /// A new `DictionaryDecoder` instance.
     pub fn init(token_to_word: TokenToWordMap<T>) -> Self {
         Self { token_to_word }
     }

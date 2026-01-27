@@ -29,6 +29,13 @@ pub struct BinaryPairVocabTrainerOptions {
 
 impl BinaryPairVocabTrainerOptions {
     /// Create new options.
+    ///
+    /// ## Arguments
+    /// * `pattern` - The word split pattern.
+    /// * `vocab_size` - The target vocabulary size.
+    ///
+    /// ## Returns
+    /// A new `BinaryPairVocabTrainerOptions` instance.
     pub fn new<P: Into<RegexWrapperPattern>>(
         pattern: P,
         vocab_size: usize,
@@ -43,8 +50,11 @@ impl BinaryPairVocabTrainerOptions {
 impl BinaryPairVocabTrainerOptions {
     /// Sets the vocab size.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `vocab_size` - The desired vocabulary size; must be >= 256 (the size of the u8 space).
+    ///
+    /// ## Returns
+    /// The updated `BinaryPairVocabTrainerOptions` instance.
     pub fn with_vocab_size(
         self,
         vocab_size: usize,
@@ -53,6 +63,15 @@ impl BinaryPairVocabTrainerOptions {
     }
 
     /// Sets the regex pattern used for text splitting.
+    ///
+    /// ## Arguments
+    /// * `pattern` - The new word split pattern.
+    ///
+    /// ## Returns
+    /// The updated `BinaryPairVocabTrainerOptions` instance.
+    ///
+    /// ## Panics
+    /// Panics if the regex pattern compilation fails.
     pub fn with_pattern<P: Into<RegexWrapperPattern>>(
         self,
         pattern: P,
@@ -64,9 +83,8 @@ impl BinaryPairVocabTrainerOptions {
 
     /// Initializes a [`BinaryPairVocabTrainer`] from these options.
     ///
-    /// # Parameters
-    /// * `K` - the type used to store strings in the word counts.
-    /// * `C` - the type used to store counts in the word counts.
+    /// ## Returns
+    /// A new `BinaryPairVocabTrainer` instance.
     pub fn init<K, C>(self) -> BinaryPairVocabTrainer<K, C>
     where
         K: StringChunkType,
@@ -158,6 +176,12 @@ where
     C: CountType,
 {
     /// Initializes a [`BinaryPairVocabTrainer`].
+    ///
+    /// ## Arguments
+    /// * `options` - The trainer options.
+    ///
+    /// ## Returns
+    /// A new `BinaryPairVocabTrainer` instance.
     pub fn init(options: BinaryPairVocabTrainerOptions) -> Self {
         let span_counter = TextSpanCounter::<K, C>::new(
             Arc::new(
@@ -176,6 +200,9 @@ where
     }
 
     /// Update the word counts inplace from a text string.
+    ///
+    /// ## Arguments
+    /// * `text` - The text string to process.
     pub fn update_from_text<S: AsRef<str>>(
         &mut self,
         text: S,
@@ -184,6 +211,9 @@ where
     }
 
     /// Update word counts inplace from a sample iterator.
+    ///
+    /// ## Arguments
+    /// * `samples` - An iterator over string-like samples.
     pub fn update_from_samples<I>(
         &mut self,
         samples: I,
@@ -201,11 +231,11 @@ where
     /// * a ``{(T, T) -> T}`` pair map vocab with the learned binary pair merges,
     /// * a ``{Vec<u8> -> T}`` word map that is empty.
     ///
-    /// # Parameters
-    /// * `T` - the [`TokenType`] of the trained vocab.
-    ///
-    /// # Arguments
+    /// ## Arguments
     /// * `byte_vocab` - the byte/token mapping table to use for training.
+    ///
+    /// ## Returns
+    /// A `Result` containing the `TrainResults<T>` or an error.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_vocab)))]
     fn train_basic_pairs<T, B>(
         self,
@@ -363,11 +393,11 @@ where
     /// * a ``{(T, T) -> T}`` pair map vocab with the learned binary pair merges,
     /// * a ``{Vec<u8> -> T}`` word map that is empty.
     ///
-    /// # Parameters
-    /// * `T` - the [`TokenType`] of the trained vocab.
-    ///
-    /// # Arguments
+    /// ## Arguments
     /// * `byte_vocab` - the byte/token mapping table to use for training.
+    ///
+    /// ## Returns
+    /// A `Result` containing the `UnifiedTokenVocab<T>` or an error.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, byte_vocab)))]
     pub fn train<T, B>(
         self,

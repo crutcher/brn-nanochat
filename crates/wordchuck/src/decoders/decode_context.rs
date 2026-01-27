@@ -23,10 +23,13 @@ impl<T: TokenType> From<Vec<T>> for TokenDecodeContext<T> {
 impl<T: TokenType> TokenDecodeContext<T> {
     /// Creates a new decoding context.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `tokens` - the tokens to decode.
     /// * `bytes_per_token_hint` - a hint for the average number of bytes per token,
     ///   used when allocating output buffer space.
+    ///
+    /// ## Returns
+    /// A new `TokenDecodeContext` instance.
     pub fn for_tokens_with_hint(
         tokens: Vec<T>,
         bytes_per_token_hint: f64,
@@ -39,11 +42,17 @@ impl<T: TokenType> TokenDecodeContext<T> {
     }
 
     /// The context is complete when the token stack is empty.
+    ///
+    /// ## Returns
+    /// `true` if the token stack is empty, `false` otherwise.
     pub fn is_complete(&self) -> bool {
         self.stack.is_empty()
     }
 
     /// Returns the decoded buffer, or an error if the stack is not empty.
+    ///
+    /// ## Returns
+    /// A `Result` containing the decoded byte vector or an error if decoding is incomplete.
     pub fn try_result(self) -> anyhow::Result<Vec<u8>> {
         if self.is_complete() {
             Ok(self.buf)
@@ -56,6 +65,12 @@ impl<T: TokenType> TokenDecodeContext<T> {
     }
 
     /// Returns the decoded buffer, panics if the stack is not empty.
+    ///
+    /// ## Returns
+    /// The decoded byte vector.
+    ///
+    /// ## Panics
+    /// Panics if the token stack is not empty.
     pub fn unwrap(self) -> Vec<u8> {
         self.try_result().unwrap()
     }

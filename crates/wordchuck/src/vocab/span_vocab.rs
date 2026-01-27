@@ -81,6 +81,15 @@ impl<T: TokenType> SpanMapVocab<T> {
     /// Build vocabulary from just a [`ByteMapVocab`].
     ///
     /// Will have 255 span entries, each 1-byte long.
+    ///
+    /// ## Arguments
+    /// * `byte_vocab` - The byte vocabulary mapping.
+    ///
+    /// ## Returns
+    /// A new `SpanMapVocab` instance.
+    ///
+    /// ## Panics
+    /// Panics if initialization fails.
     pub fn from_byte_vocab<B>(byte_vocab: B) -> Self
     where
         B: Into<Arc<ByteMapVocab<T>>>,
@@ -97,8 +106,14 @@ impl<T: TokenType> SpanMapVocab<T> {
     /// The [`ByteMapVocab`] will be inferred from the [`SpanTokenMap`],
     /// and the default ordinal byte to token mappings.
     ///
-    /// # Panics
-    /// If the [`ByteMapVocab`] mapping is not 1:1.
+    /// ## Arguments
+    /// * `span_map` - The span to token mapping.
+    ///
+    /// ## Returns
+    /// A new `SpanMapVocab` instance.
+    ///
+    /// ## Panics
+    /// If the [`ByteMapVocab`] mapping is not 1:1, or if initialization fails.
     pub fn from_span_map(span_map: SpanTokenMap<T>) -> Self {
         let mut byte_map: CommonHashMap<u8, T> = byte_map_from_span_map(&span_map);
         for ord in 0..256 {
@@ -118,6 +133,15 @@ impl<T: TokenType> SpanMapVocab<T> {
     }
 
     /// Build word vocabulary from a [`PairMapVocab<T>`].
+    ///
+    /// ## Arguments
+    /// * `pair_vocab` - The pair vocabulary to build from.
+    ///
+    /// ## Returns
+    /// A new `SpanMapVocab` instance.
+    ///
+    /// ## Panics
+    /// Panics if initialization fails.
     pub fn from_pair_vocab(pair_vocab: &PairMapVocab<T>) -> Self {
         let byte_vocab: Arc<ByteMapVocab<T>> = pair_vocab.byte_vocab().clone();
         let span_map: SpanTokenMap<T> = pair_vocab.span_pairs().collect();
@@ -129,6 +153,13 @@ impl<T: TokenType> SpanMapVocab<T> {
     ///
     /// The span map will be the union of the span map,
     /// and all overrides from the `byte_vocab`.
+    ///
+    /// ## Arguments
+    /// * `byte_vocab` - The byte vocabulary mapping.
+    /// * `span_map` - The initial span to token mapping.
+    ///
+    /// ## Returns
+    /// A `Result` containing the new `SpanMapVocab` instance or an error.
     pub fn init<B>(
         byte_vocab: B,
         mut span_map: SpanTokenMap<T>,
@@ -148,31 +179,52 @@ impl<T: TokenType> SpanMapVocab<T> {
     }
 
     /// Get the byte/token mapping table.
+    ///
+    /// ## Returns
+    /// A reference to the internal `ByteMapVocab` arc.
     pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         &self.byte_vocab
     }
 
     /// Get the span => token map.
+    ///
+    /// ## Returns
+    /// A reference to the internal `SpanTokenMap`.
     pub fn span_map(&self) -> &SpanTokenMap<T> {
         &self.span_map
     }
 
     /// The number of words in the vocabulary.
+    ///
+    /// ## Returns
+    /// The number of spans in the map.
     pub fn len(&self) -> usize {
         self.span_map.len()
     }
 
     /// Returns `true` if the vocabulary contains no words.
+    ///
+    /// ## Returns
+    /// `true` if the span map is empty, `false` otherwise.
     pub fn is_empty(&self) -> bool {
         self.span_map.is_empty()
     }
 
     /// Iterate over the words in the vocabulary.
+    ///
+    /// ## Returns
+    /// An iterator over references to spans and their corresponding tokens.
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = (&'a Vec<u8>, &'a T)> + 'a {
         self.span_map.iter()
     }
 
     /// Return the associated token for the word, if any.
+    ///
+    /// ## Arguments
+    /// * `chunk` - The byte slice to look up.
+    ///
+    /// ## Returns
+    /// An `Option` containing the token if the span exists in the vocabulary.
     pub fn lookup_token(
         &self,
         chunk: &[u8],
@@ -185,6 +237,12 @@ impl<T: TokenType> SpanMapVocab<T> {
     }
 
     /// Build a binary pair map from the word vocabulary.
+    ///
+    /// ## Returns
+    /// A new `PairMapVocab` instance.
+    ///
+    /// ## Panics
+    /// Panics if the generated pair map is invalid.
     pub fn to_pair_vocab(&self) -> PairMapVocab<T> {
         let byte_vocab = self.byte_vocab.clone();
 

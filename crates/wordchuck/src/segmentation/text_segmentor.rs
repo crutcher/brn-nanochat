@@ -23,6 +23,9 @@ pub enum SpanRef<'a> {
 
 impl<'a> SpanRef<'a> {
     /// Get the inner string slice.
+    ///
+    /// ## Returns
+    /// The string slice.
     pub fn as_str(&self) -> &'a str {
         match self {
             SpanRef::Normal(s) => s,
@@ -39,7 +42,14 @@ pub struct TextSegmentor {
 }
 
 impl TextSegmentor {
-    /// Create a new text segmentor with the given configuration.
+    /// Create a new text segmentor from the given configuration.
+    ///
+    /// ## Arguments
+    /// * `config` - The segmentation configuration.
+    /// * `re_factory` - A factory function to create regex suppliers.
+    ///
+    /// ## Returns
+    /// A new `TextSegmentor` instance.
     pub fn from_config<T, F>(
         config: SegmentationConfig<T>,
         re_factory: F,
@@ -58,6 +68,14 @@ impl TextSegmentor {
     }
 
     /// Create a new text segmentor with the given regex pattern and special words.
+    ///
+    /// ## Arguments
+    /// * `pattern` - The word split pattern.
+    /// * `specials` - A slice of special word strings.
+    /// * `re_factory` - A factory function to create regex suppliers.
+    ///
+    /// ## Returns
+    /// A new `TextSegmentor` instance.
     pub fn init<P, S, F>(
         pattern: P,
         specials: &[S],
@@ -80,6 +98,13 @@ impl TextSegmentor {
     }
 
     /// Create a new text segmentor with the given regex suppliers.
+    ///
+    /// ## Arguments
+    /// * `word_re_supplier` - The regex supplier for word splitting.
+    /// * `special_re_supplier` - The optional regex supplier for special word matching.
+    ///
+    /// ## Returns
+    /// A new `TextSegmentor` instance.
     pub fn new(
         word_re_supplier: RegexSupplierHandle,
         special_re_supplier: Option<RegexSupplierHandle>,
@@ -92,7 +117,10 @@ impl TextSegmentor {
 
     /// Find the next special span in the text.
     ///
-    /// # Returns
+    /// ## Arguments
+    /// * `text` - The text to search in.
+    ///
+    /// ## Returns
     /// * `Some(Range<usize>)` if a special span is found,
     /// * `None` otherwise.
     pub fn next_special_span<S: AsRef<str>>(
@@ -105,9 +133,11 @@ impl TextSegmentor {
             .map(|m| m.range())
     }
 
-    /// Split a chunk of text into [`SpanRef::Normal`].
+    /// Split a chunk of text into [`SpanRef::Normal`], appending to the `words` buffer.
     ///
-    /// Append to the `words` buffer.
+    /// ## Arguments
+    /// * `text` - The text to split.
+    /// * `words` - The target buffer to append to.
     fn split_append_normal_words<'a>(
         &self,
         text: &'a str,
@@ -121,9 +151,11 @@ impl TextSegmentor {
         )
     }
 
-    /// Split a chunk of text into `Vec<WordRef>`.
+    /// Split a chunk of text into spans, appending to the `words` buffer.
     ///
-    /// Append to the `words` buffer.
+    /// ## Arguments
+    /// * `text` - The text to split.
+    /// * `words` - The target buffer to append to.
     pub fn split_append_spans<'a>(
         &self,
         text: &'a str,
@@ -145,10 +177,13 @@ impl TextSegmentor {
         }
     }
 
-    /// Split a chunk of text into `Vec<WordRef>`.
+    /// Split text into spans.
     ///
-    /// # Returns
-    /// A `Vec<WordRef>` containing the `WordRef`s to `text`..
+    /// ## Arguments
+    /// * `text` - The text to split.
+    ///
+    /// ## Returns
+    /// A vector of `SpanRef` items.
     pub fn split_spans<'a>(
         &self,
         text: &'a str,
@@ -160,7 +195,13 @@ impl TextSegmentor {
         words
     }
 
-    /// Rewrite text by segmenting and de-segmenting it.
+    /// Rewrite text by splitting and re-joining with spaces.
+    ///
+    /// ## Arguments
+    /// * `text` - The text to rewrite.
+    ///
+    /// ## Returns
+    /// The rewritten string.
     pub fn rewrite<S: AsRef<str>>(
         &self,
         text: S,
