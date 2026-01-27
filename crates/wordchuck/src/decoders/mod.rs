@@ -1,5 +1,10 @@
 //! # Token Decoders
 //!
+//! Decoder clients should use:
+//!
+//! * `DictionaryDecoder` - the fastest `TokenDecoder`.
+//! * `ParallelRayonDecoder` - a batch parallelism wrapper around any `TokenDecoder`.
+//!
 //! ## Example
 //!
 //! ```rust,no_run

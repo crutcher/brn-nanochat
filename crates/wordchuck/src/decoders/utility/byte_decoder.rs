@@ -5,19 +5,19 @@
 use crate::alloc::sync::Arc;
 use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
-use crate::vocab::byte_vocab::ByteVocab;
+use crate::vocab::byte_vocab::ByteMapVocab;
 
 /// A decoders that only decodes byte tokens.
 #[derive(Clone, Default)]
 pub struct ByteDecoder<T: TokenType> {
-    byte_vocab: Arc<ByteVocab<T>>,
+    byte_vocab: Arc<ByteMapVocab<T>>,
 }
 
 impl<T: TokenType> ByteDecoder<T> {
     /// Create a new byte decoder.
     pub fn new<B>(byte_vocab: B) -> Self
     where
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         Self {
             byte_vocab: byte_vocab.into(),
@@ -25,7 +25,7 @@ impl<T: TokenType> ByteDecoder<T> {
     }
 
     /// Get the byte table.
-    pub fn byte_vocab(&self) -> &ByteVocab<T> {
+    pub fn byte_vocab(&self) -> &ByteMapVocab<T> {
         &self.byte_vocab
     }
 }

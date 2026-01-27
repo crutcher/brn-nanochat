@@ -5,17 +5,17 @@ use crate::alloc::vec::Vec;
 use crate::decoders::TokenDecoder;
 use crate::decoders::utility::pair_decoder::PairExpansionDecoder;
 use crate::types::{CommonHashSet, Pair, PairTokenMap, TokenType};
-use crate::vocab::byte_vocab::ByteVocab;
+use crate::vocab::byte_vocab::ByteMapVocab;
 use crate::vocab::token_vocab::TokenVocab;
 
-/// Validate that a [`ByteVocab`] and [`PairTokenMap`] are compatible.
+/// Validate that a [`ByteMapVocab`] and [`PairTokenMap`] are compatible.
 ///
 /// - for every ``(a, b) -> t`` entry:
 ///   - the parents ``(a, b)``:
 ///     - are either in the `byte_vocab`, or are targets in the map, not both.
 ///   - the target ``t`` is not in the `byte_vocab`.
 pub fn try_validate_pair_map<T: TokenType>(
-    byte_vocab: &ByteVocab<T>,
+    byte_vocab: &ByteMapVocab<T>,
     pairs: &PairTokenMap<T>,
 ) -> anyhow::Result<()> {
     let pair_targets: CommonHashSet<T> = pairs.values().copied().collect();
@@ -52,7 +52,7 @@ pub fn try_validate_pair_map<T: TokenType>(
 #[derive(Default, Debug, Clone)]
 pub struct PairMapVocab<T: TokenType> {
     /// Byte/token mapping table.
-    byte_vocab: Arc<ByteVocab<T>>,
+    byte_vocab: Arc<ByteMapVocab<T>>,
 
     /// Map of ``{ (T, T) -> T }``.
     pairs: PairTokenMap<T>,
@@ -65,7 +65,7 @@ impl<T: TokenType> PairMapVocab<T> {
         pairs: PairTokenMap<T>,
     ) -> anyhow::Result<Self>
     where
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         let byte_vocab = byte_vocab.into();
         try_validate_pair_map(&byte_vocab, &pairs)?;
@@ -73,7 +73,7 @@ impl<T: TokenType> PairMapVocab<T> {
     }
 
     /// Get the byte/token mapping table.
-    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+    pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         &self.byte_vocab
     }
 
@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn test_tokens_sorted() {
         type T = u32;
-        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
 
         let mut vocab = PairMapVocab::<T> {
             pairs: PairTokenMap::default(),

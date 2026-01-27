@@ -10,7 +10,7 @@ use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
 use wordchuck::encoders::{MergeHeapVocabEncoder, TokenEncoder};
 use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
 use wordchuck::training::BinaryPairVocabTrainerOptions;
-use wordchuck::vocab::byte_vocab::ByteVocab;
+use wordchuck::vocab::byte_vocab::ByteMapVocab;
 use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
 use wordchuck::vocab::{TokenVocab, UnifiedTokenVocab};
@@ -115,7 +115,7 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+    let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
 
     println!("- train");
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer

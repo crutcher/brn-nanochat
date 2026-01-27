@@ -9,11 +9,11 @@ The current status is productionization towards an alpha release.
 TODO:
 
 - New Name / New Repo. ( `wordchuck` conflicts, alas)
-- Save/Load vocabularies.
-    - Save/Load well-known / named remote vocabularies.
-    - Save/Load to `tiktoken` vocab format.
+- Pluggable URL/Local File Cache
+    - PreTrained
+    - TrainingShards
 - Benchmarks.
-- Error handling (as `Result`s, not panics).
+- More complete Error handling (as `Result`s, not panics).
 - Tuning
     - Instrument `tiktoken` (via `tracing`).
     - Compare / fix perf differences.
@@ -23,20 +23,203 @@ See:
 
 - [examples/tokenizer_trainer](examples/tokenizer_trainer)
 
-# training example
+## Crate Features
 
-- the iterator stream for samples may be quite large.
-- training a `nanochat` equivalent tokenizer takes ~80 CPU minutes.
+#### feature: ``default``
+
+* ``client``
+
+The default feature enables ``client``, with no training code.
+
+#### feature: ``client``
+
+* ``ahash``
+* ``rayon``
+* ``std``
+
+The default client is focused on loading vocabularies and running
+high performance encoders / decoders.
+
+#### feature: ``training``
+
+* ``compact_str``
+* ``dary_heap``
+* ``std``
+
+The training feature enables the training code.
+
+#### feature: ``std`` / ``no_std``
+
+The ``std`` feature enables the use of the ``std`` library;
+and the ``no_std`` feature enables deps needed when ``std`` is not enabled.
+(Negative feature deps are not stable yet.)
+
+Note: I am unsure if this is complete. It is tested CI, but I'm unsure
+if I've fully covered it; and I haven't worked out a ``no_std`` deploy test yet.
+
+#### feature: ``ahash``
+
+This swaps all HashMap/HashSet implementations for ``ahash`; which is a performance
+win on many/(most?) modern CPUs.
+
+This is done by the ``types::hash_types::CommonHash{*}`` type alias machinery.
+See also the ``hashbrown`` dep used by ``no_std``.
+
+#### feature: ``rayon``
+
+This enables some parallelism wrappers using the ``rayon`` crate.
+
+TODO: I intend on providing a ``tokio`` based ``async`` parallelism mechanism
+as well, to structure more direct ``regex`>`encode`` pipeline parallelism.
+
+#### feature: ``tracing``
+
+This enables a number of ``tracing`` instrumentation points.
+This is only useful for timing tracing of the library itself.
+
+## Clients
+
+### UnifiedTokenVocab
+
+The `UnifiedTokenVocab` is a unified representation of the vocabularies
+used by the `TokenEncoder` and `TokenDecoder` clients. It contains:
+
+* `SegmentationConfig` - describing the span/word regex and the special token map.
+* `ByteMapVocab` - describing the `{ u8 -> T }` mapping.
+* `SpanMapVocab` - describing the `{ Vec<u8> -> T }` mapping.
+* `PairMapVocab` - describing known `{ (T, T) -> T }` merge pairs.
+
+#### Loading Pretrained Vocabularies
+
+This is only partially implemented; it still requires a fair amount of manual work.
+
+A collection of metadata about known pretrained vocabularies is available:
+
+* `wordchuck::vocab::public`
+
+What is incomplete is a local URL cache plus workflow for assembling a vocab
+from the known metadata.
+
+A loading example exists in the `examples/token-cli` crate.
+
+```rust,no_run
+use wordchuck::decoders::{DictionaryDecoder, TokenDecoder};
+use wordchuck::encoders::{MergeHeapVocabEncoder, TokenEncoder};
+use wordchuck::rayon::{ParallelRayonDecoder, ParallelRayonEncoder};
+use wordchuck::regex::{regex_pool_supplier, RegexWrapperPattern};
+use wordchuck::segmentation::{SegmentationConfig, TextSegmentor};
+use wordchuck::vocab::io::tiktoken_io::load_span_map_from_tiktoken_path;
+use wordchuck::vocab::public::openai::{oa_gpt2_r50k_specials, OA_GPT2_R50K_BASE_TIKTOKEN, OA_GPT2_R50K_WORD_PATTERN};
+use wordchuck::vocab::UnifiedTokenVocab;
+
+type T = u32;
+
+let pattern: RegexWrapperPattern = OA_GPT2_R50K_WORD_PATTERN.into();
+
+let r50k_tiktoken = OA_GPT2_R50K_BASE_TIKTOKEN;
+// If we had a download cache, we'd use OA_GPT_R50K_BASE_TIKTOKEN.url here:
+let span_map = load_span_map_from_tiktoken_path(tokenizer_file)?;
+
+let segmentation = SegmentationConfig::<T>::from_pattern(pattern.clone()).with_special_words(
+    oa_gpt2_r50k_specials()
+        .iter()
+        .map(|(s, t)| (s, T::from_usize(*t).unwrap())),
+);
+
+let vocab: Arc<UnifiedTokenVocab<T>> =
+    UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();
+
+let encoder: MergeHeapVocabEncoder<T> =
+    MergeHeapVocabEncoder::<T>::init_with_factory(vocab.clone(), regex_pool_supplier);
+let encoder = ParallelRayonEncoder::new(encoder);
+
+let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
+let decoder = ParallelRayonDecoder::new(decoder);
+```
+
+### TokenEncoder Clients
+
+Encoder clients should use:
+
+* `MergeHeapVocabEncoder` - the current default (only?) `TokenEncoder`.
+* `ParallelRayonEncoder` - a batch parallelism wrapper around any `TokenEncoder`.
+
+```rust,no_run
+use wordchuck::vocab::UnifiedTokenVocab;
+use wordchuck::encoders::MergeHeapVocabEncoder;
+use wordchuck::encoders::TokenEncoder;
+use wordchuck::types::TokenType;
+use std::sync::Arc;
+
+fn example<T: TokenType>(
+    vocab: Arc<UnifiedTokenVocab<T>>,
+    batch: &[String],
+) -> Vec<Vec<T>> {
+    let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::init(vocab);
+
+    #[cfg(feature = "rayon")]
+    let encoder = wordchuck::rayon::ParallelRayonEncoder::new(encoder);
+
+    encoder.try_encode_batch(batch).unwrap()
+}
+```
+
+### TokenDecoder Clients
+
+Decoder clients should use:
+
+* `DictionaryDecoder` - the fastest `TokenDecoder`.
+* `ParallelRayonDecoder` - a batch parallelism wrapper around any `TokenDecoder`.
+
+```rust,no_run
+use wordchuck::vocab::UnifiedTokenVocab;
+use wordchuck::decoders::DictionaryDecoder;
+use wordchuck::decoders::TokenDecoder;
+use wordchuck::types::TokenType;
+use std::sync::Arc;
+
+fn example<T: TokenType>(
+    vocab: Arc<UnifiedTokenVocab<T>>,
+    batch: &[Vec<T>],
+) -> Vec<String> {
+    let decoder: DictionaryDecoder<T> = DictionaryDecoder::from_unified_vocab(vocab);
+
+    #[cfg(feature = "rayon")]
+    let decoder = wordchuck::rayon::ParallelRayonDecoder::new(decoder);
+
+    decoder.try_decode_batch_to_strings(batch).unwrap()
+}
+```
+
+### Training
+
+See `examples/tokenizer_trainer`.
+
+This is a code snippet overview of training.
+
+Expect training to take ~1s/10MB of input; and to be slowed
+primarily by how well the stream logic of loading the training
+samples is parallelized.
+
+Note: currently, training has limited logging, and no progress reporting.
+
+A common training binary is probably a good idea; and much of the messiness
+of supporting many different training data sources could be hidden in
+the isolated deps of such a tool.
+
+Here:
+
+- The iterator stream for samples may be quite large.
+- Training a `nanochat` equivalent tokenizer takes ~80 CPU minutes.
 
 ```rust,no_run
 use wordchuck::training::bpe_trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
 use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-use wordchuck::vocab::{ByteVocab, UnifiedTokenVocab};
+use wordchuck::vocab::{ByteMapVocab, UnifiedTokenVocab};
 use wordchuck::encoders::MergeHeapVocabEncoder;
 use wordchuck::decoders::DictionaryDecoder;
 use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
-use wordchuck::regex::default_regex_supplier;
 use std::sync::Arc;
 
 fn example<I, S>(
@@ -69,7 +252,7 @@ fn example<I, S>(
         trainer.update_from_samples(batch.as_ref());
     }
 
-    let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+    let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
 
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
         .train(byte_vocab.clone())
@@ -82,10 +265,7 @@ fn example<I, S>(
         println!("- tiktoken vocab: {path:?}");
     }
 
-    let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::<T>::init(
-        vocab.clone(),
-        default_regex_supplier
-    );
+    let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::init(vocab.clone());
     let encoder = ParallelRayonEncoder::new(encoder);
 
     let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
@@ -93,17 +273,16 @@ fn example<I, S>(
 }
 ```
 
-# Example Tokenizer Trainer
+#### Running `examples/tokenizer_trainer`
 
 Each shard is ~90MB parquet file.
 
-- 64 Core Thread Ripper
+- 64 Core AMD
 
 ```terminaloutput
-$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --time-encode-decode 
-   Compiling wordchuck v0.0.6 (/home/crutcher/git/brn-nanochat/crates/wordchuck)
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --time-encode-decode
    Compiling tokenizer_trainer v0.0.0 (/home/crutcher/git/brn-nanochat/crates/wordchuck/examples/tokenizer_trainer)
-    Finished `release` profile [optimized] target(s) in 1.85s
+    Finished `release` profile [optimized] target(s) in 24.15s
      Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --time-encode-decode`
 Loading Shards: [0, 1, 2, 3, 4, 5, 6, 7]
 ...
@@ -118,7 +297,7 @@ Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
 - shard: 6
 - shard: 7
 - train
-- training_duration: 203.40s
+- training_duration: 188.60s
 - vocab_size: 65535
 
 Samples Summary:
@@ -129,9 +308,9 @@ Timing Config:
 - batch size: 512
 
 Timing Encode:
-- batch avg: 76.543966ms
-- sample avg: 149.499µs
-- avg bps: 31.71 MB/s
+- batch avg: 71.640541ms
+- sample avg: 139.922µs
+- avg bps: 33.88 MB/s
 
 Observed Bytes/Token Stats:
 - total bytes: 97103222
@@ -139,10 +318,10 @@ Observed Bytes/Token Stats:
 - sample byte/token: 3.94
 
 Timing Decode:
-- batch avg: 2.466106ms
-- sample avg: 4.816µs
+- batch avg: 1.801906ms
+- sample avg: 3.519µs
 
-real    3m28.924s
-user    6m37.652s
-sys     0m35.035s
+real    3m36.164s
+user    10m34.735s
+sys     0m43.929s
 ```

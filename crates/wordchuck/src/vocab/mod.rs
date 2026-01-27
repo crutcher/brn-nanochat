@@ -6,7 +6,7 @@
 //!
 //! Due to choices which exist in the community, we are forced to explicitly
 //! map between byte values and token ranks. This is provided by:
-//! * [`ByteVocab`].
+//! * [`ByteMapVocab`].
 //!
 //! ## Unified Vocabulary
 //!
@@ -32,7 +32,7 @@ pub mod token_vocab;
 pub mod unified_vocab;
 pub mod utility;
 
-pub use byte_vocab::ByteVocab;
+pub use byte_vocab::ByteMapVocab;
 pub use pair_vocab::PairMapVocab;
 pub use span_vocab::SpanMapVocab;
 pub use token_vocab::TokenVocab;

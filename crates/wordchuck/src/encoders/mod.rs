@@ -1,5 +1,10 @@
 //! # Token Encoders
 //!
+//! Encoder clients should use:
+//!
+//! * `MergeHeapVocabEncoder` - the current default (only?) `TokenEncoder`.
+//! * `ParallelRayonEncoder` - a batch parallelism wrapper around any `TokenEncoder`.
+//!
 //! ## Example
 //!
 //! ```rust,no_run

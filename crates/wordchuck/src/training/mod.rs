@@ -1,6 +1,34 @@
 //! # Vocabulary Training
 //!
+//! Support for training token vocabularies.
+//!
+//! Training requires:
+//! * [`crate::vocab::ByteMapVocab`] - a choice of ``{ u8 -> T }` byte mappings.
+//!   * The default is ``T::from(u8)``.
+//! * [`crate::segmentation::SegmentationConfig`] - a text splitting config.
+//!   * This can be built from just a regex pattern.
+//!   * Special tokens can be overlaid on a pre-trained vocabulary.
+//!
 //! ## Training Example
+//!
+//! See `examples/tokenizer_trainer`.
+//!
+//! This is a code snippet overview of training.
+//!
+//! Expect training to take ~1s/10MB of input; and to be slowed
+//! primarily by how well the stream logic of loading the training
+//! samples is parallelized.
+//!
+//! Note: currently, training has limited logging and no progress reporting.
+//!
+//! A common training binary is probably a good idea; and much of the messiness
+//! of supporting many different training data sources could be hidden in
+//! the isolated deps of such a tool.
+//!
+//! Here:
+//!
+//! - The iterator stream for samples may be quite large.
+//! - Training a `nanochat` equivalent tokenizer takes ~80 CPU minutes.
 //!
 //! Consider the following, to train a tokenizer and export it a "*.tiktoken" file.
 //!
@@ -11,7 +39,7 @@
 //! use wordchuck::training::bpe_trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
 //! use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
 //! use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-//! use wordchuck::vocab::{ByteVocab, UnifiedTokenVocab};
+//! use wordchuck::vocab::{ByteMapVocab, UnifiedTokenVocab};
 //! use wordchuck::encoders::MergeHeapVocabEncoder;
 //! use wordchuck::decoders::DictionaryDecoder;
 //! use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
@@ -47,7 +75,7 @@
 //!         trainer.update_from_samples(batch.as_ref());
 //!     }
 //!
-//!     let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+//!     let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
 //!
 //!     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
 //!         .train(byte_vocab.clone())
