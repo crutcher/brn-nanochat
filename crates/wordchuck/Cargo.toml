@@ -29,6 +29,9 @@ std = [
     "num-traits/std",
     "log/std",
 ]
+no_std = [
+    "hashbrown/alloc"
+]
 
 training = [
     "compact_str",
@@ -68,6 +71,9 @@ num-traits = { workspace = true }
 # "std" feature deps:
 base64 = { workspace = true, optional = true }
 parking_lot = { workspace = true, optional = true }
+
+# "no_std" feature deps:
+hashbrown = { workspace = true, optional = true }
 
 # "ahash" feature deps:
 ahash = { workspace = true, optional = true }

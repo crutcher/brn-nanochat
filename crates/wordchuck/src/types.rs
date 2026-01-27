@@ -88,21 +88,40 @@ impl<T> StringChunkType for T where
 {
 }
 
-/// Type Alias for hash maps in this crate.
 #[cfg(feature = "ahash")]
-pub type CommonHashMap<K, V> = ahash::AHashMap<K, V>;
+mod hash_types {
+    /// Type Alias for hash maps in this crate.
+    pub type CommonHashMap<K, V> = ahash::AHashMap<K, V>;
 
-/// Type Alias for hash maps in this crate.
-#[cfg(not(feature = "ahash"))]
-pub type CommonHashMap<K, V> = std::collections::HashMap<K, V>;
+    /// Iterator over hash map entries.
+    pub type CommonHashIter<'a, K, V> = std::collections::hash_map::Iter<'a, K, V>;
 
-/// Type Alias for hash sets in this crate.
-#[cfg(feature = "ahash")]
-pub type CommonHashSet<V> = ahash::AHashSet<V>;
+    /// Type Alias for hash sets in this crate.
+    pub type CommonHashSet<V> = ahash::AHashSet<V>;
+}
+#[cfg(all(feature = "std", not(feature = "ahash")))]
+mod hash_types {
+    /// Type Alias for hash maps in this crate.
+    pub type CommonHashMap<K, V> = std::collections::HashMap<K, V>;
 
-/// Type Alias for hash sets in this crate.
-#[cfg(not(feature = "ahash"))]
-pub type CommonHashSet<V> = std::collections::HashSet<V>;
+    /// Iterator over hash map entries.
+    pub type CommonHashIter<'a, K, V> = std::collections::hash_map::Iter<'a, K, V>;
+
+    /// Type Alias for hash sets in this crate.
+    pub type CommonHashSet<V> = std::collections::HashSet<V>;
+}
+#[cfg(all(not(feature = "std"), feature = "no_std"))]
+mod hash_types {
+    /// Type Alias for hash maps in this crate.
+    pub type CommonHashMap<K, V> = hashbrown::HashMap<K, V>;
+
+    /// Iterator over hash map entries.
+    pub type CommonHashIter<'a, K, V> = hashbrown::hash_map::Iter<'a, K, V>;
+
+    /// Type Alias for hash sets in this crate.
+    pub type CommonHashSet<V> = hashbrown::HashSet<V>;
+}
+pub use hash_types::*;
 
 /// [`Pair<T>`] to T map.
 pub type PairTokenMap<T> = CommonHashMap<Pair<T>, T>;
