@@ -3,7 +3,7 @@
 use crate::regex::{RegexSupplierHandle, RegexWrapper};
 use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{CommonHashMap, CountType, StringChunkType, TokenType};
-use crate::vocab::byte_vocab::ByteVocab;
+use crate::vocab::byte_vocab::ByteMapVocab;
 use crate::vocab::public::size_hints::EXPECTED_WORD_LENGTH;
 use std::fmt::Debug;
 
@@ -142,7 +142,7 @@ where
     /// * `byte_vocab` - the byte table to use for byte translation.
     pub fn to_text_span_counts_iter<T: TokenType>(
         &self,
-        byte_vocab: &ByteVocab<T>,
+        byte_vocab: &ByteMapVocab<T>,
     ) -> impl Iterator<Item = (TokenSpanBuf<T>, C)> {
         self.word_counts
             .iter()
@@ -201,7 +201,7 @@ mod tests {
         type T = usize;
         type C = u64;
 
-        let byte_vocab: ByteVocab<T> = Default::default();
+        let byte_vocab: ByteMapVocab<T> = Default::default();
 
         let mut word_counts =
             TextSpanCounter::<K, C>::new(Arc::new(get_regex()), TextSpanCounterOptions::default());

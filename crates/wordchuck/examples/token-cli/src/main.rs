@@ -12,9 +12,9 @@ use wordchuck::regex::{RegexWrapperPattern, regex_pool_supplier};
 use wordchuck::segmentation::{SegmentationConfig, TextSegmentor};
 use wordchuck::vocab::UnifiedTokenVocab;
 use wordchuck::vocab::io::tiktoken_io::load_span_map_from_tiktoken_path;
-use wordchuck::vocab::public::openai::patterns::OA_GPT2_R50K_WORD_PATTERN;
-use wordchuck::vocab::public::openai::resources::OA_GPT2_R50K_BASE_TIKTOKEN;
-use wordchuck::vocab::public::openai::specials::oa_gpt2_r50k_specials;
+use wordchuck::vocab::public::openai::{
+    OA_GPT2_R50K_BASE_TIKTOKEN, OA_GPT2_R50K_WORD_PATTERN, oa_gpt2_r50k_specials,
+};
 
 /// Example encoders trainer.
 #[derive(Parser, Debug)]
@@ -67,19 +67,19 @@ fn run_load(
         .with_cache_dir(args.dataset_dir.clone())
         .init()?;
 
+    type T = u32;
+
     let pattern: RegexWrapperPattern = OA_GPT2_R50K_WORD_PATTERN.into();
 
     let r50k_tiktoken = OA_GPT2_R50K_BASE_TIKTOKEN;
-
-    type T = u32;
+    // If we had a download cache, we'd use OA_GPT_R50K_BASE_TIKTOKEN.url here:
+    let span_map = load_span_map_from_tiktoken_path(tokenizer_file)?;
 
     let segmentation = SegmentationConfig::<T>::from_pattern(pattern.clone()).with_special_words(
         oa_gpt2_r50k_specials()
             .iter()
             .map(|(s, t)| (s, T::from_usize(*t).unwrap())),
     );
-
-    let span_map = load_span_map_from_tiktoken_path(tokenizer_file)?;
 
     let vocab: Arc<UnifiedTokenVocab<T>> =
         UnifiedTokenVocab::from_span_vocab(segmentation, span_map.into()).into();

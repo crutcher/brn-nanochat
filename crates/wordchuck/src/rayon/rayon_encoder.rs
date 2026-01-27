@@ -69,7 +69,7 @@ mod tests {
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::UnifiedTokenVocab;
-    use crate::vocab::byte_vocab::ByteVocab;
+    use crate::vocab::byte_vocab::ByteMapVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
     use std::sync::Arc;
@@ -84,7 +84,7 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
         let segmentation = SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN);
         let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(byte_vocab.clone(), segmentation)
             .with_special_words(vec![("<|HI|>", 3000)])

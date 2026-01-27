@@ -4,13 +4,13 @@ use crate::alloc::sync::Arc;
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenToPairMap, TokenType};
-use crate::vocab::{ByteVocab, PairMapVocab};
+use crate::vocab::{ByteMapVocab, PairMapVocab};
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
 pub struct PairExpansionDecoder<T: TokenType> {
     /// Byte/token mapping table.
-    byte_vocab: Arc<ByteVocab<T>>,
+    byte_vocab: Arc<ByteMapVocab<T>>,
 
     /// Token to pair mapping.
     token_map: TokenToPairMap<T>,
@@ -23,7 +23,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
         token_map: TokenToPairMap<T>,
     ) -> Self
     where
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         Self {
             byte_vocab: byte_vocab.into(),
@@ -42,7 +42,7 @@ impl<T: TokenType> PairExpansionDecoder<T> {
     }
 
     /// Get the byte table.
-    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+    pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         &self.byte_vocab
     }
 }
@@ -78,7 +78,7 @@ mod tests {
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::UnifiedTokenVocab;
-    use crate::vocab::byte_vocab::ByteVocab;
+    use crate::vocab::byte_vocab::ByteMapVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
 
@@ -92,7 +92,7 @@ mod tests {
             "it's not the heat, it's the salt",
         ];
 
-        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
         let vocab: Arc<UnifiedTokenVocab<T>> = build_test_vocab(
             byte_vocab.clone(),
             SegmentationConfig::from_pattern(OA_GPT3_CL100K_WORD_PATTERN),

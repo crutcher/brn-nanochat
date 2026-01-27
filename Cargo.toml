@@ -25,38 +25,30 @@ doc_markdown = "deny"
 
 
 [workspace.dependencies]
-burn = "^0.20.0"
-bimm-contracts = "^0.19.2"
-
-hashbrown = { version = "0.16.1" }
-tracing = { version = "^0.1", default-features = false }
-log = { version = "^0.4", default-features = false }
-clap = "^4.5"
-anyhow = { version = "^1.0" , default-features = false }
-shellexpand = "^3.1"
-
-num-traits = {  version = "^0.2.19", default-features = false }
-compact_str = "^0.9"
 ahash = "^0.8"
+arrow = "^57.1"
+base64 = "^0.22.1"
+bimm-contracts = "^0.19.2"
+burn = "^0.20.0"
+clap = "^4.5"
+compact_str = "^0.9"
 dary_heap = "^0.3"
-stackvec = "^0.2.1"
-edit-distance = "^2.2"
-similar = "^2.7.0"
-
-parking_lot = "^0.12.5"
-
-rayon = "^1.11"
-
-base64 = {  version = "^0.22.1" }
-serde = "^1.0"
-
 downloader = "^0.2"
-
+edit-distance = "^2.2"
+hashbrown = "0.16.1"
+parking_lot = "^0.12.5"
+parquet = "^57.1"
+rayon = "^1.11"
+serde = "^1.0"
+shellexpand = "^3.1"
+similar = "^2.7.0"
+stackvec = "^0.2.1"
 tempdir = "^0.3"
 
-parquet = "^57.1"
-arrow = "^57.1"
-
-regex = "^1.12"
-fancy-regex = "^0.17"
+anyhow = { version = "^1.0", default-features = false }
+fancy-regex = { version = "^0.17", default-features = false }
+log = { version = "^0.4", default-features = false }
+num-traits = { version = "^0.2.19", default-features = false }
+regex = { version = "^1.12", default-features = false }
+tracing = { version = "^0.1", default-features = false }
 

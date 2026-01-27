@@ -7,7 +7,7 @@ use crate::training::token_span_buffer::TokenSpanBuf;
 use crate::types::{
     CommonHashMap, CommonHashSet, CountType, Pair, PairTokenMap, StringChunkType, TokenType,
 };
-use crate::vocab::byte_vocab::ByteVocab;
+use crate::vocab::byte_vocab::ByteMapVocab;
 use crate::vocab::pair_vocab::PairMapVocab;
 use crate::vocab::utility::validators;
 use crate::vocab::utility::validators::U8_SIZE;
@@ -214,7 +214,7 @@ where
     where
         T: TokenType,
         C: CountType,
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         let byte_vocab = byte_vocab.into();
 
@@ -376,7 +376,7 @@ where
     where
         T: TokenType,
         C: CountType,
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         let results = self.train_basic_pairs(byte_vocab)?;
         Ok(UnifiedTokenVocab::from_pair_vocab(
@@ -395,7 +395,7 @@ mod tests {
     use crate::training::bpe_trainer::MergeJob;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::{ByteVocab, UnifiedTokenVocab};
+    use crate::vocab::{ByteMapVocab, UnifiedTokenVocab};
     use compact_str::CompactString;
     use core::cmp::Ordering;
 
@@ -435,7 +435,7 @@ mod tests {
         let mut trainer = options.init::<K, C>();
         trainer.update_from_samples(samples.iter());
 
-        let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+        let byte_vocab: Arc<ByteMapVocab<T>> = Arc::new(Default::default());
 
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_vocab.clone()).unwrap().into();
 

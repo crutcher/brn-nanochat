@@ -3,13 +3,13 @@
 use crate::alloc::sync::Arc;
 use crate::alloc::vec::Vec;
 use crate::types::{CommonHashIter, CommonHashMap, SpanTokenMap, TokenType};
-use crate::vocab::{ByteVocab, PairMapVocab, TokenVocab};
+use crate::vocab::{ByteMapVocab, PairMapVocab, TokenVocab};
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpanMapVocab<T: TokenType> {
     /// The byte/token mapping table.
-    byte_vocab: Arc<ByteVocab<T>>,
+    byte_vocab: Arc<ByteMapVocab<T>>,
 
     /// The regex pattern used for text spl
     /// Map of ``{ Vec<u8> -> T }``.
@@ -18,7 +18,7 @@ pub struct SpanMapVocab<T: TokenType> {
 
 impl<T: TokenType> Default for SpanMapVocab<T> {
     fn default() -> Self {
-        SpanMapVocab::from_byte_vocab(Arc::new(ByteVocab::default()))
+        SpanMapVocab::from_byte_vocab(Arc::new(ByteMapVocab::default()))
     }
 }
 
@@ -52,9 +52,9 @@ pub fn byte_map_from_span_map<T: TokenType>(span_map: &SpanTokenMap<T>) -> Commo
         .collect()
 }
 
-/// Validate that a [`ByteVocab`] and [`SpanMapVocab`] are compatible.
+/// Validate that a [`ByteMapVocab`] and [`SpanMapVocab`] are compatible.
 pub fn try_validate_span_map<T>(
-    byte_vocab: &ByteVocab<T>,
+    byte_vocab: &ByteMapVocab<T>,
     span_map: &SpanTokenMap<T>,
 ) -> anyhow::Result<()>
 where
@@ -78,12 +78,12 @@ where
 }
 
 impl<T: TokenType> SpanMapVocab<T> {
-    /// Build vocabulary from just a [`ByteVocab`].
+    /// Build vocabulary from just a [`ByteMapVocab`].
     ///
     /// Will have 255 span entries, each 1-byte long.
     pub fn from_byte_vocab<B>(byte_vocab: B) -> Self
     where
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         let byte_vocab = byte_vocab.into();
 
@@ -94,11 +94,11 @@ impl<T: TokenType> SpanMapVocab<T> {
 
     /// Build a [`Self`] from a [`SpanTokenMap`].
     ///
-    /// The [`ByteVocab`] will be inferred from the [`SpanTokenMap`],
+    /// The [`ByteMapVocab`] will be inferred from the [`SpanTokenMap`],
     /// and the default ordinal byte to token mappings.
     ///
     /// # Panics
-    /// If the [`ByteVocab`] mapping is not 1:1.
+    /// If the [`ByteMapVocab`] mapping is not 1:1.
     pub fn from_span_map(span_map: SpanTokenMap<T>) -> Self {
         let mut byte_map: CommonHashMap<u8, T> = byte_map_from_span_map(&span_map);
         for ord in 0..256 {
@@ -111,14 +111,15 @@ impl<T: TokenType> SpanMapVocab<T> {
         ord_table.sort_by_key(|&(k, _)| k);
         let byte_to_token: Vec<T> = ord_table.into_iter().map(|(_, v)| v).collect();
 
-        let byte_vocab: Arc<ByteVocab<T>> = ByteVocab::from_byte_to_token(&byte_to_token).into();
+        let byte_vocab: Arc<ByteMapVocab<T>> =
+            ByteMapVocab::from_byte_to_token(&byte_to_token).into();
 
         Self::init(byte_vocab, span_map).unwrap()
     }
 
     /// Build word vocabulary from a [`PairMapVocab<T>`].
     pub fn from_pair_vocab(pair_vocab: &PairMapVocab<T>) -> Self {
-        let byte_vocab: Arc<ByteVocab<T>> = pair_vocab.byte_vocab().clone();
+        let byte_vocab: Arc<ByteMapVocab<T>> = pair_vocab.byte_vocab().clone();
         let span_map: SpanTokenMap<T> = pair_vocab.span_pairs().collect();
 
         Self::init(byte_vocab, span_map).unwrap()
@@ -133,7 +134,7 @@ impl<T: TokenType> SpanMapVocab<T> {
         mut span_map: SpanTokenMap<T>,
     ) -> anyhow::Result<Self>
     where
-        B: Into<Arc<ByteVocab<T>>>,
+        B: Into<Arc<ByteMapVocab<T>>>,
     {
         let byte_vocab = byte_vocab.into();
         try_validate_span_map(&byte_vocab, &span_map)?;
@@ -147,7 +148,7 @@ impl<T: TokenType> SpanMapVocab<T> {
     }
 
     /// Get the byte/token mapping table.
-    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+    pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         &self.byte_vocab
     }
 
@@ -231,13 +232,13 @@ impl<T: TokenType> TokenVocab<T> for SpanMapVocab<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vocab::{ByteVocab, TokenVocab};
+    use crate::vocab::{ByteMapVocab, TokenVocab};
 
     #[test]
     fn test_tokens_iter() {
         type T = u32;
 
-        let byte_vocab: ByteVocab<T> = Default::default();
+        let byte_vocab: ByteMapVocab<T> = Default::default();
 
         let vocab = SpanMapVocab::<T>::default();
 

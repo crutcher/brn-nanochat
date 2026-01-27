@@ -4,7 +4,7 @@ use crate::alloc::sync::Arc;
 use crate::alloc::vec::Vec;
 use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::{CommonHashMap, CommonHashSet, Pair, SpanTokenMap, TokenType};
-use crate::vocab::ByteVocab;
+use crate::vocab::ByteMapVocab;
 use crate::vocab::pair_vocab::PairMapVocab;
 use crate::vocab::span_vocab::SpanMapVocab;
 use crate::vocab::token_vocab::TokenVocab;
@@ -73,7 +73,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Get the byte table for the word vocabulary.
-    pub fn byte_vocab(&self) -> &Arc<ByteVocab<T>> {
+    pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         self.span_vocab.byte_vocab()
     }
 

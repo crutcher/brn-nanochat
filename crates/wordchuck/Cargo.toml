@@ -17,35 +17,38 @@ workspace = true
 
 
 [features]
-default = ["std", "ahash", "rayon"]
-
-# This is only partial support for no_std.
-# It *is* tested by CI, but it isn't propagated to the dependents of this crate;
-# and some of those will require feature degradation.
-std = [
-    "anyhow/std",
-    "dep:base64",
-    "dep:parking_lot",
-    "num-traits/std",
-    "log/std",
-]
-no_std = [
-    "hashbrown/alloc"
+default = [
+    "client",
 ]
 
+# Features for typical client usage.
+client = [
+    "ahash",
+    "rayon",
+    "std",
+]
+
+# Enable to have access to the vocab training code.
 training = [
     "compact_str",
     "dary_heap",
     "std",
 ]
 
-rayon = [
-    "dep:rayon",
-    "std"
-]
 
-tracing = [
-    "tracing/attributes",
+# Tested in CI; but I'm unsure I've fully covered it.
+# When "std" is not enabled, "no_std" is required.
+std = [
+    "anyhow/std",
+    "dep:base64",
+    "dep:parking_lot",
+    "fancy-regex/default",
+    "log/std",
+    "num-traits/std",
+    "regex/default",
+]
+no_std = [
+    "hashbrown/alloc"
 ]
 
 # We can switch HashMap/HashSet implementations for the whole crate.
@@ -58,10 +61,21 @@ ahash = [
     "std",
 ]
 
+# Enable rayon based parallelism.
+rayon = [
+    "dep:rayon",
+    "std"
+]
+
+# Enable tracing instrumentation.
+tracing = [
+    "tracing/attributes",
+]
+
 
 [dependencies]
-fancy-regex = { workspace = true }
-regex = { workspace = true }
+fancy-regex = { workspace = true, features = ["unicode"] }
+regex = { workspace = true, features = ["unicode"] }
 
 # no-default deps
 anyhow = { workspace = true }
