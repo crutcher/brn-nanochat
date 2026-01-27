@@ -10,14 +10,10 @@ publish = false
 workspace = true
 
 [dependencies]
-burn = { workspace = true, features = ["network"] }
-nanochat-data = { path = "../../../nanochat-data" }
-wordchuck = { path = "../..", features = ["rayon", "training"] }
-
-clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
-
-similar = { workspace = true }
-
-parquet = { workspace = true, features = ["arrow"] }
 arrow = { workspace = true }
+burn = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+nanochat-data = { path = "../../../nanochat-data" }
+similar = { workspace = true }
+wordchuck = { path = "../..", features = ["rayon", "training"] }

@@ -1,12 +1,11 @@
 //! # Unified Token Vocabulary
 
 use crate::segmentation::segmentation_config::SegmentationConfig;
-use crate::types::{Pair, SpanTokenMap, TokenType};
+use crate::types::{CommonHashMap, CommonHashSet, Pair, SpanTokenMap, TokenType};
 use crate::vocab::ByteVocab;
 use crate::vocab::pair_vocab::PairMapVocab;
 use crate::vocab::span_vocab::SpanMapVocab;
 use crate::vocab::token_vocab::TokenVocab;
-use ahash::{AHashMap, AHashSet};
 use std::sync::Arc;
 
 /// Unified token vocabulary.
@@ -49,7 +48,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     ) -> Self {
         assert_eq!(word_vocab.byte_vocab(), pair_vocab.byte_vocab());
 
-        let tokens = word_vocab.unordered_tokens().collect::<AHashSet<_>>();
+        let tokens = word_vocab.unordered_tokens().collect::<CommonHashSet<_>>();
         for ((a, b), c) in pair_vocab.pairs() {
             for t in [a, b, c].iter() {
                 assert!(
@@ -93,8 +92,8 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Compiled expansion dictionary.
-    pub fn unified_dictionary(&self) -> AHashMap<T, Vec<u8>> {
-        let mut tmp = AHashMap::default();
+    pub fn unified_dictionary(&self) -> CommonHashMap<T, Vec<u8>> {
+        let mut tmp = CommonHashMap::default();
 
         self.span_vocab.iter().for_each(|(chunk, &token)| {
             tmp.insert(chunk.clone(), token);

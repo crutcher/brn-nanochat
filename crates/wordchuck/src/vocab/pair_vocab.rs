@@ -2,10 +2,9 @@
 
 use crate::decoders::TokenDecoder;
 use crate::decoders::utility::pair_decoder::PairExpansionDecoder;
-use crate::types::{Pair, PairTokenMap, TokenType};
+use crate::types::{CommonHashSet, Pair, PairTokenMap, TokenType};
 use crate::vocab::byte_vocab::ByteVocab;
 use crate::vocab::token_vocab::TokenVocab;
-use ahash::AHashSet;
 use std::sync::Arc;
 
 /// Validate that a [`ByteVocab`] and [`PairTokenMap`] are compatible.
@@ -18,7 +17,7 @@ pub fn try_validate_pair_map<T: TokenType>(
     byte_vocab: &ByteVocab<T>,
     pairs: &PairTokenMap<T>,
 ) -> anyhow::Result<()> {
-    let pair_targets: AHashSet<T> = pairs.values().copied().collect();
+    let pair_targets: CommonHashSet<T> = pairs.values().copied().collect();
 
     for t in &pair_targets {
         if let Some(b) = byte_vocab.get_byte(*t) {
