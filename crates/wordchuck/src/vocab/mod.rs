@@ -20,8 +20,10 @@
 //! Metadata and load support for a number of public pre-trained tokenizers
 //! exists in [`public`].
 
-pub mod byte_vocab;
+#[cfg(feature = "std")]
 pub mod io;
+
+pub mod byte_vocab;
 pub mod pair_vocab;
 pub mod public;
 pub mod span_vocab;

@@ -22,7 +22,7 @@ default = ["rayon"]
 # This is only partial support for no_std.
 # It *is* tested by CI, but it isn't propagated to the dependents of this crate;
 # and some of those will require feature degradation.
-std = []
+std = ["dep:base64", "num-traits/std", "dep:parking_lot"]
 
 training = ["std", "compact_str", "dary_heap"]
 
@@ -32,20 +32,21 @@ tracing = ["dep:tracing"]
 # We can switch HashMap/HashSet implementations for the whole crate.
 # This is done in the "src/types.rs" file.
 #
-# "ahash" is here as an example of how to do this;
-# but in my testing it provides only a small improvement
-# to decode, and actually degrades encode.
+# - mac hardware: fasster to enable ahash
+# - 2020 desktop linux: faster decode, no encode benefit.
 ahash = ["dep:ahash", "std"]
 
 
 [dependencies]
 anyhow = { workspace = true }
-base64 = { workspace = true }
 fancy-regex = { workspace = true }
 log = { workspace = true }
 num-traits = { workspace = true }
-parking_lot = { workspace = true }
 regex = { workspace = true }
+
+# "std" feature deps:
+base64 = { workspace = true, optional = true }
+parking_lot = { workspace = true, optional = true }
 
 # "ahash" feature deps:
 ahash = { workspace = true, optional = true }
