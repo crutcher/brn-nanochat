@@ -13,7 +13,10 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
     /// Progresses until `ctx.stack` is empty,
     /// or the top token cannot be decoded by this decoders.
     ///
-    /// # Returns
+    /// ## Arguments
+    /// * `ctx` - The decoding context to process.
+    ///
+    /// ## Returns
     /// `ctx.stack.is_empty()`
     fn incremental_decode(
         &self,
@@ -22,8 +25,11 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
 
     /// Decodes tokens into bytes.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `tokens` - A slice of tokens to decode.
+    ///
+    /// ## Returns
+    /// A `TokenDecodeContext` containing the decoded bytes and any remaining tokens.
     fn decode_to_context<S: AsRef<[T]>>(
         &self,
         tokens: S,
@@ -34,6 +40,12 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
     }
 
     /// Decode tokens into bytes, returning an error if the decoding fails.
+    ///
+    /// ## Arguments
+    /// * `tokens` - A slice of tokens to decode.
+    ///
+    /// ## Returns
+    /// A `Result` containing the decoded byte vector or an error if decoding is incomplete.
     fn try_decode_to_bytes<S: AsRef<[T]>>(
         &self,
         tokens: S,
@@ -42,6 +54,12 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
     }
 
     /// Decodes a batch of tokens into a vector of byte vectors, returning an error if the decoding fails.
+    ///
+    /// ## Arguments
+    /// * `batch` - A slice of token vectors to decode.
+    ///
+    /// ## Returns
+    /// A `Result` containing a vector of decoded byte vectors or an error if any decoding fails.
     fn try_decode_batch_to_bytes(
         &self,
         batch: &[Vec<T>],
@@ -52,6 +70,12 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
     /// Decodes tokens into a string, returning an error if the decoding fails.
     ///
     /// UTF-8 lossy decoding is used to handle invalid UTF-8 sequences.
+    ///
+    /// ## Arguments
+    /// * `tokens` - A slice of tokens to decode.
+    ///
+    /// ## Returns
+    /// A `Result` containing the decoded string or an error if decoding is incomplete.
     fn try_decode_to_string<S: AsRef<[T]>>(
         &self,
         tokens: S,
@@ -62,6 +86,12 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
     /// Decodes a batch of tokens into a vector of strings, returning an error if the decoding fails.
     ///
     /// UTF-8 lossy decoding is used to handle invalid UTF-8 sequences.
+    ///
+    /// ## Arguments
+    /// * `batch` - A slice of token vectors to decode.
+    ///
+    /// ## Returns
+    /// A `Result` containing a vector of decoded strings or an error if any decoding fails.
     fn try_decode_batch_to_strings(
         &self,
         batch: &[Vec<T>],

@@ -24,6 +24,13 @@ pub struct UnifiedTokenVocab<T: TokenType> {
 
 impl<T: TokenType> UnifiedTokenVocab<T> {
     /// Build a new [`UnifiedTokenVocab`] from a [`SpanMapVocab`].
+    ///
+    /// ## Arguments
+    /// * `segmentation` - The segmentation configuration.
+    /// * `span_vocab` - The span map vocabulary.
+    ///
+    /// ## Returns
+    /// A new `UnifiedTokenVocab` instance.
     pub fn from_span_vocab(
         segmentation: SegmentationConfig<T>,
         span_vocab: SpanMapVocab<T>,
@@ -33,6 +40,13 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Build a new [`UnifiedTokenVocab`] from a [`PairMapVocab`].
+    ///
+    /// ## Arguments
+    /// * `segmentation` - The segmentation configuration.
+    /// * `pair_vocab` - The pair map vocabulary.
+    ///
+    /// ## Returns
+    /// A new `UnifiedTokenVocab` instance.
     pub fn from_pair_vocab(
         segmentation: SegmentationConfig<T>,
         pair_vocab: PairMapVocab<T>,
@@ -42,6 +56,17 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Initialize a [`UnifiedTokenVocab`].
+    ///
+    /// ## Arguments
+    /// * `segmentation` - The segmentation configuration.
+    /// * `word_vocab` - The span map vocabulary.
+    /// * `pair_vocab` - The pair map vocabulary.
+    ///
+    /// ## Returns
+    /// A new `UnifiedTokenVocab` instance.
+    ///
+    /// ## Panics
+    /// Panics if the vocabularies are inconsistent.
     pub fn init(
         segmentation: SegmentationConfig<T>,
         word_vocab: SpanMapVocab<T>,
@@ -73,11 +98,20 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Get the byte table for the word vocabulary.
+    ///
+    /// ## Returns
+    /// A reference to the internal `ByteMapVocab` arc.
     pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         self.span_vocab.byte_vocab()
     }
 
     /// Extend the vocabulary with the given special words.
+    ///
+    /// ## Arguments
+    /// * `special_words` - An iterator of word strings and tokens.
+    ///
+    /// ## Returns
+    /// The updated `UnifiedTokenVocab` instance.
     pub fn with_special_words<W, S>(
         self,
         special_words: W,
@@ -93,6 +127,9 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
     }
 
     /// Compiled expansion dictionary.
+    ///
+    /// ## Returns
+    /// A hash map from tokens to their corresponding byte vectors.
     pub fn unified_dictionary(&self) -> CommonHashMap<T, Vec<u8>> {
         let mut tmp = CommonHashMap::default();
 
@@ -118,12 +155,10 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
     /// Looks up a token in the vocabulary using the provided byte slice.
     ///
-    /// # Arguments
-    ///
+    /// ## Arguments
     /// * `span` - A byte slice (`&[u8]`) representing the token to be looked up in the vocabulary.
     ///
-    /// # Returns
-    ///
+    /// ## Returns
     /// * `Option<T>` - Returns `Some(T)` if the token is found in the vocabulary,
     ///   where `T` is the type of the value associated with the token. Returns
     ///   `None` if the token is not found.
@@ -136,12 +171,10 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
 
     /// Looks up a given pair in the pair vocabulary and retrieves its associated data, if present.
     ///
-    /// # Arguments
-    ///
+    /// ## Arguments
     /// * `pair` - A reference to the `Pair<T>` to be looked up in the pair vocabulary.
     ///
-    /// # Returns
-    ///
+    /// ## Returns
     /// * `Option<&T>` - Returns `Some(&T)` if the pair is found in the pair vocabulary, otherwise returns `None`.
     pub fn lookup_pair(
         &self,

@@ -7,6 +7,12 @@ use crate::regex::regex_wrapper::RegexWrapperPattern;
 /// Create a union pattern of exact matches.
 ///
 /// This will always be a [`RegexWrapperPattern::Basic`] variant.
+///
+/// ## Arguments
+/// * `alts` - A slice of string-like alternatives to union.
+///
+/// ## Returns
+/// A new `RegexWrapperPattern::Basic` containing the union pattern.
 pub fn exact_match_union_regex_pattern<S: AsRef<str>>(alts: &[S]) -> RegexWrapperPattern {
     let parts = alts
         .iter()

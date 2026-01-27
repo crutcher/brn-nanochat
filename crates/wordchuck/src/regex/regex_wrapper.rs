@@ -56,6 +56,9 @@ pub enum ConstRegexWrapperPattern {
 
 impl ConstRegexWrapperPattern {
     /// Get the underlying regex pattern.
+    ///
+    /// ## Returns
+    /// The regex pattern string slice.
     pub fn as_str(&self) -> &str {
         match self {
             Self::Basic(pattern) => pattern,
@@ -64,11 +67,17 @@ impl ConstRegexWrapperPattern {
     }
 
     /// Convert to [`RegexWrapperPattern`]
+    ///
+    /// ## Returns
+    /// A new `RegexWrapperPattern` instance.
     pub fn to_pattern(self) -> RegexWrapperPattern {
         self.into()
     }
 
     /// Compile the regex pattern into a `RegexWrapper`.
+    ///
+    /// ## Returns
+    /// A `Result` containing the compiled `RegexWrapper` or an `ErrorWrapper`.
     pub fn compile(&self) -> Result<RegexWrapper, ErrorWrapper> {
         RegexWrapperPattern::from(*self).compile()
     }
@@ -107,6 +116,9 @@ impl<S: AsRef<str>> From<S> for RegexWrapperPattern {
 
 impl RegexWrapperPattern {
     /// Get the underlying regex pattern.
+    ///
+    /// ## Returns
+    /// The regex pattern string slice.
     pub fn as_str(&self) -> &str {
         match self {
             Self::Basic(pattern) => pattern,
@@ -116,6 +128,9 @@ impl RegexWrapperPattern {
     }
 
     /// Compile the regex pattern into a `RegexWrapper`.
+    ///
+    /// ## Returns
+    /// A `Result` containing the compiled `RegexWrapper` or an `ErrorWrapper`.
     pub fn compile(&self) -> Result<RegexWrapper, ErrorWrapper> {
         match self {
             Self::Basic(pattern) => regex::Regex::new(pattern)
@@ -170,6 +185,9 @@ impl From<fancy_regex::Regex> for RegexWrapper {
 
 impl RegexWrapper {
     /// Is this `Basic`?
+    ///
+    /// ## Returns
+    /// `true` if it wraps a `regex::Regex`, `false` otherwise.
     pub fn is_basic(&self) -> bool {
         match self {
             Self::Basic(_) => true,
@@ -178,6 +196,9 @@ impl RegexWrapper {
     }
 
     /// Is this `Fancy`?
+    ///
+    /// ## Returns
+    /// `true` if it wraps a `fancy_regex::Regex`, `false` otherwise.
     pub fn is_fancy(&self) -> bool {
         match self {
             Self::Basic(_) => false,
@@ -186,6 +207,9 @@ impl RegexWrapper {
     }
 
     /// Get the underlying regex pattern.
+    ///
+    /// ## Returns
+    /// The regex pattern string slice.
     pub fn as_str(&self) -> &str {
         match self {
             Self::Basic(regex) => regex.as_str(),
@@ -194,6 +218,12 @@ impl RegexWrapper {
     }
 
     /// Wrapper for `find_iter`.
+    ///
+    /// ## Arguments
+    /// * `haystack` - The string to search in.
+    ///
+    /// ## Returns
+    /// A `MatchesWrapper` iterator over the matches.
     pub fn find_iter<'r, 'h>(
         &'r self,
         haystack: &'h str,

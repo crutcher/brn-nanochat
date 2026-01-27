@@ -18,6 +18,13 @@ pub struct PairExpansionDecoder<T: TokenType> {
 
 impl<T: TokenType> PairExpansionDecoder<T> {
     /// Creates a new Decoder.
+    ///
+    /// ## Arguments
+    /// * `byte_vocab` - The byte vocabulary mapping.
+    /// * `token_map` - The token to pair mapping.
+    ///
+    /// ## Returns
+    /// A new `PairExpansionDecoder` instance.
     pub fn new<B>(
         byte_vocab: B,
         token_map: TokenToPairMap<T>,
@@ -32,6 +39,12 @@ impl<T: TokenType> PairExpansionDecoder<T> {
     }
 
     /// Build a [`PairExpansionDecoder`] from this [`PairMapVocab`].
+    ///
+    /// ## Arguments
+    /// * `pair_vocab` - The pair vocabulary mapping to build the decoder from.
+    ///
+    /// ## Returns
+    /// A new `PairExpansionDecoder` instance.
     pub fn from_pair_vocab(pair_vocab: &PairMapVocab<T>) -> Self {
         let token_map = pair_vocab
             .pairs()
@@ -42,6 +55,9 @@ impl<T: TokenType> PairExpansionDecoder<T> {
     }
 
     /// Get the byte table.
+    ///
+    /// ## Returns
+    /// A reference to the internal `ByteMapVocab` arc.
     pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         &self.byte_vocab
     }

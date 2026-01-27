@@ -50,6 +50,12 @@ pub use regex_supplier::{RegexSupplier, RegexSupplierHandle};
 pub use regex_wrapper::{ErrorWrapper, RegexWrapper, RegexWrapperHandle, RegexWrapperPattern};
 
 /// Build a [`RegexSupplierHandle`].
+///
+/// ## Arguments
+/// * `regex` - The regex wrapper handle.
+///
+/// ## Returns
+/// A `RegexSupplierHandle`.
 pub fn default_regex_supplier(regex: RegexWrapperHandle) -> RegexSupplierHandle {
     regex
 }
@@ -59,6 +65,12 @@ pub fn default_regex_supplier(regex: RegexWrapperHandle) -> RegexSupplierHandle 
 /// Users of a [`RegexWrapper`] that *may* be under heavy thread contention should use
 /// [`regex_pool_supplier`]; which in some build environments will provide
 /// a thread local clone regex supplier, and in some, a simple clone implementation.
+///
+/// ## Arguments
+/// * `regex` - The regex wrapper handle.
+///
+/// ## Returns
+/// A `RegexSupplierHandle`.
 pub fn regex_pool_supplier(regex: RegexWrapperHandle) -> RegexSupplierHandle {
     #[cfg(feature = "std")]
     return alloc::sync::Arc::new(regex_pool::RegexWrapperPool::new(regex));

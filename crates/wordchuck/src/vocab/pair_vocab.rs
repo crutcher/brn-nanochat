@@ -14,6 +14,13 @@ use crate::vocab::token_vocab::TokenVocab;
 ///   - the parents ``(a, b)``:
 ///     - are either in the `byte_vocab`, or are targets in the map, not both.
 ///   - the target ``t`` is not in the `byte_vocab`.
+///
+/// ## Arguments
+/// * `byte_vocab` - The byte vocabulary to validate against.
+/// * `pairs` - The pair token map to validate.
+///
+/// ## Returns
+/// A `Result` indicating whether the maps are compatible.
 pub fn try_validate_pair_map<T: TokenType>(
     byte_vocab: &ByteMapVocab<T>,
     pairs: &PairTokenMap<T>,
@@ -60,6 +67,13 @@ pub struct PairMapVocab<T: TokenType> {
 
 impl<T: TokenType> PairMapVocab<T> {
     /// Initialize a [`PairMapVocab`].
+    ///
+    /// ## Arguments
+    /// * `byte_vocab` - The byte vocabulary mapping.
+    /// * `pairs` - The pair token map.
+    ///
+    /// ## Returns
+    /// A `Result` containing the new `PairMapVocab` instance or an error.
     pub fn init<B>(
         byte_vocab: B,
         pairs: PairTokenMap<T>,
@@ -73,22 +87,37 @@ impl<T: TokenType> PairMapVocab<T> {
     }
 
     /// Get the byte/token mapping table.
+    ///
+    /// ## Returns
+    /// A reference to the internal `ByteMapVocab` arc.
     pub fn byte_vocab(&self) -> &Arc<ByteMapVocab<T>> {
         &self.byte_vocab
     }
 
     /// Get the map of pairs.
+    ///
+    /// ## Returns
+    /// A reference to the internal `PairTokenMap`.
     pub fn pairs(&self) -> &PairTokenMap<T> {
         &self.pairs
     }
 
     /// Get the number of tokens in the vocabulary.
+    ///
+    /// ## Returns
+    /// The total number of tokens (bytes + pairs).
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.byte_vocab.len() + self.pairs.len()
     }
 
     /// Looks up a pair.
+    ///
+    /// ## Arguments
+    /// * `pair` - The pair of tokens to look up.
+    ///
+    /// ## Returns
+    /// An `Option` containing the token corresponding to the pair if it exists.
     pub fn lookup_pair(
         &self,
         pair: &Pair<T>,
