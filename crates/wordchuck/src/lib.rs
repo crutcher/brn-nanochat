@@ -14,6 +14,9 @@
 //! * [`vocab::public`]
 #![warn(missing_docs, unused)]
 
+// FIXME: finish porting to no_std
+// #![cfg_attr(not(feature = "std"), no_std)]
+
 extern crate alloc;
 
 #[cfg(feature = "rayon")]

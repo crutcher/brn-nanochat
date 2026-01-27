@@ -1,5 +1,8 @@
 //! # Special Tokens
 
+use crate::alloc::string::String;
+use crate::alloc::string::ToString;
+use crate::alloc::vec::Vec;
 use crate::declare_carrot_special;
 use crate::vocab::utility::specials_tools::format_reserved_carrot;
 
@@ -144,6 +147,7 @@ pub fn oa_gpt5_o200k_harmony_specials() -> Vec<(String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::vec;
 
     #[test]
     fn test_oa_gpt2_r50k_specials() {

@@ -1,11 +1,13 @@
 //! # Token Encoder Trait
 
+use crate::alloc::string::String;
+use crate::alloc::sync::Arc;
+use crate::alloc::vec::Vec;
 use crate::segmentation::TextSegmentor;
 use crate::segmentation::text_segmentor::SpanRef;
 use crate::types::TokenType;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 use crate::vocab::special_vocab::SpecialVocab;
-use std::sync::Arc;
 
 /// A trait for token encoders.
 pub trait TokenEncoder<T: TokenType>: Send + Sync {

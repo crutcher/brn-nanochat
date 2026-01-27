@@ -1,5 +1,7 @@
 //! Exact Match Union Patterns
 
+use crate::alloc::format;
+use crate::alloc::vec::Vec;
 use crate::regex::regex_wrapper::RegexWrapperPattern;
 
 /// Create a union pattern of exact matches.
@@ -16,6 +18,7 @@ pub fn exact_match_union_regex_pattern<S: AsRef<str>>(alts: &[S]) -> RegexWrappe
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::vec;
     use crate::regex::RegexWrapper;
 
     #[test]

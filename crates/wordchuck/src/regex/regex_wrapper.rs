@@ -1,7 +1,9 @@
 //! # Regex Wrapper
 //! This modules provides mechanisms to mix `regex` and `fancy_regex` types.
 
-use alloc::sync::Arc;
+use crate::alloc::string::String;
+use crate::alloc::string::ToString;
+use crate::alloc::sync::Arc;
 use core::fmt::Debug;
 
 /// Error wrapper for regex patterns.
@@ -232,7 +234,7 @@ impl<'r, 'h> Iterator for MatchesWrapper<'r, 'h> {
             Self::Regex(matches) => matches.next(),
             Self::FancyRegex(matches) => matches
                 .next()
-                .map(|m| unsafe { std::mem::transmute(m.unwrap()) }),
+                .map(|m| unsafe { core::mem::transmute(m.unwrap()) }),
         }
     }
 }

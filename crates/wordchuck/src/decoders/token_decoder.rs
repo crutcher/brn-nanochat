@@ -1,5 +1,7 @@
 //! # Token Decoder Trait
 
+use crate::alloc::string::String;
+use crate::alloc::vec::Vec;
 use crate::decoders::TokenDecodeContext;
 use crate::types::TokenType;
 use crate::vocab::utility::strings::string_from_lossy_utf8;
@@ -75,6 +77,8 @@ pub trait TokenDecoder<T: TokenType>: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::string::ToString;
+    use crate::alloc::vec;
     use crate::decoders::utility::byte_decoder::ByteDecoder;
     use num_traits::FromPrimitive;
 

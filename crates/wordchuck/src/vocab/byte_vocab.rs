@@ -1,5 +1,7 @@
 //! # Byte/Token Mapping Table
 
+use crate::alloc::vec;
+use crate::alloc::vec::Vec;
 use crate::types::{CommonHashMap, TokenType};
 use crate::vocab::TokenVocab;
 use core::fmt::Debug;

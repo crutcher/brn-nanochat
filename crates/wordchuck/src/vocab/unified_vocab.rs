@@ -1,12 +1,13 @@
 //! # Unified Token Vocabulary
 
+use crate::alloc::sync::Arc;
+use crate::alloc::vec::Vec;
 use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::{CommonHashMap, CommonHashSet, Pair, SpanTokenMap, TokenType};
 use crate::vocab::ByteVocab;
 use crate::vocab::pair_vocab::PairMapVocab;
 use crate::vocab::span_vocab::SpanMapVocab;
 use crate::vocab::token_vocab::TokenVocab;
-use std::sync::Arc;
 
 /// Unified token vocabulary.
 #[derive(Clone)]

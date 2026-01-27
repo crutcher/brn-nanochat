@@ -1,4 +1,6 @@
 //! # Text Segmentation Configuration
+use crate::alloc::string::String;
+use crate::alloc::string::ToString;
 use crate::regex::RegexWrapperPattern;
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;

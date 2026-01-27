@@ -1,9 +1,9 @@
 //! # Thread Regex Pool
 #![allow(unused)]
+use crate::alloc::sync::Arc;
 use crate::regex::regex_supplier::RegexSupplier;
 use crate::regex::regex_wrapper::RegexWrapper;
 use crate::types::CommonHashMap;
-use alloc::sync::Arc;
 use core::num::NonZero;
 use parking_lot::RwLock;
 use std::thread::ThreadId;

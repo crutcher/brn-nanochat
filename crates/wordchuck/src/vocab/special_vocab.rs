@@ -1,5 +1,6 @@
 //! # Special Words Vocabulary
 
+use crate::alloc::vec::Vec;
 use crate::types::{SpanTokenMap, TokenType};
 use crate::vocab::TokenVocab;
 

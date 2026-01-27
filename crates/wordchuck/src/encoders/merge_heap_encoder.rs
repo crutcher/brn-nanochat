@@ -1,12 +1,13 @@
 //! # Encoder for [`UnifiedTokenVocab`].
 
+use crate::alloc::sync::Arc;
+use crate::alloc::vec::Vec;
 use crate::encoders::token_encoder::TokenEncoder;
 use crate::regex::{RegexSupplierHandle, RegexWrapperHandle, default_regex_supplier};
 use crate::segmentation::text_segmentor::TextSegmentor;
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;
 use crate::vocab::unified_vocab::UnifiedTokenVocab;
-use alloc::sync::Arc;
 
 /// A Chunk/Pair Scanning [`TokenEncoder`].
 #[derive(Clone)]
@@ -159,6 +160,8 @@ impl<T: TokenType> TokenEncoder<T> for MergeHeapVocabEncoder<T> {
 
 #[cfg(test)]
 mod tests {
+    use crate::alloc::sync::Arc;
+    use crate::alloc::vec;
     use crate::decoders::{DictionaryDecoder, TokenDecoder};
     use crate::encoders::{MergeHeapVocabEncoder, TokenEncoder};
     use crate::segmentation::SegmentationConfig;
@@ -166,7 +169,6 @@ mod tests {
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
     use crate::vocab::{ByteVocab, UnifiedTokenVocab};
-    use alloc::sync::Arc;
 
     #[test]
     fn test_encoder() {

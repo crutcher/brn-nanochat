@@ -1,5 +1,6 @@
 //! # Token Vocabulary Index
 
+use crate::alloc::vec::Vec;
 use crate::types::TokenType;
 
 /// Common traits for token vocabularies.

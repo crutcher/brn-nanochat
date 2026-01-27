@@ -72,6 +72,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::sync::Arc;
     use crate::decoders::DictionaryDecoder;
     use crate::encoders::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
@@ -81,7 +82,6 @@ mod tests {
     use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
-    use alloc::sync::Arc;
     use num_traits::FromPrimitive;
 
     #[test]

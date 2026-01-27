@@ -10,7 +10,7 @@ pub fn try_vocab_size<T: TokenType>(vocab_size: usize) -> anyhow::Result<usize> 
         Err(anyhow::anyhow!(
             "vocab_size ({}) doesn't fit in TokenType: {}",
             vocab_size,
-            std::any::type_name::<T>()
+            core::any::type_name::<T>()
         ))
     } else if vocab_size < U8_SIZE {
         Err(anyhow::anyhow!(

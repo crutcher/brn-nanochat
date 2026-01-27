@@ -1,11 +1,12 @@
 //! # Pair Map ``{ (T, T) -> T }`` Token Vocabulary
 
+use crate::alloc::sync::Arc;
+use crate::alloc::vec::Vec;
 use crate::decoders::TokenDecoder;
 use crate::decoders::utility::pair_decoder::PairExpansionDecoder;
 use crate::types::{CommonHashSet, Pair, PairTokenMap, TokenType};
 use crate::vocab::byte_vocab::ByteVocab;
 use crate::vocab::token_vocab::TokenVocab;
-use std::sync::Arc;
 
 /// Validate that a [`ByteVocab`] and [`PairTokenMap`] are compatible.
 ///
@@ -117,6 +118,7 @@ impl<T: TokenType> TokenVocab<T> for PairMapVocab<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::sync::Arc;
 
     #[test]
     fn test_tokens_sorted() {

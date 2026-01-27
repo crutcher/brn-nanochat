@@ -1,10 +1,10 @@
 //! # Pair Expansion ``{ T -> (T, T) }`` Token Decoder
 
+use crate::alloc::sync::Arc;
 use crate::decoders::decode_context::TokenDecodeContext;
 use crate::decoders::token_decoder::TokenDecoder;
 use crate::types::{TokenToPairMap, TokenType};
 use crate::vocab::{ByteVocab, PairMapVocab};
-use std::sync::Arc;
 
 /// A Pair Expansion ``{ T -> (T, T) }``  [`TokenDecoder`].
 #[derive(Clone)]
@@ -71,6 +71,8 @@ impl<T: TokenType> TokenDecoder<T> for PairExpansionDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::sync::Arc;
+    use crate::alloc::vec;
     use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::segmentation::SegmentationConfig;
@@ -79,7 +81,6 @@ mod tests {
     use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
-    use alloc::sync::Arc;
 
     #[test]
     fn test_pair_decoder() {

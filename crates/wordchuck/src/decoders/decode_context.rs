@@ -1,5 +1,6 @@
 //! # `crate::vocab::TokenDecoder`] Context
 
+use crate::alloc::vec::Vec;
 use crate::types::TokenType;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
 
@@ -63,6 +64,8 @@ impl<T: TokenType> TokenDecodeContext<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::string::ToString;
+    use crate::alloc::vec;
 
     #[test]
     fn test_complete() {

@@ -28,7 +28,7 @@ doc_markdown = "deny"
 burn = "^0.20.0"
 bimm-contracts = "^0.19.2"
 
-tracing = "^0.1"
+tracing = { version = "^0.1", default-features = false }
 log = { version = "^0.4", default-features = false }
 clap = "^4.5"
 anyhow = { version = "^1.0" , default-features = false }
