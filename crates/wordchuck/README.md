@@ -1,21 +1,14 @@
 # rust-centric clone of nanochat/rustbpe
 
-See: [nanochat rustbpe](https://github.com/karpathy/nanochat/tree/master/rustbpe)
+This is a high-performance rust BPE tokenizer trainer/encoder/decoder.
 
-This repo aims to be a rust-first *BPETokenizer* library;
-focusing on performance and ease of use as a first-class rust crate.
+It is inspired by [nanochat rustbpe](https://github.com/karpathy/nanochat/tree/master/rustbpe)
 
-Python bindings already exist for `nanochat/rustbpe`.
-
-## Status: WIP
-
-I am incrementally porting features from `nanochat/rustbpe` to this crate;
-while cleaning up the rust mechanics, and writing full tests and docs.
-
-This is complete to training, tokenization, and decoding.
+The current status is productionization towards an alpha release.
 
 TODO:
 
+- New Name / New Repo. ( `wordchuck` conflicts, alas)
 - Save/Load vocabularies.
     - Save/Load well-known / named remote vocabularies.
     - Save/Load to `tiktoken` vocab format.
@@ -36,13 +29,14 @@ See:
 - training a `nanochat` equivalent tokenizer takes ~80 CPU minutes.
 
 ```rust,no_run
-use wordchuck::training::trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
-use wordchuck::vocab::io::tiktoken_io::save_word_map_to_tiktoken_path;
-use wordchuck::vocab::public::patterns::GPT3_CL100K_WORD_PATTERN;
-use wordchuck::vocab::UnifiedTokenVocab;
-use wordchuck::encoders::UnifiedVocabEncoder;
+use wordchuck::training::bpe_trainer::{BinaryPairVocabTrainer, BinaryPairVocabTrainerOptions};
+use wordchuck::vocab::io::tiktoken_io::save_span_map_to_tiktoken_path;
+use wordchuck::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
+use wordchuck::vocab::{ByteVocab, UnifiedTokenVocab};
+use wordchuck::encoders::MergeHeapVocabEncoder;
 use wordchuck::decoders::DictionaryDecoder;
 use wordchuck::rayon::{ParallelRayonEncoder, ParallelRayonDecoder};
+use wordchuck::regex::default_regex_supplier;
 use std::sync::Arc;
 
 fn example<I, S>(
@@ -61,7 +55,7 @@ fn example<I, S>(
     type C = u64;
 
     let options = BinaryPairVocabTrainerOptions::new(
-        GPT3_CL100K_WORD_PATTERN,
+        OA_GPT3_CL100K_WORD_PATTERN,
         vocab_size,
     );
 
@@ -75,21 +69,26 @@ fn example<I, S>(
         trainer.update_from_samples(batch.as_ref());
     }
 
+    let byte_vocab: Arc<ByteVocab<T>> = Arc::new(Default::default());
+
     let vocab: Arc<UnifiedTokenVocab<T>> = trainer
-        .train::<T>()
+        .train(byte_vocab.clone())
         .expect("training failed")
         .into();
 
     if let Some(path) = tiktoken_save_path {
-        save_word_map_to_tiktoken_path(&vocab.word_vocab, &path)
+        save_span_map_to_tiktoken_path(&vocab.span_vocab.span_map(), &path)
             .expect("failed to save tiktoken vocab");
         println!("- tiktoken vocab: {path:?}");
     }
 
-    let encoder: UnifiedVocabEncoder<T> = UnifiedVocabEncoder::<T>::new(vocab.clone());
+    let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::<T>::init(
+        vocab.clone(),
+        default_regex_supplier
+    );
     let encoder = ParallelRayonEncoder::new(encoder);
 
-    let decoder = DictionaryDecoder::new(vocab.compiled_dictionary());
+    let decoder = DictionaryDecoder::from_unified_vocab(vocab.clone());
     let decoder = ParallelRayonDecoder::new(decoder);
 }
 ```
@@ -98,12 +97,13 @@ fn example<I, S>(
 
 Each shard is ~90MB parquet file.
 
-- 128/64 Core Thread Ripper
+- 64 Core Thread Ripper
 
 ```terminaloutput
-$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset  --time-encode-decode 
+$ time cargo run --release -p tokenizer_trainer -- --dataset-dir /media/Data/nanochat/dataset --time-encode-decode 
+   Compiling wordchuck v0.0.6 (/home/crutcher/git/brn-nanochat/crates/wordchuck)
    Compiling tokenizer_trainer v0.0.0 (/home/crutcher/git/brn-nanochat/crates/wordchuck/examples/tokenizer_trainer)
-    Finished `release` profile [optimized] target(s) in 1.34s
+    Finished `release` profile [optimized] target(s) in 1.85s
      Running `target/release/tokenizer_trainer --dataset-dir /media/Data/nanochat/dataset --time-encode-decode`
 Loading Shards: [0, 1, 2, 3, 4, 5, 6, 7]
 ...
@@ -118,7 +118,7 @@ Training Tokenizer on shards: [0, 1, 2, 3, 4, 5, 6, 7]
 - shard: 6
 - shard: 7
 - train
-- training_duration: 220.05s
+- training_duration: 203.40s
 - vocab_size: 65535
 
 Samples Summary:
@@ -129,9 +129,9 @@ Timing Config:
 - batch size: 512
 
 Timing Encode:
-- batch avg: 69.918721ms
-- sample avg: 136.56µs
-- avg bps: 34.72 MB/s
+- batch avg: 76.543966ms
+- sample avg: 149.499µs
+- avg bps: 31.71 MB/s
 
 Observed Bytes/Token Stats:
 - total bytes: 97103222
@@ -139,10 +139,10 @@ Observed Bytes/Token Stats:
 - sample byte/token: 3.94
 
 Timing Decode:
-- batch avg: 2.373206ms
-- sample avg: 4.635µs
+- batch avg: 2.466106ms
+- sample avg: 4.816µs
 
-real    3m45.018s
-user    78m36.407s
-sys     37m53.941s
+real    3m28.924s
+user    6m37.652s
+sys     0m35.035s
 ```
