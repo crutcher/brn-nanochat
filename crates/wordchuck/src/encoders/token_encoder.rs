@@ -47,12 +47,20 @@ pub trait TokenEncoder<T: TokenType>: Send + Sync {
         &self,
         text: S,
     ) -> Vec<T> {
+        self.try_encode(text).unwrap()
+    }
+
+    /// Encode text into tokens, returning an error if the encoding fails.
+    fn try_encode<S: AsRef<str>>(
+        &self,
+        text: S,
+    ) -> anyhow::Result<Vec<T>> {
         let text = text.as_ref();
         let capacity = text.len() as f64 / (EXPECTED_BYTES_PER_TOKEN * 0.5);
         let mut tokens = Vec::with_capacity(capacity as usize);
 
         self.encode_append(text, &mut tokens);
-        tokens
+        Ok(tokens)
     }
 
     /// Encode a batch of text into tokens.
@@ -60,6 +68,14 @@ pub trait TokenEncoder<T: TokenType>: Send + Sync {
         &self,
         batch: &[String],
     ) -> Vec<Vec<T>> {
-        batch.iter().map(|s| self.encode(s)).collect()
+        self.try_encode_batch(batch).unwrap()
+    }
+
+    /// Encode a batch of text into tokens, returning an error if the encoding fails.
+    fn try_encode_batch(
+        &self,
+        batch: &[String],
+    ) -> anyhow::Result<Vec<Vec<T>>> {
+        batch.iter().map(|s| self.try_encode(s)).collect()
     }
 }

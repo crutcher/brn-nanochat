@@ -1,10 +1,11 @@
 //! # Token Encoders
 //!
-//! ## Examples
+//! ## Example
 //!
 //! ```rust,no_run
 //! use wordchuck::vocab::UnifiedTokenVocab;
 //! use wordchuck::encoders::MergeHeapVocabEncoder;
+//! use wordchuck::encoders::TokenEncoder;
 //! use wordchuck::types::TokenType;
 //! use std::sync::Arc;
 //!
@@ -15,9 +16,9 @@
 //!     let encoder: MergeHeapVocabEncoder<T> = MergeHeapVocabEncoder::init(vocab);
 //!
 //!     #[cfg(feature = "rayon")]
-//!     let encoder = wordchuck::rayon::RayonEncoder::new(encoder);
+//!     let encoder = wordchuck::rayon::ParallelRayonEncoder::new(encoder);
 //!
-//!     encoder.encode_batch(batch);
+//!     encoder.try_encode_batch(batch).unwrap()
 //! }
 //! ```
 
