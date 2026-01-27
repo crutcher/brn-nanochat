@@ -4,13 +4,14 @@ use crate::regex::RegexWrapperPattern;
 use crate::training::pair_span_index::{PairIndexMap, PairSpanIndex};
 use crate::training::text_span_counter::{TextSpanCounter, TextSpanCounterOptions};
 use crate::training::token_span_buffer::TokenSpanBuf;
-use crate::types::{CountType, Pair, PairTokenMap, StringChunkType, TokenType};
+use crate::types::{
+    CommonHashMap, CommonHashSet, CountType, Pair, PairTokenMap, StringChunkType, TokenType,
+};
 use crate::vocab::byte_vocab::ByteVocab;
 use crate::vocab::pair_vocab::PairMapVocab;
 use crate::vocab::utility::validators;
 use crate::vocab::utility::validators::U8_SIZE;
 use crate::vocab::{TokenVocab, UnifiedTokenVocab};
-use ahash::{AHashMap, AHashSet};
 use compact_str::CompactString;
 use core::cmp::Ordering;
 use dary_heap::OctonaryHeap;
@@ -85,7 +86,7 @@ pub struct MergeJob<T: TokenType, C: CountType> {
     pub pair: Pair<T>,
 
     /// Word indices that may contain this pair.
-    pub word_indices: AHashSet<usize>,
+    pub word_indices: CommonHashSet<usize>,
 }
 
 impl<T: TokenType, C: CountType> MergeJob<T, C> {
@@ -224,7 +225,7 @@ where
 
         self.options.pattern.compile()?;
 
-        let mut pairs: PairTokenMap<T> = AHashMap::with_capacity(num_merges);
+        let mut pairs: PairTokenMap<T> = CommonHashMap::with_capacity(num_merges);
 
         let (mut words, word_counts): (Vec<TokenSpanBuf<T>>, Vec<C>) = self
             .span_counter
@@ -292,7 +293,7 @@ where
             // Record merge
             pairs.insert(job.pair, new_token);
 
-            let mut new_token_pair_map: PairIndexMap<T> = AHashMap::with_capacity(16);
+            let mut new_token_pair_map: PairIndexMap<T> = CommonHashMap::with_capacity(16);
 
             // Merge this pair in all words where it occurs
             for &word_idx in &job.word_indices {
@@ -346,8 +347,7 @@ where
 
         pairs.shrink_to_fit();
 
-        let pair_vocab: PairMapVocab<T> =
-            PairMapVocab::<T>::init(byte_vocab.clone(), pairs).unwrap();
+        let pair_vocab: PairMapVocab<T> = PairMapVocab::<T>::init(byte_vocab.clone(), pairs)?;
 
         log::info!("Finished training: {} merges completed", merges_done);
         Ok(TrainResults {

@@ -1,14 +1,13 @@
 //! # `PairIndex` Builder
 
 use crate::training::token_span_buffer::TokenSpanBuf;
-use crate::types::{CountType, Pair, TokenType};
-use ahash::{AHashMap, AHashSet};
+use crate::types::{CommonHashMap, CommonHashSet, CountType, Pair, TokenType};
 
 /// A map from [`Pair`] to its occurrence count.
-pub type PairCountMap<T, C> = AHashMap<Pair<T>, C>;
+pub type PairCountMap<T, C> = CommonHashMap<Pair<T>, C>;
 
 /// A map from [`Pair`] to indices over ``words``.
-pub type PairIndexMap<T> = AHashMap<Pair<T>, AHashSet<usize>>;
+pub type PairIndexMap<T> = CommonHashMap<Pair<T>, CommonHashSet<usize>>;
 
 /// An index of ``(T, T)`` pair information relative to a ``&[TokenSpanBuf<T>]``.
 #[derive(Debug, Clone)]
@@ -134,7 +133,7 @@ mod tests {
             .into_iter()
             .map(|((a, b), s)| (
                 (T::from_u8(a as u8).unwrap(), T::from_u8(b as u8).unwrap()),
-                AHashSet::from_iter(s)
+                CommonHashSet::from_iter(s)
             ))
             .collect::<PairIndexMap<T>>()
         );

@@ -2,7 +2,7 @@
 #![allow(unused)]
 use crate::regex::regex_supplier::RegexSupplier;
 use crate::regex::regex_wrapper::RegexWrapper;
-use ahash::AHashMap;
+use crate::types::CommonHashMap;
 use alloc::sync::Arc;
 use core::num::NonZero;
 use parking_lot::RwLock;
@@ -21,7 +21,7 @@ pub struct RegexWrapperPool {
     regex: Arc<RegexWrapper>,
 
     max_pool: u64,
-    pool: Arc<RwLock<AHashMap<u64, Arc<RegexWrapper>>>>,
+    pool: Arc<RwLock<CommonHashMap<u64, Arc<RegexWrapper>>>>,
 }
 
 impl From<Arc<RegexWrapper>> for RegexWrapperPool {
@@ -40,7 +40,7 @@ impl RegexWrapperPool {
         Self {
             regex,
             max_pool,
-            pool: Arc::new(RwLock::new(AHashMap::new())),
+            pool: Arc::new(RwLock::new(Default::default())),
         }
     }
 
@@ -51,10 +51,6 @@ impl RegexWrapperPool {
 }
 
 impl RegexSupplier for RegexWrapperPool {
-    fn get_pattern(&self) -> String {
-        self.regex.as_str().to_string()
-    }
-
     fn get_regex(&self) -> Arc<RegexWrapper> {
         let thread_id = std::thread::current().id();
         let slot = unsafe_threadid_to_u64(&thread_id) % self.max_pool;
@@ -67,6 +63,10 @@ impl RegexSupplier for RegexWrapperPool {
         let re = Arc::new((*self.regex).clone());
         writer.insert(slot, re.clone());
         re
+    }
+
+    fn get_pattern(&self) -> String {
+        self.regex.as_str().to_string()
     }
 }
 

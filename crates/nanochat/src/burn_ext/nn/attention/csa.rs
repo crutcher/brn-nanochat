@@ -161,10 +161,6 @@ pub struct CausalSelfAttention<B: Backend> {
 }
 
 impl<B: Backend> CausalSelfAttentionMeta for CausalSelfAttention<B> {
-    fn head_dim(&self) -> usize {
-        self.head_dim
-    }
-
     fn n_embed(&self) -> usize {
         self.c_q.weight.dims()[0]
     }
@@ -175,6 +171,10 @@ impl<B: Backend> CausalSelfAttentionMeta for CausalSelfAttention<B> {
 
     fn n_kv_head(&self) -> usize {
         self.c_k.weight.dims()[1] / self.head_dim()
+    }
+
+    fn head_dim(&self) -> usize {
+        self.head_dim
     }
 }
 

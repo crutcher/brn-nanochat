@@ -47,5 +47,5 @@ jobs:
       - name: Test Training
         run: cargo test -p wordchuck --features training
 
-      - name: no_std Test
+      - name: Test no-default-features
         run: cargo test -p wordchuck --no-default-features --tests

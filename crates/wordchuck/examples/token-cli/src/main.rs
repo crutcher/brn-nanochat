@@ -92,7 +92,7 @@ fn run_load(
     let decoder = ParallelRayonDecoder::new(decoder);
 
     let shards: Vec<usize> = vec![0];
-    let num_timing_batches = 2;
+    let num_timing_batches = 20;
     let batch_size = 512;
 
     println!("Loading Shards: {shards:?}");

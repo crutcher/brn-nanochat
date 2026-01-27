@@ -1,8 +1,7 @@
 //! # Byte/Token Mapping Table
 
-use crate::types::TokenType;
+use crate::types::{CommonHashMap, TokenType};
 use crate::vocab::TokenVocab;
-use ahash::AHashMap;
 use core::fmt::Debug;
 
 /// ``0..=255`` Rank Byte/Token Bijection Table
@@ -13,7 +12,7 @@ use core::fmt::Debug;
 #[derive(Clone, PartialEq)]
 pub struct ByteVocab<T: TokenType> {
     /// Hash map from token to byte ordinal value.
-    token_to_byte: AHashMap<T, u8>,
+    token_to_byte: CommonHashMap<T, u8>,
 
     /// Table mapping from byte ordinal (position) to token.
     byte_to_token: [T; 256],
@@ -50,7 +49,7 @@ impl<T: TokenType> ByteVocab<T> {
 
         let byte_to_token: [T; 256] = byte_to_token.try_into().unwrap();
 
-        let token_to_byte: AHashMap<T, u8> = byte_to_token
+        let token_to_byte: CommonHashMap<T, u8> = byte_to_token
             .iter()
             .enumerate()
             .map(|(t, &token)| (token, t as u8))
@@ -68,10 +67,10 @@ impl<T: TokenType> ByteVocab<T> {
     ///
     /// # Panics
     /// If there the map is not a 1:1 bijection.
-    pub fn from_token_to_byte(token_to_byte: &AHashMap<T, u8>) -> Self {
+    pub fn from_token_to_byte(token_to_byte: &CommonHashMap<T, u8>) -> Self {
         let token_to_byte = token_to_byte.clone();
 
-        let ord_map: AHashMap<u8, T> = token_to_byte.iter().map(|(&t, &b)| (b, t)).collect();
+        let ord_map: CommonHashMap<u8, T> = token_to_byte.iter().map(|(&t, &b)| (b, t)).collect();
         assert_eq!(ord_map.len(), 256);
 
         let mut ord_items = ord_map.into_iter().collect::<Vec<_>>();
@@ -102,7 +101,7 @@ impl<T: TokenType> ByteVocab<T> {
     }
 
     /// Get the token->byte hash map.
-    pub fn token_to_byte(&self) -> &AHashMap<T, u8> {
+    pub fn token_to_byte(&self) -> &CommonHashMap<T, u8> {
         &self.token_to_byte
     }
 

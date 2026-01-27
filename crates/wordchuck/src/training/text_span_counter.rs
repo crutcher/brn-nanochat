@@ -2,15 +2,14 @@
 
 use crate::regex::{RegexSupplierHandle, RegexWrapper};
 use crate::training::token_span_buffer::TokenSpanBuf;
-use crate::types::{CountType, StringChunkType, TokenType};
+use crate::types::{CommonHashMap, CountType, StringChunkType, TokenType};
 use crate::vocab::byte_vocab::ByteVocab;
 use crate::vocab::public::size_hints::EXPECTED_WORD_LENGTH;
-use ahash::AHashMap;
 use std::fmt::Debug;
 
 /// Update word counts in-place from text using a regular expression.
 pub fn update_word_counts_from_text<S, K, C>(
-    word_counts: &mut AHashMap<K, C>,
+    word_counts: &mut CommonHashMap<K, C>,
     regex: &RegexWrapper,
     text: S,
 ) where
@@ -27,8 +26,8 @@ pub fn update_word_counts_from_text<S, K, C>(
 
 /// Update word counts inplace from another map.
 pub fn update_word_counts<K, C>(
-    word_counts: &mut AHashMap<K, C>,
-    source: AHashMap<K, C>,
+    word_counts: &mut CommonHashMap<K, C>,
+    source: CommonHashMap<K, C>,
 ) where
     K: StringChunkType,
     C: CountType,
@@ -78,7 +77,7 @@ where
     pub options: TextSpanCounterOptions,
 
     /// The word counts.
-    pub word_counts: AHashMap<K, C>,
+    pub word_counts: CommonHashMap<K, C>,
 }
 
 impl<K, C> TextSpanCounter<K, C>
@@ -94,12 +93,12 @@ where
         Self {
             options,
             regex_supplier,
-            word_counts: AHashMap::with_capacity(100_000),
+            word_counts: CommonHashMap::with_capacity(100_000),
         }
     }
 
     /// Release the word counts and return them.
-    pub fn release(self) -> AHashMap<K, C> {
+    pub fn release(self) -> CommonHashMap<K, C> {
         self.word_counts
     }
 
@@ -132,7 +131,7 @@ where
     /// Update word counts inplace from a map.
     pub fn update_from_word_counts(
         &mut self,
-        word_counts: AHashMap<K, C>,
+        word_counts: CommonHashMap<K, C>,
     ) {
         update_word_counts(&mut self.word_counts, word_counts);
     }
@@ -178,7 +177,7 @@ mod tests {
         check_common_counts(counts);
     }
 
-    fn check_common_counts<K, C>(counts: AHashMap<K, C>)
+    fn check_common_counts<K, C>(counts: CommonHashMap<K, C>)
     where
         K: StringChunkType,
         C: CountType,
@@ -211,12 +210,12 @@ mod tests {
 
         word_counts.update_from_samples(samples.iter());
 
-        let counts: AHashMap<TokenSpanBuf<T>, C> =
+        let counts: CommonHashMap<TokenSpanBuf<T>, C> =
             word_counts.to_text_span_counts_iter(&byte_vocab).collect();
         let mut counts = counts.into_iter().collect::<Vec<_>>();
         counts.sort();
 
-        let mut expected = AHashMap::new();
+        let mut expected = CommonHashMap::new();
         expected.insert(TokenSpanBuf::from_string("Hello", &byte_vocab), 1);
         expected.insert(TokenSpanBuf::from_string("Foo", &byte_vocab), 1);
         expected.insert(TokenSpanBuf::from_string("bar", &byte_vocab), 1);

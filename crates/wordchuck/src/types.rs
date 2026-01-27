@@ -87,17 +87,33 @@ impl<T> StringChunkType for T where
 {
 }
 
+/// Type Alias for hash maps in this crate.
+#[cfg(feature = "ahash")]
+pub type CommonHashMap<K, V> = ahash::AHashMap<K, V>;
+
+/// Type Alias for hash maps in this crate.
+#[cfg(not(feature = "ahash"))]
+pub type CommonHashMap<K, V> = std::collections::HashMap<K, V>;
+
+/// Type Alias for hash sets in this crate.
+#[cfg(feature = "ahash")]
+pub type CommonHashSet<V> = ahash::AHashSet<V>;
+
+/// Type Alias for hash sets in this crate.
+#[cfg(not(feature = "ahash"))]
+pub type CommonHashSet<V> = std::collections::HashSet<V>;
+
 /// [`Pair<T>`] to T map.
-pub type PairTokenMap<T> = ahash::AHashMap<Pair<T>, T>;
+pub type PairTokenMap<T> = CommonHashMap<Pair<T>, T>;
 
 /// T to [`Pair<T>`] map.
-pub type TokenToPairMap<T> = ahash::AHashMap<T, Pair<T>>;
+pub type TokenToPairMap<T> = CommonHashMap<T, Pair<T>>;
 
 /// Byte vector to T map.
-pub type SpanTokenMap<T> = ahash::AHashMap<Vec<u8>, T>;
+pub type SpanTokenMap<T> = CommonHashMap<Vec<u8>, T>;
 
 /// T to byte vector map.
-pub type TokenToWordMap<T> = ahash::AHashMap<T, Vec<u8>>;
+pub type TokenToWordMap<T> = CommonHashMap<T, Vec<u8>>;
 
 /// Check if a type is `Send`.
 #[cfg(test)]
