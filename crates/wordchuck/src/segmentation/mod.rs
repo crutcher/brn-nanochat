@@ -1,4 +1,13 @@
 //! # Text Segmentation
+//!
+//! This module exists to factor out text segmentation scanning.
+//!
+//! [`SegmentationConfig`] describes the declarative needs of a tokenizer:
+//! * `pattern` - the word/span split pattern.
+//! * `specials` - a map of `{ Vec<u8> -> T }` special tokens to handle out-of-band.
+//!
+//! [`TextSegmentor`] implements the run-time management of segmentation,
+//! as well as any need for [`crate::regex::regex_pool::RegexWrapperPool`]s.
 
 pub mod segmentation_config;
 pub mod text_segmentor;
