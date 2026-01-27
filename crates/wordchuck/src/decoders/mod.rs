@@ -1,4 +1,26 @@
 //! # Token Decoders
+//!
+//! ## Example
+//!
+//! ```rust,no_run
+//! use wordchuck::vocab::UnifiedTokenVocab;
+//! use wordchuck::decoders::DictionaryDecoder;
+//! use wordchuck::decoders::TokenDecoder;
+//! use wordchuck::types::TokenType;
+//! use std::sync::Arc;
+//!
+//! fn example<T: TokenType>(
+//!     vocab: Arc<UnifiedTokenVocab<T>>,
+//!     batch: &[Vec<T>],
+//! ) -> Vec<String> {
+//!     let decoder: DictionaryDecoder<T> = DictionaryDecoder::from_unified_vocab(vocab);
+//!
+//!     #[cfg(feature = "rayon")]
+//!     let decoder = wordchuck::rayon::ParallelRayonDecoder::new(decoder);
+//!
+//!     decoder.try_decode_batch_to_strings(batch).unwrap()
+//! }
+//! ```
 
 pub mod decode_context;
 pub mod dictionary_decoder;

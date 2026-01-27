@@ -31,7 +31,7 @@ impl<T: TokenType> ByteDecoder<T> {
 }
 
 impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, buf, tokens)))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, ctx)))]
     fn incremental_decode(
         &self,
         ctx: &mut TokenDecodeContext<T>,

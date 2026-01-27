@@ -388,16 +388,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::decoders::DictionaryDecoder;
-    use crate::decoders::token_decoder::TokenDecoder;
-    use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
-    use crate::encoders::token_encoder::TokenEncoder;
-    use crate::regex::default_regex_supplier;
-    use crate::training::bpe_trainer::{BinaryPairVocabTrainerOptions, MergeJob};
+    use crate::decoders::{DictionaryDecoder, TokenDecoder};
+    use crate::encoders::{MergeHeapVocabEncoder, TokenEncoder};
+    use crate::training::BinaryPairVocabTrainerOptions;
+    use crate::training::bpe_trainer::MergeJob;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use crate::vocab::unified_vocab::UnifiedTokenVocab;
+    use crate::vocab::{ByteVocab, UnifiedTokenVocab};
     use alloc::sync::Arc;
     use compact_str::CompactString;
     use core::cmp::Ordering;
@@ -442,7 +439,7 @@ mod tests {
 
         let vocab: Arc<UnifiedTokenVocab<T>> = trainer.train(byte_vocab.clone()).unwrap().into();
 
-        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

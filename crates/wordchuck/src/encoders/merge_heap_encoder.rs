@@ -1,7 +1,7 @@
 //! # Encoder for [`UnifiedTokenVocab`].
 
 use crate::encoders::token_encoder::TokenEncoder;
-use crate::regex::{RegexSupplierHandle, RegexWrapperHandle};
+use crate::regex::{RegexSupplierHandle, RegexWrapperHandle, default_regex_supplier};
 use crate::segmentation::text_segmentor::TextSegmentor;
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;
@@ -20,7 +20,12 @@ pub struct MergeHeapVocabEncoder<T: TokenType> {
 
 impl<T: TokenType> MergeHeapVocabEncoder<T> {
     /// Construct an encoder from data.
-    pub fn init<F>(
+    pub fn init(data: Arc<UnifiedTokenVocab<T>>) -> Self {
+        Self::init_with_factory(data, default_regex_supplier)
+    }
+
+    /// Construct an encoder from data.
+    pub fn init_with_factory<F>(
         data: Arc<UnifiedTokenVocab<T>>,
         re_factory: F,
     ) -> Self
@@ -154,17 +159,13 @@ impl<T: TokenType> TokenEncoder<T> for MergeHeapVocabEncoder<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::decoders::DictionaryDecoder;
-    use crate::decoders::token_decoder::TokenDecoder;
-    use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
-    use crate::encoders::token_encoder::TokenEncoder;
-    use crate::regex::default_regex_supplier;
+    use crate::decoders::{DictionaryDecoder, TokenDecoder};
+    use crate::encoders::{MergeHeapVocabEncoder, TokenEncoder};
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
-    use crate::vocab::UnifiedTokenVocab;
-    use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
+    use crate::vocab::{ByteVocab, UnifiedTokenVocab};
     use alloc::sync::Arc;
 
     #[test]
@@ -189,7 +190,7 @@ mod tests {
 
         let special_sample = "hello <|HI|> world";
 
-        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone());
         check_is_send(&encoder);
         check_is_sync(&encoder);
 

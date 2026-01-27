@@ -75,7 +75,6 @@ mod tests {
     use crate::decoders::DictionaryDecoder;
     use crate::encoders::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
-    use crate::regex::default_regex_supplier;
     use crate::segmentation::SegmentationConfig;
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::UnifiedTokenVocab;
@@ -102,7 +101,7 @@ mod tests {
         )
         .into();
 
-        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone(), default_regex_supplier);
+        let encoder = MergeHeapVocabEncoder::<T>::init(vocab.clone());
 
         let decoder = ParallelRayonDecoder::new(DictionaryDecoder::from_unified_vocab(vocab));
         check_is_send(&decoder);
