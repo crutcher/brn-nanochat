@@ -48,4 +48,4 @@ jobs:
         run: cargo test -p wordchuck --features training
 
       - name: Test no-default-features
-        run: cargo test -p wordchuck --no-default-features --tests
+        run: cargo test -p wordchuck --no-default-features --features no_std --tests
