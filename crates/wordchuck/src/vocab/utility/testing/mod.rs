@@ -1,9 +1,9 @@
 //! # Vocab Testing Tools
 
+use crate::alloc::sync::Arc;
 use crate::segmentation::SegmentationConfig;
 use crate::types::{SpanTokenMap, TokenType};
 use crate::vocab::{ByteVocab, SpanMapVocab, UnifiedTokenVocab};
-use alloc::sync::Arc;
 
 /// Create a test [`UnifiedTokenVocab`].
 pub fn build_test_vocab<T: TokenType, C>(

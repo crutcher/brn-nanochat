@@ -1,5 +1,5 @@
 //! # Common Types and Traits
-use alloc::vec::Vec;
+use crate::alloc::vec::Vec;
 use core::fmt::{Debug, Display};
 use core::hash::Hash;
 use core::ops::{AddAssign, SubAssign};
@@ -127,7 +127,7 @@ pub(crate) fn check_is_sync<S: Sync>(_: S) {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::string::String;
+    use crate::alloc::string::String;
     use compact_str::CompactString;
     use core::marker::PhantomData;
 

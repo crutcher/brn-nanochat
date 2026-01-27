@@ -1,9 +1,9 @@
 //! # Text Segmentation Configuration
+use crate::alloc::string::String;
+use crate::alloc::string::ToString;
 use crate::regex::RegexWrapperPattern;
 use crate::types::TokenType;
 use crate::vocab::special_vocab::SpecialVocab;
-use alloc::string::String;
-use alloc::string::ToString;
 
 /// Word Split + Special Words Segmentor Configuration
 #[derive(Debug, Clone)]

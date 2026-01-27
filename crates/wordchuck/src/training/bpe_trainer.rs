@@ -388,6 +388,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::alloc::sync::Arc;
     use crate::decoders::{DictionaryDecoder, TokenDecoder};
     use crate::encoders::{MergeHeapVocabEncoder, TokenEncoder};
     use crate::training::BinaryPairVocabTrainerOptions;
@@ -395,7 +396,6 @@ mod tests {
     use crate::types::{check_is_send, check_is_sync};
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::{ByteVocab, UnifiedTokenVocab};
-    use alloc::sync::Arc;
     use compact_str::CompactString;
     use core::cmp::Ordering;
 

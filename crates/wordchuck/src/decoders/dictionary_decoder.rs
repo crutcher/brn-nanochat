@@ -50,6 +50,8 @@ impl<T: TokenType> TokenDecoder<T> for DictionaryDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::sync::Arc;
+    use crate::alloc::vec;
     use crate::encoders::merge_heap_encoder::MergeHeapVocabEncoder;
     use crate::encoders::token_encoder::TokenEncoder;
     use crate::segmentation::SegmentationConfig;
@@ -57,8 +59,6 @@ mod tests {
     use crate::vocab::byte_vocab::ByteVocab;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
     use crate::vocab::utility::testing::build_test_vocab;
-    use alloc::sync::Arc;
-    use alloc::vec;
 
     #[test]
     fn test_dictionary_decoder() {

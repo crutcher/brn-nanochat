@@ -2,10 +2,10 @@
 //!
 //! Mainly used for utility.
 
+use crate::alloc::sync::Arc;
 use crate::decoders::{TokenDecodeContext, TokenDecoder};
 use crate::types::TokenType;
 use crate::vocab::byte_vocab::ByteVocab;
-use alloc::sync::Arc;
 
 /// A decoders that only decodes byte tokens.
 #[derive(Clone, Default)]
@@ -51,7 +51,7 @@ impl<T: TokenType> TokenDecoder<T> for ByteDecoder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
+    use crate::alloc::vec;
 
     #[test]
     fn test_decode_context() {

@@ -1,10 +1,10 @@
 //! # Regex Supplier Trait
 
+use crate::alloc::fmt::Debug;
+use crate::alloc::string::String;
+use crate::alloc::string::ToString;
+use crate::alloc::sync::Arc;
 use crate::regex::RegexWrapper;
-use alloc::fmt::Debug;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
 
 /// Common Regex Supplier Handle Type
 pub type RegexSupplierHandle = Arc<dyn RegexSupplier>;

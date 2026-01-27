@@ -1,8 +1,8 @@
 //! # Special Words Vocabulary
 
+use crate::alloc::vec::Vec;
 use crate::types::{SpanTokenMap, TokenType};
 use crate::vocab::TokenVocab;
-use alloc::vec::Vec;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 ///

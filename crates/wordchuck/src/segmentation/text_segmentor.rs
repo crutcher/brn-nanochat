@@ -1,5 +1,7 @@
 //! # Text Segmentor
 
+use crate::alloc::string::String;
+use crate::alloc::vec::Vec;
 use crate::regex::RegexWrapperPattern;
 use crate::regex::exact_match_union::exact_match_union_regex_pattern;
 use crate::regex::{RegexSupplierHandle, RegexWrapperHandle};
@@ -7,8 +9,6 @@ use crate::segmentation::segmentation_config::SegmentationConfig;
 use crate::types::TokenType;
 use crate::vocab::TokenVocab;
 use crate::vocab::public::size_hints::EXPECTED_BYTES_PER_TOKEN;
-use alloc::string::String;
-use alloc::vec::Vec;
 use core::ops::Range;
 
 /// Word Reference for [`TextSegmentor`].
@@ -175,9 +175,9 @@ impl TextSegmentor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::alloc::vec;
     use crate::regex::default_regex_supplier;
     use crate::vocab::public::openai::patterns::OA_GPT3_CL100K_WORD_PATTERN;
-    use alloc::vec;
 
     #[test]
     fn test_split_words() {

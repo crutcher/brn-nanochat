@@ -1,9 +1,9 @@
 //! # Word Map ``{ Vec<u8> -> T }`` Token Vocabulary
 
+use crate::alloc::sync::Arc;
+use crate::alloc::vec::Vec;
 use crate::types::{CommonHashMap, SpanTokenMap, TokenType};
 use crate::vocab::{ByteVocab, PairMapVocab, TokenVocab};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
 #[derive(Debug, Clone, PartialEq)]
