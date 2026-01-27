@@ -26,12 +26,6 @@ pub fn try_validate_pair_map<T: TokenType>(
     }
 
     for (&pair, &t) in pairs.iter() {
-        /*
-        if pair.0 >= t || pair.1 >= t {
-            anyhow::bail!("Illegal pair order: {pair:?} -> {t:?}");
-        }
-         */
-
         for pt in [pair.0, pair.1] {
             let is_pair_target = pair_targets.contains(&pt);
             let byte_target = byte_vocab.get_byte(pt);

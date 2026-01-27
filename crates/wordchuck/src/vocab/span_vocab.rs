@@ -205,11 +205,6 @@ impl<T: TokenType> SpanMapVocab<T> {
 
                 if let Some(a) = self.lookup_token(pre)
                     && let Some(b) = self.lookup_token(post)
-                /*
-                && a < token
-                && b < token
-
-                 */
                 {
                     pairs.insert((a, b), token);
                 }
