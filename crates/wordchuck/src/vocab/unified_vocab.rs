@@ -53,7 +53,7 @@ impl<T: TokenType> UnifiedTokenVocab<T> {
         for ((a, b), c) in pair_vocab.pairs() {
             for t in [a, b, c].iter() {
                 assert!(
-                    tokens.contains(t),
+                    tokens.contains(*t),
                     "pair token {t:?} not found in word vocab"
                 );
             }

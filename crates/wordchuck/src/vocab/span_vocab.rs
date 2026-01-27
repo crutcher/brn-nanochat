@@ -2,7 +2,7 @@
 
 use crate::alloc::sync::Arc;
 use crate::alloc::vec::Vec;
-use crate::types::{CommonHashMap, SpanTokenMap, TokenType};
+use crate::types::{CommonHashIter, CommonHashMap, SpanTokenMap, TokenType};
 use crate::vocab::{ByteVocab, PairMapVocab, TokenVocab};
 
 /// Token vocabulary as a dictionary map of ``{ Vec<u8> -> T }``.
@@ -31,7 +31,7 @@ impl<T: TokenType> From<SpanTokenMap<T>> for SpanMapVocab<T> {
 impl<'a, T: TokenType> IntoIterator for &'a SpanMapVocab<T> {
     type Item = (&'a Vec<u8>, &'a T);
 
-    type IntoIter = std::collections::hash_map::Iter<'a, Vec<u8>, T>;
+    type IntoIter = CommonHashIter<'a, Vec<u8>, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.span_map.iter()
