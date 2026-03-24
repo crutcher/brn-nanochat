@@ -1,0 +1,25 @@
+[package]
+name = "train"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+log = { workspace = true }
+wordchipper = { workspace = true, features = ["client"] }
+wordchipper-cli-util = { workspace = true }
+burn = { workspace = true, features = ["train", "autotune", "fusion"] }
+
+nanochat = { path = "../../crates/nanochat" }
+
+[features]
+default = ["cuda"]
+cuda = ["burn/cuda"]
+
+
+[lints]
+workspace = true
