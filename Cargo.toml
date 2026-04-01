@@ -5,6 +5,7 @@ resolver = "2"
 
 members = [
     "crates/*", "examples/train",
+    "crates/*/examples/*",
 ]
 
 [workspace.package]
@@ -24,6 +25,7 @@ doc_markdown = "deny"
 
 
 [workspace.dependencies]
+derive-new = "0.7.0"
 
 wordchipper = { version = "0.9.0" }
 wordchipper-cli-util = { version = "0.9.0" }

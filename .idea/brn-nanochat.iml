@@ -14,6 +14,9 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck-trainer/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/wordchuck/examples/token-cli/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/examples/train/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/llm-dataloader/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/llm-dataloader/examples/dl-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/llm-dataloader/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/crates/nanochat/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/crates/wordchuck/target" />
