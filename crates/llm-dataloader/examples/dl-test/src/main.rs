@@ -128,6 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let batch = res?;
         let total = batch.total_tokens();
         log::info!("{idx}: {:?}", total);
+        idx += 1;
     }
 
     Ok(())
