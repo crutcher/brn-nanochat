@@ -1,7 +1,10 @@
 #![allow(unused)]
 
 use arrow::array::{RecordBatch, StringArray};
+use burn::serde::Serialize;
 use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
+use rand::prelude::SliceRandom;
+use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
 use wordchipper::support::slices::inner_str_view;
@@ -17,7 +20,7 @@ impl<T: TokenType> TokenBatch<T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenBatchOptions {
     /// The number of sequences to load per batch.
     pub batch_size: usize,
@@ -40,11 +43,50 @@ impl Default for TokenBatchOptions {
     }
 }
 
+pub struct TokenBatchLoader<T: TokenType> {
+    tokenizer: Arc<Tokenizer<T>>,
+    options: TokenBatchOptions,
+    bos_token: T,
+
+    files: Vec<PathBuf>,
+}
+
+impl<T: TokenType> TokenBatchLoader<T> {
+    pub fn new(
+        tokenizer: Arc<Tokenizer<T>>,
+        files: Vec<PathBuf>,
+        options: TokenBatchOptions,
+        bos_token: T,
+    ) -> Self {
+        Self {
+            tokenizer,
+            options,
+            bos_token,
+            files,
+        }
+    }
+
+    pub fn iter(
+        &self,
+        shuffle: bool,
+    ) -> TokenBatchIterator<T> {
+        let mut files = self.files.clone();
+        if shuffle {
+            files.shuffle(&mut rand::rng());
+        }
+
+        TokenBatchIterator::new(
+            self.tokenizer.clone(),
+            files,
+            self.options.clone(),
+            self.bos_token,
+        )
+    }
+}
+
 pub struct TokenBatchIterator<T: TokenType> {
     tokenizer: Arc<Tokenizer<T>>,
     options: TokenBatchOptions,
-
-    /// Beginning-of-Sequence token.
     bos_token: T,
 
     files: Vec<PathBuf>,
@@ -66,6 +108,18 @@ impl<T: TokenType> TokenBatchIterator<T> {
             files,
             buffer: Vec::new(),
             reader: None,
+        }
+    }
+}
+
+impl<T: TokenType> Iterator for TokenBatchIterator<T> {
+    type Item = Result<TokenBatch<T>, Box<dyn std::error::Error>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.next_batch() {
+            Ok(Some(batch)) => Some(Ok(batch)),
+            Ok(None) => None,
+            Err(e) => Some(Err(e)),
         }
     }
 }
@@ -92,7 +146,7 @@ impl<T: TokenType> TokenBatchIterator<T> {
         }
     }
 
-    pub fn refill_buffer(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn refill_buffer(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while self.buffer.len() < self.options.min_buffer {
             if let Some(record_batch) = self.next_record_batch()? {
                 let column = record_batch
@@ -118,7 +172,7 @@ impl<T: TokenType> TokenBatchIterator<T> {
         Ok(())
     }
 
-    pub fn next_batch(&mut self) -> Result<Option<TokenBatch<T>>, Box<dyn std::error::Error>> {
+    fn next_batch(&mut self) -> Result<Option<TokenBatch<T>>, Box<dyn std::error::Error>> {
         let mut batch = Vec::with_capacity(self.options.batch_size);
 
         let row_capacity = self.options.batch_seq_len;
@@ -166,7 +220,7 @@ impl<T: TokenType> TokenBatchIterator<T> {
                 }
             }
 
-            if row.len() == 0 {
+            if row.is_empty() {
                 break;
             }
 
@@ -176,7 +230,7 @@ impl<T: TokenType> TokenBatchIterator<T> {
         if batch.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(TokenBatch { batch: batch }))
+            Ok(Some(TokenBatch { batch }))
         }
     }
 }

@@ -12,6 +12,7 @@ wordchipper = { workspace = true, features = ["client"] }
 wordchipper-cli-util = { workspace = true }
 llm-dataloader = { path = "../.." }
 nanochat-data = { path = "../../../nanochat-data" }
+serde_json = { workspace = true }
 log = { workspace = true }
 
 clap = { workspace = true, features = ["derive"] }

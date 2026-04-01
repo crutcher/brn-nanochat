@@ -1,12 +1,38 @@
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
-use llm_dataloader::loader::TokenBatchIterator;
+use llm_dataloader::loader::{TokenBatchLoader, TokenBatchOptions};
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 use std::sync::Arc;
 use wordchipper::disk_cache::WordchipperDiskCache;
 use wordchipper::{Tokenizer, UnifiedTokenVocab, VocabIndex};
 use wordchipper_cli_util::logging::LogArgs;
+
+#[derive(Debug, Clone, clap::Args)]
+pub struct TokenBatchOptionsArgs {
+    /// The number of sequences to load per batch.
+    #[arg(long, default_value_t = 32)]
+    pub batch_size: usize,
+
+    /// The maximum number of tokens in a sequence.
+    #[arg(long, default_value_t = 2048)]
+    pub batch_seq_len: usize,
+
+    /// The minimum number of sequences to keep in the buffer
+    /// before loading more sequences.
+    #[arg(long, default_value_t = 1024)]
+    pub min_buffer: usize,
+}
+
+impl TokenBatchOptionsArgs {
+    pub fn options(&self) -> TokenBatchOptions {
+        TokenBatchOptions {
+            batch_size: self.batch_size,
+            batch_seq_len: self.batch_seq_len,
+            min_buffer: self.min_buffer,
+        }
+    }
+}
 
 /// Example Nanochat Data Loader.
 #[derive(Parser, Debug)]
@@ -26,6 +52,9 @@ pub struct Args {
 
     #[arg(long, default_value = "<|bos|>")]
     pub bos_token: String,
+
+    #[command(flatten)]
+    pub token_batch_options: TokenBatchOptionsArgs,
 
     /// Logging configuration.
     #[clap(flatten)]
@@ -88,14 +117,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    let mut it: TokenBatchIterator<T> =
-        TokenBatchIterator::new(tok, shard_paths, Default::default(), bos_token);
+    let loader: TokenBatchLoader<T> = TokenBatchLoader::new(
+        tok.clone(),
+        shard_paths.clone(),
+        args.token_batch_options.options(),
+        bos_token,
+    );
 
-    let mut idx = 0;
-    while let Some(batch) = it.next_batch()? {
+    for (idx, res) in loader.iter(true).enumerate() {
+        let batch = res?;
         let total = batch.total_tokens();
         log::info!("{idx}: {:?}", total);
-        idx += 1;
     }
 
     Ok(())
