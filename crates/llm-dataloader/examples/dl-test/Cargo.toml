@@ -1,0 +1,20 @@
+[package]
+name = "dl-test"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+burn = { workspace = true }
+wordchipper = { workspace = true, features = ["client"] }
+wordchipper-cli-util = { workspace = true }
+llm-dataloader = { path = "../.." }
+nanochat-data = { path = "../../../nanochat-data" }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+

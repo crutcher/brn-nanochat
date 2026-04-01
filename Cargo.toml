@@ -5,6 +5,7 @@ resolver = "2"
 
 members = [
     "crates/*", "examples/train",
+    "crates/*/examples/*",
 ]
 
 [workspace.package]
@@ -24,20 +25,24 @@ doc_markdown = "deny"
 
 
 [workspace.dependencies]
+derive-new = "0.7.0"
 
 wordchipper = { version = "0.9.0" }
 wordchipper-cli-util = { version = "0.9.0" }
 
 ahash = "0.8"
 arrow = "58.1.0"
-parquet = "58.1.0"
 bimm-contracts = "0.19.2"
 burn = "0.20.1"
 clap = "4.5"
 dary_heap = "0.3"
 downloader = "0.2"
+parquet = "58.1.0"
+rand = "0.10"
 shellexpand = "3.1"
 tempdir = "0.3"
+serde = "1.0.228"
+serde_json = "1.0.149"
 
 anyhow = { version = "1.0", default-features = false }
 log = { version = "0.4", default-features = false }

@@ -1,0 +1,20 @@
+[package]
+name = "llm-dataloader"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+burn = { workspace = true, features = ["train"] }
+rand = { workspace = true }
+derive-new = { workspace = true }
+wordchipper = { workspace = true, features = ["client"] }
+parquet = { workspace = true, features = ["arrow"] }
+arrow = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
