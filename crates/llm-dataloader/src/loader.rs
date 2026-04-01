@@ -87,8 +87,6 @@ impl<T: TokenType> TokenBatchLoader<T> {
 pub struct TokenBatchIterator<T: TokenType> {
     tokenizer: Arc<Tokenizer<T>>,
     options: TokenBatchOptions,
-
-    /// Beginning-of-Sequence token.
     bos_token: T,
 
     files: Vec<PathBuf>,
