@@ -36,7 +36,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check Format
-        run: cargo fmt --check
+        run: cargo +nightly fmt --check
 
       - name: Clippy Lint
         run: cargo clippy --no-deps
