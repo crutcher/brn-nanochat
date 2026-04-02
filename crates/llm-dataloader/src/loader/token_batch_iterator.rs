@@ -1,27 +1,16 @@
-#![allow(unused)]
-
-use arrow::array::{RecordBatch, StringArray};
-use burn::serde::Serialize;
+use crate::loader::token_batch::TokenBatch;
+use arrow::array::{Array, RecordBatch, StringArray};
+use burn::data::dataloader::{DataLoaderIterator, Progress};
 use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
 use rand::prelude::SliceRandom;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use wordchipper::support::slices::inner_str_view;
 use wordchipper::{TokenEncoder, TokenType, Tokenizer};
 
-pub struct TokenBatch<T: TokenType> {
-    pub batch: Vec<Vec<T>>,
-}
-
-impl<T: TokenType> TokenBatch<T> {
-    pub fn total_tokens(&self) -> usize {
-        self.batch.iter().map(|x| x.len()).sum()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenBatchOptions {
+pub struct ToxenBatchIteratorOptions {
     /// The number of sequences to load per batch.
     pub batch_size: usize,
 
@@ -33,7 +22,7 @@ pub struct TokenBatchOptions {
     pub min_buffer: usize,
 }
 
-impl Default for TokenBatchOptions {
+impl Default for ToxenBatchIteratorOptions {
     fn default() -> Self {
         Self {
             batch_size: 32,
@@ -43,19 +32,20 @@ impl Default for TokenBatchOptions {
     }
 }
 
-pub struct TokenBatchLoader<T: TokenType> {
+#[derive(Clone)]
+pub struct TokenBatchIteratorFactory<T: TokenType> {
     tokenizer: Arc<Tokenizer<T>>,
-    options: TokenBatchOptions,
+    options: ToxenBatchIteratorOptions,
     bos_token: T,
 
     files: Vec<PathBuf>,
 }
 
-impl<T: TokenType> TokenBatchLoader<T> {
+impl<T: TokenType> TokenBatchIteratorFactory<T> {
     pub fn new(
         tokenizer: Arc<Tokenizer<T>>,
         files: Vec<PathBuf>,
-        options: TokenBatchOptions,
+        options: ToxenBatchIteratorOptions,
         bos_token: T,
     ) -> Self {
         Self {
@@ -64,6 +54,14 @@ impl<T: TokenType> TokenBatchLoader<T> {
             bos_token,
             files,
         }
+    }
+
+    pub fn files(&self) -> &[PathBuf] {
+        &self.files
+    }
+
+    pub fn num_items(&self) -> usize {
+        self.files.len()
     }
 
     pub fn iter(
@@ -82,14 +80,32 @@ impl<T: TokenType> TokenBatchLoader<T> {
             self.bos_token,
         )
     }
+
+    pub fn slice(
+        &self,
+        start: usize,
+        end: usize,
+    ) -> Self {
+        let files = self.files.clone();
+        let options = self.options.clone();
+        let bos_token = self.bos_token;
+        Self {
+            tokenizer: self.tokenizer.clone(),
+            files: files[start..end].to_vec(),
+            options,
+            bos_token,
+        }
+    }
 }
 
 pub struct TokenBatchIterator<T: TokenType> {
     tokenizer: Arc<Tokenizer<T>>,
-    options: TokenBatchOptions,
+    options: ToxenBatchIteratorOptions,
     bos_token: T,
 
     files: Vec<PathBuf>,
+    num_items: usize,
+
     buffer: Vec<Vec<T>>,
     reader: Option<ParquetRecordBatchReader>,
 }
@@ -98,29 +114,41 @@ impl<T: TokenType> TokenBatchIterator<T> {
     pub fn new(
         tokenizer: Arc<Tokenizer<T>>,
         files: Vec<PathBuf>,
-        options: TokenBatchOptions,
+        options: ToxenBatchIteratorOptions,
         bos_token: T,
     ) -> Self {
+        let num_items = files.len();
         Self {
             tokenizer,
             options,
             bos_token,
             files,
+            num_items,
             buffer: Vec::new(),
             reader: None,
         }
     }
+
+    pub fn files(&self) -> &[PathBuf] {
+        &self.files
+    }
+
+    pub fn num_items(&self) -> usize {
+        self.num_items
+    }
 }
 
 impl<T: TokenType> Iterator for TokenBatchIterator<T> {
-    type Item = Result<TokenBatch<T>, Box<dyn std::error::Error>>;
+    type Item = TokenBatch<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next_batch() {
-            Ok(Some(batch)) => Some(Ok(batch)),
-            Ok(None) => None,
-            Err(e) => Some(Err(e)),
-        }
+        self.next_batch().unwrap()
+    }
+}
+
+impl<T: TokenType> DataLoaderIterator<TokenBatch<T>> for TokenBatchIterator<T> {
+    fn progress(&self) -> Progress {
+        Progress::new(self.num_items - self.buffer.len(), self.num_items)
     }
 }
 
