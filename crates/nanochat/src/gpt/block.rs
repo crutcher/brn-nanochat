@@ -1,16 +1,35 @@
 //! # GPT Block
 
-use crate::burn_ext::nn::attention::csa::{
-    CausalSelfAttention, CausalSelfAttentionConfig, CausalSelfAttentionMeta,
+use burn::{
+    Tensor,
+    config::Config,
+    module::Module,
+    nn::norm::{
+        Normalization,
+        NormalizationConfig,
+        RmsNormConfig,
+    },
+    prelude::Backend,
 };
-use crate::burn_ext::nn::attention::kvcache::KVCache;
-use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
-use crate::gpt::mlp::{MLP, MLPConfig, MLPMeta};
-use burn::Tensor;
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
-use burn::prelude::Backend;
+
+use crate::{
+    burn_ext::nn::{
+        attention::{
+            csa::{
+                CausalSelfAttention,
+                CausalSelfAttentionConfig,
+                CausalSelfAttentionMeta,
+            },
+            kvcache::KVCache,
+        },
+        embedding::rotary::RotaryEmbedding,
+    },
+    gpt::mlp::{
+        MLP,
+        MLPConfig,
+        MLPMeta,
+    },
+};
 
 /// Common meta for [`GPTBlock`] and [`GPTBlockConfig`].
 pub trait GPTBlockMeta {
@@ -101,11 +120,14 @@ impl<B: Backend> GPTBlock<B> {
 
 #[cfg(test)]
 mod tests {
+    use bimm_contracts::assert_shape_contract;
+    use burn::{
+        backend::Wgpu,
+        tensor::Distribution,
+    };
+
     use super::*;
     use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::Wgpu;
-    use burn::tensor::Distribution;
 
     #[test]
     fn test_gpt_block_config() {

@@ -1,11 +1,19 @@
 //! # KV Cache
 
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::Tensor;
-use burn::config::Config;
-use burn::module::Module;
-use burn::prelude::{Backend, s};
-use burn::tensor::DType;
+use bimm_contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    Tensor,
+    config::Config,
+    module::Module,
+    prelude::{
+        Backend,
+        s,
+    },
+    tensor::DType,
+};
 
 /// Common meta trait for [`KVCache`] and [`KVCacheConfig`].
 pub trait KVCacheMeta {

@@ -1,17 +1,40 @@
 //! # Causal Self-Attention
 
-use crate::burn_ext::nn::attention::kvcache::KVCache;
-use crate::burn_ext::nn::attention::sdpa::{
-    ScaledDotProductAttentionConfig, scaled_dot_product_attention,
+use bimm_contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
 };
-use crate::burn_ext::nn::embedding::rotary::RotaryEmbedding;
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::Tensor;
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
-use burn::nn::{Linear, LinearConfig};
-use burn::prelude::{Backend, Bool, Int, s};
+use burn::{
+    Tensor,
+    config::Config,
+    module::Module,
+    nn::{
+        Linear,
+        LinearConfig,
+        norm::{
+            Normalization,
+            NormalizationConfig,
+            RmsNormConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Bool,
+        Int,
+        s,
+    },
+};
+
+use crate::burn_ext::nn::{
+    attention::{
+        kvcache::KVCache,
+        sdpa::{
+            ScaledDotProductAttentionConfig,
+            scaled_dot_product_attention,
+        },
+    },
+    embedding::rotary::RotaryEmbedding,
+};
 
 /// Common meta for [`CausalSelfAttention`] and [`CausalSelfAttentionConfig`].
 pub trait CausalSelfAttentionMeta {
@@ -279,11 +302,14 @@ impl<B: Backend> CausalSelfAttention<B> {
 
 #[cfg(test)]
 mod tests {
+    use bimm_contracts::assert_shape_contract;
+    use burn::{
+        backend::Wgpu,
+        tensor::Distribution,
+    };
+
     use super::*;
     use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
-    use bimm_contracts::assert_shape_contract;
-    use burn::backend::Wgpu;
-    use burn::tensor::Distribution;
 
     #[test]
     fn test_csa_config() {

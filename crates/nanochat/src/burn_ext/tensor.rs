@@ -1,8 +1,10 @@
 //! # Tensor Extensions
 
-use burn::Tensor;
-use burn::prelude::Backend;
-use burn::tensor::AsIndex;
+use burn::{
+    Tensor,
+    prelude::Backend,
+    tensor::AsIndex,
+};
 
 /// Repeat Interleave.
 ///
@@ -59,8 +61,9 @@ pub fn repeat_interleave<B: Backend, const R: usize, const R2: usize, D: AsIndex
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use burn::backend::Wgpu;
+
+    use super::*;
 
     #[test]
     fn test_repeat_interleave() {

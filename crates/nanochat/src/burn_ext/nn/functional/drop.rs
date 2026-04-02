@@ -1,8 +1,10 @@
 //! # Drop Extensions
 
-use burn::Tensor;
-use burn::prelude::Backend;
-use burn::tensor::Distribution;
+use burn::{
+    Tensor,
+    prelude::Backend,
+    tensor::Distribution,
+};
 
 /// Applies functional dropout on the input tensor.
 ///
@@ -27,9 +29,12 @@ pub fn dropout<B: Backend, const D: usize>(
 
 #[cfg(test)]
 mod tests {
+    use burn::{
+        backend::Wgpu,
+        prelude::ElementConversion,
+    };
+
     use super::*;
-    use burn::backend::Wgpu;
-    use burn::prelude::ElementConversion;
 
     #[test]
     fn dropout_prob_0_should_return_input() {

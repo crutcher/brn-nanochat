@@ -1,7 +1,11 @@
-use burn::tensor::{AsIndex, Slice};
+use std::collections::HashSet;
+
+use burn::tensor::{
+    AsIndex,
+    Slice,
+};
 use clap::Parser;
 use nanochat_data::dataset::DatasetCacheConfig;
-use std::collections::HashSet;
 
 /// Example Nanochat Data Loader.
 #[derive(Parser, Debug)]

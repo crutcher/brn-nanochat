@@ -1,16 +1,32 @@
-use burn::nn::{Embedding, EmbeddingConfig};
-use burn::tensor::backend::AutodiffBackend;
-use burn::tensor::{AsIndex, Slice};
+use std::{
+    collections::HashSet,
+    sync::Arc,
+};
+
+use burn::{
+    nn::{
+        Embedding,
+        EmbeddingConfig,
+    },
+    tensor::{
+        AsIndex,
+        Slice,
+        backend::AutodiffBackend,
+    },
+};
 use clap::Parser;
 use llm_dataloader::loader::{
-    TokenBatchDataLoader, TokenBatchIteratorFactory, ToxenBatchIteratorOptions,
+    TokenBatchDataLoader,
+    TokenBatchIteratorFactory,
+    TokenBatchIteratorOptions,
 };
 use nanochat::gpt::gpt_model::GPTConfig;
 use nanochat_data::dataset::DatasetCacheConfig;
-use std::collections::HashSet;
-use std::sync::Arc;
-use wordchipper::disk_cache::WordchipperDiskCache;
-use wordchipper::{UnifiedTokenVocab, VocabIndex};
+use wordchipper::{
+    UnifiedTokenVocab,
+    VocabIndex,
+    disk_cache::WordchipperDiskCache,
+};
 use wordchipper_cli_util::logging::LogArgs;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -30,8 +46,8 @@ pub struct TokenBatchOptionsArgs {
 }
 
 impl TokenBatchOptionsArgs {
-    pub fn options(&self) -> ToxenBatchIteratorOptions {
-        ToxenBatchIteratorOptions {
+    pub fn options(&self) -> TokenBatchIteratorOptions {
+        TokenBatchIteratorOptions {
             batch_size: self.batch_size,
             batch_seq_len: self.batch_seq_len,
             min_buffer: self.min_buffer,

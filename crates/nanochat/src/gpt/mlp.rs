@@ -1,11 +1,25 @@
 //! GPT Block MLP
 
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::config::Config;
-use burn::module::Module;
-use burn::nn::activation::{Activation, ActivationConfig};
-use burn::nn::{Linear, LinearConfig};
-use burn::prelude::{Backend, Tensor};
+use bimm_contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    config::Config,
+    module::Module,
+    nn::{
+        Linear,
+        LinearConfig,
+        activation::{
+            Activation,
+            ActivationConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Tensor,
+    },
+};
 
 /// Common meta for [`MLP`] and [`MLPConfig`].
 pub trait MLPMeta {
@@ -107,10 +121,13 @@ impl<B: Backend> MLP<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::Wgpu;
-    use burn::tensor::Distribution;
+    use burn::{
+        backend::Wgpu,
+        tensor::Distribution,
+    };
+
+    use super::*;
 
     #[test]
     fn test_mlp_config() {
