@@ -1,6 +1,6 @@
 use burn::tensor::{AsIndex, Slice};
 use clap::Parser;
-use llm_dataloader::loader::{TokenBatchLoader, TokenBatchOptions};
+use llm_dataloader::loader::{TokenBatchIteratorFactory, ToxenBatchIteratorOptions};
 use nanochat_data::dataset::DatasetCacheConfig;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -25,8 +25,8 @@ pub struct TokenBatchOptionsArgs {
 }
 
 impl TokenBatchOptionsArgs {
-    pub fn options(&self) -> TokenBatchOptions {
-        TokenBatchOptions {
+    pub fn options(&self) -> ToxenBatchIteratorOptions {
+        ToxenBatchIteratorOptions {
             batch_size: self.batch_size,
             batch_seq_len: self.batch_seq_len,
             min_buffer: self.min_buffer,
@@ -117,17 +117,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    let loader: TokenBatchLoader<T> = TokenBatchLoader::new(
+    let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
         tok.clone(),
         shard_paths.clone(),
         args.token_batch_options.options(),
         bos_token,
     );
 
-    for (idx, res) in loader.iter(true).enumerate() {
-        let batch = res?;
-        let total = batch.total_tokens();
-        log::info!("{idx}: {:?}", total);
+    for (idx, batch) in loader.iter(true).enumerate() {
+        log::info!("{idx}: {:?}", batch.total_tokens());
     }
 
     Ok(())

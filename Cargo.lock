@@ -7792,8 +7792,10 @@ dependencies = [
  "anyhow",
  "burn 0.20.1",
  "clap",
+ "llm-dataloader",
  "log",
  "nanochat",
+ "nanochat-data",
  "wordchipper",
  "wordchipper-cli-util",
 ]
