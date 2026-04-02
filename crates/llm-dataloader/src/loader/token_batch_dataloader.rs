@@ -1,8 +1,18 @@
-use crate::loader::{TokenBatch, TokenBatchIteratorFactory};
-use burn::data::dataloader::{DataLoader, DataLoaderIterator};
-use burn::prelude::Backend;
 use std::sync::Arc;
+
+use burn::{
+    data::dataloader::{
+        DataLoader,
+        DataLoaderIterator,
+    },
+    prelude::Backend,
+};
 use wordchipper::TokenType;
+
+use crate::loader::{
+    TokenBatch,
+    TokenBatchIteratorFactory,
+};
 
 pub struct TokenBatchDataLoader<T: TokenType, B: Backend> {
     loader: TokenBatchIteratorFactory<T>,

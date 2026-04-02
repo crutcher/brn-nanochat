@@ -1,16 +1,37 @@
-use crate::loader::token_batch::TokenBatch;
-use arrow::array::{Array, RecordBatch, StringArray};
-use burn::data::dataloader::{DataLoaderIterator, Progress};
-use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
+use std::{
+    path::PathBuf,
+    sync::Arc,
+};
+
+use arrow::array::{
+    Array,
+    RecordBatch,
+    StringArray,
+};
+use burn::data::dataloader::{
+    DataLoaderIterator,
+    Progress,
+};
+use parquet::arrow::arrow_reader::{
+    ParquetRecordBatchReader,
+    ParquetRecordBatchReaderBuilder,
+};
 use rand::prelude::SliceRandom;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::sync::Arc;
-use wordchipper::support::slices::inner_str_view;
-use wordchipper::{TokenEncoder, TokenType, Tokenizer};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use wordchipper::{
+    TokenEncoder,
+    TokenType,
+    Tokenizer,
+    support::slices::inner_str_view,
+};
+
+use crate::loader::token_batch::TokenBatch;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToxenBatchIteratorOptions {
+pub struct TokenBatchIteratorOptions {
     /// The number of sequences to load per batch.
     pub batch_size: usize,
 
@@ -22,7 +43,7 @@ pub struct ToxenBatchIteratorOptions {
     pub min_buffer: usize,
 }
 
-impl Default for ToxenBatchIteratorOptions {
+impl Default for TokenBatchIteratorOptions {
     fn default() -> Self {
         Self {
             batch_size: 32,
@@ -35,7 +56,7 @@ impl Default for ToxenBatchIteratorOptions {
 #[derive(Clone)]
 pub struct TokenBatchIteratorFactory<T: TokenType> {
     tokenizer: Arc<Tokenizer<T>>,
-    options: ToxenBatchIteratorOptions,
+    options: TokenBatchIteratorOptions,
     bos_token: T,
 
     files: Vec<PathBuf>,
@@ -45,7 +66,7 @@ impl<T: TokenType> TokenBatchIteratorFactory<T> {
     pub fn new(
         tokenizer: Arc<Tokenizer<T>>,
         files: Vec<PathBuf>,
-        options: ToxenBatchIteratorOptions,
+        options: TokenBatchIteratorOptions,
         bos_token: T,
     ) -> Self {
         Self {
@@ -100,7 +121,7 @@ impl<T: TokenType> TokenBatchIteratorFactory<T> {
 
 pub struct TokenBatchIterator<T: TokenType> {
     tokenizer: Arc<Tokenizer<T>>,
-    options: ToxenBatchIteratorOptions,
+    options: TokenBatchIteratorOptions,
     bos_token: T,
 
     files: Vec<PathBuf>,
@@ -114,7 +135,7 @@ impl<T: TokenType> TokenBatchIterator<T> {
     pub fn new(
         tokenizer: Arc<Tokenizer<T>>,
         files: Vec<PathBuf>,
-        options: ToxenBatchIteratorOptions,
+        options: TokenBatchIteratorOptions,
         bos_token: T,
     ) -> Self {
         let num_items = files.len();
@@ -226,7 +247,8 @@ impl<T: TokenType> TokenBatchIterator<T> {
                     })
                     .max_by_key(|(_, k)| *k)
                 {
-                    // Find and add the longest sequence in the buffer that fits entirely in the row.
+                    // Find and add the longest sequence in the buffer that fits entirely in the
+                    // row.
                     idx
                 } else {
                     // No doc fits entirely in the row.

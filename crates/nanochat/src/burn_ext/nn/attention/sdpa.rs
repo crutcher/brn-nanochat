@@ -1,13 +1,27 @@
 //! # Attention Extensions
 
-use crate::burn_ext::nn::functional::drop::dropout;
-use crate::burn_ext::tensor;
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::Tensor;
-use burn::config::Config;
-use burn::prelude::{Backend, Bool, Int};
-use burn::tensor::DType;
-use burn::tensor::activation::softmax;
+use bimm_contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
+};
+use burn::{
+    Tensor,
+    config::Config,
+    prelude::{
+        Backend,
+        Bool,
+        Int,
+    },
+    tensor::{
+        DType,
+        activation::softmax,
+    },
+};
+
+use crate::burn_ext::{
+    nn::functional::drop::dropout,
+    tensor,
+};
 
 #[derive(Config, Debug, Copy)]
 pub struct ScaledDotProductAttentionConfig {
@@ -170,8 +184,9 @@ pub fn sdpa_bias<B: Backend>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use burn::backend::Wgpu;
+
+    use super::*;
 
     #[test]
     fn test_scaled_dot_product_attention_bias() {

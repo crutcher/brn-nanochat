@@ -1,11 +1,20 @@
 //! # Nanochat Dataset Loader
 
+use std::{
+    fs,
+    fs::File,
+    path::PathBuf,
+};
+
 use burn::config::Config;
-use downloader::{Download, Downloader};
-use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
-use std::fs;
-use std::fs::File;
-use std::path::PathBuf;
+use downloader::{
+    Download,
+    Downloader,
+};
+use parquet::arrow::arrow_reader::{
+    ParquetRecordBatchReader,
+    ParquetRecordBatchReaderBuilder,
+};
 
 /// The upstream dataset URL.
 pub static NANOCHAT_TRAIN_BASE_URL: &str =
@@ -51,8 +60,8 @@ impl DatasetSource {
 
     /// Construct a shard filename.
     ///
-    /// Substitutes the ``Self::format_index(index)`` result in for `"{index}"` in
-    /// the [`Self::shard_template`].
+    /// Substitutes the ``Self::format_index(index)`` result in for `"{index}"`
+    /// in the [`Self::shard_template`].
     pub fn format_shard_filename(
         &self,
         index: usize,
@@ -287,9 +296,11 @@ impl DatasetCache {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::File;
+
     use tempdir::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_dataset_source_config() {

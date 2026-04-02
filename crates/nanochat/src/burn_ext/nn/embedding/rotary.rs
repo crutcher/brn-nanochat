@@ -1,11 +1,20 @@
 //! # Rotary Embedding
 
-use burn::Tensor;
-use burn::config::Config;
-use burn::module::Module;
-use burn::prelude::{Backend, s};
-use burn::tensor::{DType, linalg};
 use std::ops::Range;
+
+use burn::{
+    Tensor,
+    config::Config,
+    module::Module,
+    prelude::{
+        Backend,
+        s,
+    },
+    tensor::{
+        DType,
+        linalg,
+    },
+};
 
 /// Common meta for [`RotaryEmbedding`] and [`RotaryEmbeddingConfig`].
 pub trait RotaryEmbeddingMeta {
@@ -225,10 +234,16 @@ pub fn positional_frequency_table<B: Backend>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::Wgpu;
-    use burn::tensor::{Distribution, Tolerance};
+    use burn::{
+        backend::Wgpu,
+        tensor::{
+            Distribution,
+            Tolerance,
+        },
+    };
+
+    use super::*;
 
     #[test]
     fn test_inverse_frequency_table() {

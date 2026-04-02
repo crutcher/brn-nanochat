@@ -1,19 +1,57 @@
 //! # GPT Module
 
-use crate::burn_ext::nn::attention::csa::{CausalSelfAttentionConfig, CausalSelfAttentionMeta};
-use crate::burn_ext::nn::attention::kvcache::{KVCache, KVCacheConfig};
-use crate::burn_ext::nn::embedding::rotary::{
-    RotaryEmbedding, RotaryEmbeddingConfig, RotaryEmbeddingMeta,
+use bimm_contracts::{
+    assert_shape_contract_periodically,
+    unpack_shape_contract,
 };
-use crate::gpt::block::{GPTBlock, GPTBlockConfig};
-use crate::gpt::mlp::MLPConfig;
-use bimm_contracts::{assert_shape_contract_periodically, unpack_shape_contract};
-use burn::Tensor;
-use burn::module::Module;
-use burn::nn::activation::ActivationConfig;
-use burn::nn::norm::{Normalization, NormalizationConfig, RmsNormConfig};
-use burn::nn::{Embedding, EmbeddingConfig, Linear, LinearConfig};
-use burn::prelude::{Backend, Config, Int};
+use burn::{
+    Tensor,
+    module::Module,
+    nn::{
+        Embedding,
+        EmbeddingConfig,
+        Linear,
+        LinearConfig,
+        activation::ActivationConfig,
+        norm::{
+            Normalization,
+            NormalizationConfig,
+            RmsNormConfig,
+        },
+    },
+    prelude::{
+        Backend,
+        Config,
+        Int,
+    },
+};
+
+use crate::{
+    burn_ext::nn::{
+        attention::{
+            csa::{
+                CausalSelfAttentionConfig,
+                CausalSelfAttentionMeta,
+            },
+            kvcache::{
+                KVCache,
+                KVCacheConfig,
+            },
+        },
+        embedding::rotary::{
+            RotaryEmbedding,
+            RotaryEmbeddingConfig,
+            RotaryEmbeddingMeta,
+        },
+    },
+    gpt::{
+        block::{
+            GPTBlock,
+            GPTBlockConfig,
+        },
+        mlp::MLPConfig,
+    },
+};
 
 /// Common meta for [`GPT`] and [`GPTConfig`].
 pub trait GPTMeta {
@@ -358,10 +396,13 @@ impl<B: Backend> GPT<B> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bimm_contracts::assert_shape_contract;
-    use burn::backend::Wgpu;
-    use burn::tensor::Distribution;
+    use burn::{
+        backend::Wgpu,
+        tensor::Distribution,
+    };
+
+    use super::*;
 
     #[test]
     fn test_gpt_config() {

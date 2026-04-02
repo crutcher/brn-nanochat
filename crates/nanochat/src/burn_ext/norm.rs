@@ -1,7 +1,9 @@
 //! # Norm Extensions
-use burn::Tensor;
-use burn::prelude::Backend;
-use burn::tensor::DType::F32;
+use burn::{
+    Tensor,
+    prelude::Backend,
+    tensor::DType::F32,
+};
 
 /// Apply root-mean-square norm.
 pub fn rms_norm<B: Backend, const R: usize>(x: Tensor<B, R>) -> Tensor<B, R> {
@@ -22,9 +24,12 @@ pub fn rms_norm<B: Backend, const R: usize>(x: Tensor<B, R>) -> Tensor<B, R> {
 
 #[cfg(test)]
 mod tests {
+    use burn::{
+        backend::Wgpu,
+        tensor::Distribution,
+    };
+
     use super::*;
-    use burn::backend::Wgpu;
-    use burn::tensor::Distribution;
 
     #[test]
     fn test_rms_norm() {
