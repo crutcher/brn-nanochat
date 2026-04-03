@@ -69,6 +69,9 @@ pub struct Args {
     #[command(flatten)]
     pub token_batch_options: TokenBatchOptionsArgs,
 
+    #[arg(long, default_value_t = false)]
+    pub use_arrow: bool,
+
     /// Logging configuration.
     #[clap(flatten)]
     logging: LogArgs,
@@ -130,15 +133,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
-        tok.clone(),
-        shard_paths.clone(),
-        args.token_batch_options.options(),
-        bos_token,
-    );
+    if !args.use_arrow {
+        let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
+            tok.clone(),
+            shard_paths.clone(),
+            args.token_batch_options.options(),
+            bos_token,
+        );
 
-    for (idx, batch) in loader.iter(true).enumerate() {
-        log::info!("{idx}: {:?}", batch.total_tokens());
+        for (idx, batch) in loader.iter(true).enumerate() {
+            log::info!("{idx}: {:?}", batch.total_tokens());
+        }
+    } else {
+
     }
 
     Ok(())
