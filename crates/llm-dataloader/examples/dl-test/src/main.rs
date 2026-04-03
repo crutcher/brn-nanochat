@@ -8,9 +8,12 @@ use burn::tensor::{
     Slice,
 };
 use clap::Parser;
-use llm_dataloader::loader::{
-    TokenBatchIteratorFactory,
-    TokenBatchIteratorOptions,
+use llm_dataloader::{
+    loader::{
+        TokenBatchIteratorFactory,
+        TokenBatchIteratorOptions,
+    },
+    reader,
 };
 use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
@@ -145,7 +148,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             log::info!("{idx}: {:?}", batch.total_tokens());
         }
     } else {
-
+        // turn a list of paths into a joined iterator over parquet readers.
+        for res in reader::read_tokenized_batches(shard_paths, tok.clone()) {
+            let batch = res?;
+            println!("batch.len: {}", batch.num_rows())
+        }
     }
 
     Ok(())
