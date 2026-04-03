@@ -8,9 +8,12 @@ use burn::tensor::{
     Slice,
 };
 use clap::Parser;
-use llm_dataloader::loader::{
-    TokenBatchIteratorFactory,
-    TokenBatchIteratorOptions,
+use llm_dataloader::{
+    loader::{
+        TokenBatchIteratorFactory,
+        TokenBatchIteratorOptions,
+    },
+    reader,
 };
 use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
@@ -68,6 +71,9 @@ pub struct Args {
 
     #[command(flatten)]
     pub token_batch_options: TokenBatchOptionsArgs,
+
+    #[arg(long, default_value_t = false)]
+    pub use_arrow: bool,
 
     /// Logging configuration.
     #[clap(flatten)]
@@ -130,15 +136,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
-        tok.clone(),
-        shard_paths.clone(),
-        args.token_batch_options.options(),
-        bos_token,
-    );
+    if !args.use_arrow {
+        let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
+            tok.clone(),
+            shard_paths.clone(),
+            args.token_batch_options.options(),
+            bos_token,
+        );
 
-    for (idx, batch) in loader.iter(true).enumerate() {
-        log::info!("{idx}: {:?}", batch.total_tokens());
+        for (idx, batch) in loader.iter(true).enumerate() {
+            log::info!("{idx}: {:?}", batch.total_tokens());
+        }
+    } else {
+        // turn a list of paths into a joined iterator over parquet readers.
+        for res in reader::read_tokenized_batches(shard_paths, tok.clone()) {
+            let batch = res?;
+            println!("batch.len: {}", batch.num_rows())
+        }
     }
 
     Ok(())

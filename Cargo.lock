@@ -3281,11 +3281,13 @@ name = "dl-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow",
  "burn 0.20.1",
  "clap",
  "llm-dataloader",
  "log",
  "nanochat-data",
+ "parquet",
  "serde_json",
  "wordchipper",
  "wordchipper-cli-util",

@@ -14,6 +14,8 @@ llm-dataloader = { path = "../.." }
 nanochat-data = { path = "../../../nanochat-data" }
 serde_json = { workspace = true }
 log = { workspace = true }
+arrow = { workspace = true }
+parquet = { workspace = true }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
