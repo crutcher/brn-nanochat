@@ -1,81 +1,39 @@
-use std::{
-    cmp::min,
-    sync::Arc,
-};
+use std::cmp::min;
 
-use arrow::{
-    array::{
-        Array,
-        RecordBatch,
-        StringArray,
-    },
-    error::{
-        ArrowError,
-        Result as ArrowResult,
-    },
-};
+use arrow::error::Result as ArrowResult;
 use serde::{
     Deserialize,
     Serialize,
 };
-use wordchipper::{
-    TokenEncoder,
-    Tokenizer,
-    support::slices::inner_str_view,
-};
-
-pub fn select_text_columns<I, S>(
-    column: S,
-    iter: I,
-) -> impl Iterator<Item = ArrowResult<Vec<String>>>
-where
-    I: Iterator<Item = ArrowResult<RecordBatch>>,
-    S: AsRef<str>,
-{
-    let column = column.as_ref().to_string();
-    iter.map(move |res| -> ArrowResult<Vec<String>> {
-        let record_batch = res?;
-
-        let text_column = record_batch
-            .column_by_name(&column)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-
-        let samples: Vec<String> = text_column
-            .into_iter()
-            .flat_map(|x| x.map(|s| s.to_string()))
-            .collect::<Vec<String>>();
-
-        Ok(samples)
-    })
-}
-
-pub fn tokenize_text_batches<I>(
-    tokenizer: Arc<Tokenizer<u32>>,
-    iter: I,
-) -> impl Iterator<Item = ArrowResult<Vec<Vec<u32>>>>
-where
-    I: Iterator<Item = ArrowResult<Vec<String>>>,
-{
-    iter.map(move |res| -> ArrowResult<Vec<Vec<u32>>> {
-        let text_batch = res?;
-
-        let tokens = tokenizer
-            .try_encode_batch(&inner_str_view(&text_batch), None)
-            .map_err(|e| ArrowError::ComputeError(e.to_string()))?;
-
-        Ok(tokens)
-    })
-}
-
 pub struct DenseTokenBlocksOptions {
     pub batch_size: usize,
     pub batch_seq_len: usize,
     pub min_buffer: usize,
     pub bos: Vec<u32>,
     pub eos: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenBatchIteratorOptions {
+    /// The number of sequences to load per batch.
+    pub batch_size: usize,
+
+    /// The maximum number of tokens in a sequence.
+    pub batch_seq_len: usize,
+
+    /// The minimum number of sequences to keep in the buffer
+    /// before loading more sequences.
+    pub min_buffer: usize,
+}
+
+impl Default for TokenBatchIteratorOptions {
+    fn default() -> Self {
+        Self {
+            batch_size: 32,
+            batch_seq_len: 2048,
+            min_buffer: 1024,
+        }
+    }
 }
 
 impl DenseTokenBlocksOptions {
@@ -242,29 +200,6 @@ where
             Ok(None) => None,
             Ok(Some(batch)) => Some(Ok(batch)),
             Err(err) => Some(Err(err)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenBatchIteratorOptions {
-    /// The number of sequences to load per batch.
-    pub batch_size: usize,
-
-    /// The maximum number of tokens in a sequence.
-    pub batch_seq_len: usize,
-
-    /// The minimum number of sequences to keep in the buffer
-    /// before loading more sequences.
-    pub min_buffer: usize,
-}
-
-impl Default for TokenBatchIteratorOptions {
-    fn default() -> Self {
-        Self {
-            batch_size: 32,
-            batch_seq_len: 2048,
-            min_buffer: 1024,
         }
     }
 }

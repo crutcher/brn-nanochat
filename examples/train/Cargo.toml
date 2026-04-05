@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 zsl-chat = { path = "../../crates/zsl-chat" }
 zsl-data-cache = { path = "../../crates/zsl-data-cache" }
-llm-dataloader = { path = "../../crates/llm-dataloader" }
+zsl-chat-data = { path = "../../crates/zsl-chat-data" }
 
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
