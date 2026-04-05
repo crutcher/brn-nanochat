@@ -335,7 +335,7 @@ impl<B: Backend> GPT<B> {
 
         let mut x = self.wte.forward(idx);
 
-        // Note: The reference nanochat has a norm here,
+        // Note: The reference zsl-chat has a norm here,
         // but the block has the same norm as the first operation.
         // x = rms_norm(x);
 

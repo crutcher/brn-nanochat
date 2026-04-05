@@ -10,8 +10,9 @@ publish = false
 workspace = true
 
 [dependencies]
+zsl-data-cache = { path = "../.." }
+
 burn = { workspace = true, features = ["network"] }
-nanochat-data = { path = "../.." }
 
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }

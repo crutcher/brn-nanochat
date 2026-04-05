@@ -27,11 +27,10 @@ doc_markdown = "deny"
 [workspace.dependencies]
 derive-new = "0.7.0"
 
-wordchipper = { version = "0.9.0" }
-wordchipper-cli-util = { version = "0.9.0" }
+wordchipper = { version = "0.9.1" }
+wordchipper-cli-util = { version = "0.9.1" }
 
 humansize = "2.1.3"
-ahash = "0.8"
 arrow = "58.1.0"
 bimm-contracts = "0.19.2"
 burn = "0.20.1"

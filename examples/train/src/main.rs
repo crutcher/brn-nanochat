@@ -16,14 +16,14 @@ use burn::{
 };
 use clap::Parser;
 use llm_dataloader::reader::TokenBatchIteratorOptions;
-use nanochat::gpt::gpt_model::GPTConfig;
-use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
     UnifiedTokenVocab,
     VocabIndex,
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
+use zsl_chat::gpt::gpt_model::GPTConfig;
+use zsl_data_cache::dataset::DatasetCacheConfig;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct TokenBatchOptionsArgs {
