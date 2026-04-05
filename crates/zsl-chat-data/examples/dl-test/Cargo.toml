@@ -9,11 +9,11 @@ workspace = true
 
 [dependencies]
 zsl-data-cache = { path = "../../../zsl-data-cache" }
-llm-dataloader = { path = "../.." }
-
-burn = { workspace = true }
+zsl-chat-data = { path = "../.." }
 wordchipper = { workspace = true, features = ["client"] }
 wordchipper-cli-util = { workspace = true }
+
+burn = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 arrow = { workspace = true }

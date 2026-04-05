@@ -1,19 +1,26 @@
 [package]
-name = "llm-dataloader"
+name = "zsl-chat-data"
 rust-version.workspace = true
 edition.workspace = true
 publish = false
 
+
+[lints]
+workspace = true
+
+
 [dependencies]
+wordchipper = { workspace = true, features = ["client"] }
+
 burn = { workspace = true, features = ["train"] }
 rand = { workspace = true }
 derive-new = { workspace = true }
-wordchipper = { workspace = true, features = ["client"] }
 parquet = { workspace = true, features = ["arrow"] }
 arrow = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 log = { workspace = true }
 
-[lints]
-workspace = true
+
+[dev-dependencies]
+wordchipper = { workspace = true, features = ["testing"] }

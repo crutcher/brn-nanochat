@@ -3285,12 +3285,12 @@ dependencies = [
  "burn 0.20.1",
  "clap",
  "humansize",
- "llm-dataloader",
  "log",
  "parquet",
  "serde_json",
  "wordchipper",
  "wordchipper-cli-util",
+ "zsl-chat-data",
  "zsl-data-cache",
 ]
 
@@ -5002,21 +5002,6 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
-
-[[package]]
-name = "llm-dataloader"
-version = "0.0.0"
-dependencies = [
- "arrow",
- "burn 0.20.1",
- "derive-new",
- "log",
- "parquet",
- "rand 0.10.0",
- "serde",
- "serde_json",
- "wordchipper",
-]
 
 [[package]]
 name = "lock_api"
@@ -7784,11 +7769,11 @@ dependencies = [
  "anyhow",
  "burn 0.20.1",
  "clap",
- "llm-dataloader",
  "log",
  "wordchipper",
  "wordchipper-cli-util",
  "zsl-chat",
+ "zsl-chat-data",
  "zsl-data-cache",
 ]
 
@@ -9128,6 +9113,21 @@ dependencies = [
  "anyhow",
  "bimm-contracts",
  "burn 0.20.1",
+]
+
+[[package]]
+name = "zsl-chat-data"
+version = "0.0.0"
+dependencies = [
+ "arrow",
+ "burn 0.20.1",
+ "derive-new",
+ "log",
+ "parquet",
+ "rand 0.10.0",
+ "serde",
+ "serde_json",
+ "wordchipper",
 ]
 
 [[package]]

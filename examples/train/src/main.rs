@@ -15,7 +15,6 @@ use burn::{
     },
 };
 use clap::Parser;
-use llm_dataloader::reader::TokenBatchIteratorOptions;
 use wordchipper::{
     UnifiedTokenVocab,
     VocabIndex,
@@ -23,6 +22,7 @@ use wordchipper::{
 };
 use wordchipper_cli_util::logging::LogArgs;
 use zsl_chat::gpt::gpt_model::GPTConfig;
+use zsl_chat_data::tokens::TokenBatchIteratorOptions;
 use zsl_data_cache::dataset::DatasetCacheConfig;
 
 #[derive(Debug, Clone, clap::Args)]

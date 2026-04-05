@@ -8,15 +8,6 @@ use burn::tensor::{
     Slice,
 };
 use clap::Parser;
-use llm_dataloader::{
-    reader::{
-        DenseTokenBlocksOptions,
-        TokenBatchIteratorOptions,
-        select_text_columns,
-        tokenize_text_batches,
-    },
-    support::parquet::read_parquet_shards,
-};
 use wordchipper::{
     Tokenizer,
     UnifiedTokenVocab,
@@ -24,6 +15,17 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
+use zsl_chat_data::{
+    arrow::{
+        read_parquet_shards,
+        select_text_column,
+    },
+    tokens::{
+        DenseTokenBlocksOptions,
+        TokenBatchIteratorOptions,
+        tokenize_text_batches,
+    },
+};
 use zsl_data_cache::dataset::DatasetCacheConfig;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -139,7 +141,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parquet_batches = read_parquet_shards(shard_paths);
 
     // Iterator<ArrowResult<Vec<String>>>
-    let sample_batches = select_text_columns("text", parquet_batches);
+    let sample_batches = select_text_column("text", parquet_batches);
 
     let mut total_sample_bytes: usize = 0;
     let sample_batches = sample_batches.map(|batch| match batch {
