@@ -9,11 +9,13 @@ use burn::tensor::{
 };
 use clap::Parser;
 use llm_dataloader::{
-    loader::{
-        TokenBatchIteratorFactory,
+    reader::{
+        DenseTokenBlocksOptions,
         TokenBatchIteratorOptions,
+        select_text_columns,
+        tokenize_text_batches,
     },
-    reader,
+    support::parquet::read_parquet_shards,
 };
 use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
@@ -71,9 +73,6 @@ pub struct Args {
 
     #[command(flatten)]
     pub token_batch_options: TokenBatchOptionsArgs,
-
-    #[arg(long, default_value_t = false)]
-    pub use_arrow: bool,
 
     /// Logging configuration.
     #[clap(flatten)]
@@ -136,24 +135,63 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    if !args.use_arrow {
-        let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
-            tok.clone(),
-            shard_paths.clone(),
-            args.token_batch_options.options(),
-            bos_token,
-        );
+    // Iterator<ArrowResult<RecordBatch>>
+    let parquet_batches = read_parquet_shards(shard_paths);
 
-        for (idx, batch) in loader.iter(true).enumerate() {
-            log::info!("{idx}: {:?}", batch.total_tokens());
+    // Iterator<ArrowResult<Vec<String>>>
+    let sample_batches = select_text_columns("text", parquet_batches);
+
+    let mut total_sample_bytes: usize = 0;
+    let sample_batches = sample_batches.map(|batch| match batch {
+        Ok(batch) => {
+            total_sample_bytes += batch.iter().map(|s| s.len()).sum::<usize>();
+            Ok(batch)
         }
-    } else {
-        // turn a list of paths into a joined iterator over parquet readers.
-        for res in reader::read_tokenized_batches(shard_paths, tok.clone()) {
-            let batch = res?;
-            println!("batch.len: {}", batch.num_rows())
-        }
+        Err(err) => Err(err),
+    });
+
+    // Iterator<ArrowResult<Vec<Vec<u32>>>>
+    let token_batches = tokenize_text_batches(tok.clone(), sample_batches);
+
+    // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
+    let dense_blocks = DenseTokenBlocksOptions {
+        batch_size: args.token_batch_options.batch_size,
+        batch_seq_len: args.token_batch_options.batch_seq_len,
+        min_buffer: args.token_batch_options.min_buffer,
+        bos: vec![bos_token],
+        eos: vec![],
     }
+    .build_dense_blocks(token_batches);
+
+    let t0 = std::time::Instant::now();
+    let mut last_idx = 0;
+    for (idx, res) in dense_blocks.enumerate() {
+        let block = res?;
+        assert_eq!(block.len(), args.token_batch_options.batch_size);
+        block.iter().for_each(|seq| {
+            assert_eq!(seq.len(), args.token_batch_options.batch_seq_len);
+        });
+
+        last_idx = idx;
+    }
+    let elapsed = t0.elapsed();
+    println!("elapsed: {:?}", elapsed);
+    println!(
+        "shape: {last_idx} x [{}, {}]",
+        args.token_batch_options.batch_size, args.token_batch_options.batch_seq_len,
+    );
+
+    println!(
+        "total sample bytes: {}",
+        humansize::format_size(total_sample_bytes, humansize::BINARY)
+    );
+
+    let token_bytes =
+        last_idx * args.token_batch_options.batch_size * args.token_batch_options.batch_seq_len * 4;
+    println!(
+        "total token bytes: {}",
+        humansize::format_size(token_bytes, humansize::BINARY)
+    );
 
     Ok(())
 }

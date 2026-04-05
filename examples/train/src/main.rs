@@ -15,11 +15,7 @@ use burn::{
     },
 };
 use clap::Parser;
-use llm_dataloader::loader::{
-    TokenBatchDataLoader,
-    TokenBatchIteratorFactory,
-    TokenBatchIteratorOptions,
-};
+use llm_dataloader::reader::TokenBatchIteratorOptions;
 use nanochat::gpt::gpt_model::GPTConfig;
 use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
@@ -118,7 +114,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     };
 
     log::info!("Loading Shards: {shards:?}");
-    let shard_paths = cache.load_shards(&shards)?;
+    let _shard_paths = cache.load_shards(&shards)?;
 
     let mut disk_cache = WordchipperDiskCache::default();
     let mut vocab: UnifiedTokenVocab<T> =
@@ -130,7 +126,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let max_token = vocab.max_token().unwrap();
 
-    let bos_token: T = {
+    let _bos_token: T = {
         let specials = vocab.special_vocab_mut();
         if let Some(tok) = specials.lookup_token(args.bos_token.as_bytes()) {
             tok
@@ -142,19 +138,10 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     };
     let vocab = Arc::new(vocab);
 
-    let tok = wordchipper::TokenizerOptions::default()
+    let _tok = wordchipper::TokenizerOptions::default()
         .with_accelerated_lexers(true)
         .with_parallel(true)
         .build(vocab);
-
-    let token_factory: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
-        tok.clone(),
-        shard_paths.clone(),
-        args.token_batch_options.options(),
-        bos_token,
-    );
-    let _token_loader: TokenBatchDataLoader<T, B> =
-        TokenBatchDataLoader::new(token_factory, device.clone(), true);
 
     let ec = EmbeddingConfig::new(vocab_size, args.embedding_dim);
 
