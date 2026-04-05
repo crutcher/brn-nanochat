@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    cmp::min,
+    sync::Arc,
+};
 
 use arrow::{
     array::{
@@ -65,6 +68,35 @@ where
 
         Ok(tokens)
     })
+}
+
+pub struct DenseTokenBlocksOptions {
+    pub batch_size: usize,
+    pub batch_seq_len: usize,
+    pub min_buffer: usize,
+    pub bos: Vec<u32>,
+    pub eos: Vec<u32>,
+}
+
+impl DenseTokenBlocksOptions {
+    pub fn build_dense_blocks<I>(
+        self,
+        iter: I,
+    ) -> impl Iterator<Item = ArrowResult<Vec<Vec<u32>>>>
+    where
+        I: Iterator<Item = ArrowResult<Vec<Vec<u32>>>>,
+    {
+        DenseTokenBlockBatcher::new(
+            iter,
+            TokenBatchIteratorOptions {
+                batch_size: self.batch_size,
+                batch_seq_len: self.batch_seq_len,
+                min_buffer: self.min_buffer,
+            },
+            self.bos.clone(),
+            self.eos.clone(),
+        )
+    }
 }
 
 pub fn compact_dense_token_blocks<I>(
@@ -137,8 +169,9 @@ where
 
                 let remaining = row_capacity - row.len();
 
-                let mut best_fit: Option<(usize, usize)> = None; // (idx, length)
-                let mut shortest: Option<(usize, usize)> = None; // (idx, length)
+                // (idx, length)
+                let mut best_fit: Option<(usize, usize)> = None;
+                let mut shortest: Option<(usize, usize)> = None;
 
                 for (i, ts) in self.buffer.iter().enumerate() {
                     let k = ts.len();
@@ -156,10 +189,19 @@ where
                 }
 
                 let idx = best_fit.unwrap_or(shortest.unwrap()).0;
+                let seq = self.buffer.remove(idx);
 
-                row.extend(self.buffer.remove(idx));
-                row.extend(&self.eos_seq);
-                row.truncate(row_capacity);
+                // The trash below is the no-extra-copy version of:
+                // ```
+                // row.extend(seq);
+                // row.extend(&self.eos_seq);
+                // row.truncate(row_capacity);
+                // ```
+                row.extend(&seq[..min(remaining, seq.len())]);
+                if !self.eos_seq.is_empty() {
+                    let remaining = row_capacity - row.len();
+                    row.extend(&self.eos_seq[..min(remaining, self.eos_seq.len())]);
+                }
             }
 
             if row.is_empty() {

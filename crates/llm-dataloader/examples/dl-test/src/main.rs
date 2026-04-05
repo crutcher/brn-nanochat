@@ -10,12 +10,12 @@ use burn::tensor::{
 use clap::Parser;
 use llm_dataloader::{
     reader::{
+        DenseTokenBlocksOptions,
         TokenBatchIteratorOptions,
-        compact_dense_token_blocks,
         select_text_columns,
         tokenize_text_batches,
     },
-    support::arrow::parquet_shards::read_parquet_shards,
+    support::parquet::read_parquet_shards,
 };
 use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
@@ -141,30 +141,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Iterator<ArrowResult<Vec<String>>>
     let sample_batches = select_text_columns("text", parquet_batches);
 
+    let mut total_sample_bytes: usize = 0;
+    let sample_batches = sample_batches.map(|batch| match batch {
+        Ok(batch) => {
+            total_sample_bytes += batch.iter().map(|s| s.len()).sum::<usize>();
+            Ok(batch)
+        }
+        Err(err) => Err(err),
+    });
+
     // Iterator<ArrowResult<Vec<Vec<u32>>>>
     let token_batches = tokenize_text_batches(tok.clone(), sample_batches);
 
     // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
-    let dense_blocks = compact_dense_token_blocks(
-        args.token_batch_options.options(),
-        vec![bos_token],
-        vec![],
-        token_batches,
-    );
+    let dense_blocks = DenseTokenBlocksOptions {
+        batch_size: args.token_batch_options.batch_size,
+        batch_seq_len: args.token_batch_options.batch_seq_len,
+        min_buffer: args.token_batch_options.min_buffer,
+        bos: vec![bos_token],
+        eos: vec![],
+    }
+    .build_dense_blocks(token_batches);
 
+    let t0 = std::time::Instant::now();
+    let mut last_idx = 0;
     for (idx, res) in dense_blocks.enumerate() {
         let block = res?;
-
-        let b = block.len();
-        let k = block.first().unwrap().len();
-
-        assert_eq!(b, args.token_batch_options.batch_size);
+        assert_eq!(block.len(), args.token_batch_options.batch_size);
         block.iter().for_each(|seq| {
             assert_eq!(seq.len(), args.token_batch_options.batch_seq_len);
         });
 
-        println!("{idx}: {b} x {k}");
+        last_idx = idx;
     }
+    let elapsed = t0.elapsed();
+    println!("elapsed: {:?}", elapsed);
+    println!(
+        "shape: {last_idx} x [{}, {}]",
+        args.token_batch_options.batch_size, args.token_batch_options.batch_seq_len,
+    );
+
+    println!(
+        "total sample bytes: {}",
+        humansize::format_size(total_sample_bytes, humansize::BINARY)
+    );
+
+    let token_bytes =
+        last_idx * args.token_batch_options.batch_size * args.token_batch_options.batch_seq_len * 4;
+    println!(
+        "total token bytes: {}",
+        humansize::format_size(token_bytes, humansize::BINARY)
+    );
 
     Ok(())
 }

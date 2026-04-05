@@ -14,6 +14,7 @@ pub fn read_parquet_shards(paths: Vec<PathBuf>) -> impl Iterator<Item = ArrowRes
         .into_iter()
         .map(|path| {
             let file = File::open(&path)?;
+            log::info!("Loading Parquet: {:?}", path);
             ParquetRecordBatchReaderBuilder::try_new(file).and_then(|b| b.build())
         })
         .flat_map(|res| {

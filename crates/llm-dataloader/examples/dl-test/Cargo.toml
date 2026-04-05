@@ -20,3 +20,4 @@ parquet = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 
+humansize = { workspace = true }
