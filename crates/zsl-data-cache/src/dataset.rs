@@ -75,7 +75,7 @@ impl DatasetSource {
 #[derive(Config, Debug)]
 pub struct DatasetCacheConfig {
     /// The dataset cache directory.
-    #[config(default = "\"~/.cache/brn-nanochat/dataset/\".to_string()")]
+    #[config(default = "\"~/.cache/brn-zsl-chat/dataset/\".to_string()")]
     pub cache_dir: String,
 
     /// The dataset source configuration.
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_dataset_cache() -> anyhow::Result<()> {
-        let tmpdir = TempDir::new("brn-nanochat-test")?;
+        let tmpdir = TempDir::new("brn-zsl-chat-test")?;
         let base_dir = tmpdir.path();
 
         let cache = DatasetCacheConfig::new()

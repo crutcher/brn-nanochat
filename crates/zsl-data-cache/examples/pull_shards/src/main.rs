@@ -5,7 +5,7 @@ use burn::tensor::{
     Slice,
 };
 use clap::Parser;
-use nanochat_data::dataset::DatasetCacheConfig;
+use zsl_data_cache::dataset::DatasetCacheConfig;
 
 /// Example Nanochat Data Loader.
 #[derive(Parser, Debug)]

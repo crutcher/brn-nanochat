@@ -1,22 +1,20 @@
 [package]
 name = "train"
-version.workspace = true
-repository.workspace = true
 rust-version.workspace = true
 edition.workspace = true
-license.workspace = true
+publish = false
 
 [dependencies]
+zsl-chat = { path = "../../crates/zsl-chat" }
+zsl-data-cache = { path = "../../crates/zsl-data-cache" }
+llm-dataloader = { path = "../../crates/llm-dataloader" }
+
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 log = { workspace = true }
 wordchipper = { workspace = true, features = ["client"] }
 wordchipper-cli-util = { workspace = true }
 burn = { workspace = true, features = ["train", "autotune", "fusion"] }
-
-nanochat = { path = "../../crates/nanochat" }
-nanochat-data = { path = "../../crates/nanochat-data" }
-llm-dataloader = { path = "../../crates/llm-dataloader" }
 
 [features]
 default = ["cuda"]

@@ -63,7 +63,7 @@ where
         let text_batch = res?;
 
         let tokens = tokenizer
-            .try_encode_batch(&inner_str_view(&text_batch))
+            .try_encode_batch(&inner_str_view(&text_batch), None)
             .map_err(|e| ArrowError::ComputeError(e.to_string()))?;
 
         Ok(tokens)

@@ -1,17 +1,19 @@
 [package]
 name = "dl-test"
-version = "0.1.0"
-edition = "2024"
+rust-version.workspace = true
+edition.workspace = true
+publish = false
 
 [lints]
 workspace = true
 
 [dependencies]
+zsl-data-cache = { path = "../../../zsl-data-cache" }
+llm-dataloader = { path = "../.." }
+
 burn = { workspace = true }
 wordchipper = { workspace = true, features = ["client"] }
 wordchipper-cli-util = { workspace = true }
-llm-dataloader = { path = "../.." }
-nanochat-data = { path = "../../../nanochat-data" }
 serde_json = { workspace = true }
 log = { workspace = true }
 arrow = { workspace = true }

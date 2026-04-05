@@ -3278,7 +3278,7 @@ dependencies = [
 
 [[package]]
 name = "dl-test"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "arrow",
@@ -3287,11 +3287,11 @@ dependencies = [
  "humansize",
  "llm-dataloader",
  "log",
- "nanochat-data",
  "parquet",
  "serde_json",
  "wordchipper",
  "wordchipper-cli-util",
+ "zsl-data-cache",
 ]
 
 [[package]]
@@ -5005,7 +5005,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
 name = "llm-dataloader"
-version = "0.0.9"
+version = "0.0.0"
 dependencies = [
  "arrow",
  "burn 0.20.1",
@@ -5284,27 +5284,6 @@ dependencies = [
  "spirv",
  "thiserror 2.0.18",
  "unicode-ident",
-]
-
-[[package]]
-name = "nanochat"
-version = "0.0.9"
-dependencies = [
- "anyhow",
- "bimm-contracts",
- "burn 0.20.1",
-]
-
-[[package]]
-name = "nanochat-data"
-version = "0.0.9"
-dependencies = [
- "anyhow",
- "burn 0.20.1",
- "downloader",
- "parquet",
- "shellexpand",
- "tempdir",
 ]
 
 [[package]]
@@ -5946,7 +5925,7 @@ dependencies = [
  "anyhow",
  "burn 0.20.1",
  "clap",
- "nanochat-data",
+ "zsl-data-cache",
 ]
 
 [[package]]
@@ -7800,17 +7779,17 @@ dependencies = [
 
 [[package]]
 name = "train"
-version = "0.0.9"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "burn 0.20.1",
  "clap",
  "llm-dataloader",
  "log",
- "nanochat",
- "nanochat-data",
  "wordchipper",
  "wordchipper-cli-util",
+ "zsl-chat",
+ "zsl-data-cache",
 ]
 
 [[package]]
@@ -8897,9 +8876,9 @@ dependencies = [
 
 [[package]]
 name = "wordchipper"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4f8eac3c67d6f64221938a290f24936002efcdf3f7ce7b96f14db6e2ef5d795"
+checksum = "2cccf85b4121a46574cacb027d2edb6c3f9c4300e06b65b710892bf17f2eebb0"
 dependencies = [
  "aho-corasick",
  "base64",
@@ -8927,9 +8906,9 @@ dependencies = [
 
 [[package]]
 name = "wordchipper-cli-util"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a7f97fcb619785a9868f72588b4a2e40c503bb8d305ea85c81b8f21b2ee0428"
+checksum = "2cf921056a6ba255d944dd2cbf425c8c426499a6043a537b92f4f4864e621a98"
 dependencies = [
  "arrow",
  "clap",
@@ -8941,9 +8920,9 @@ dependencies = [
 
 [[package]]
 name = "wordchipper-disk-cache"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c566661c8874931e15ce57ae46cc0f0c484461fcb3bbc104744092995ff065e"
+checksum = "ce34ada1747394840e6ddaf27d22871a23c77aa311c179c6f9f8631a200a09e6"
 dependencies = [
  "directories-next",
  "downloader",
@@ -9141,6 +9120,27 @@ name = "zmij"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02aae0f83f69aafc94776e879363e9771d7ecbffe2c7fbb6c14c5e00dfe88439"
+
+[[package]]
+name = "zsl-chat"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bimm-contracts",
+ "burn 0.20.1",
+]
+
+[[package]]
+name = "zsl-data-cache"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "burn 0.20.1",
+ "downloader",
+ "parquet",
+ "shellexpand",
+ "tempdir",
+]
 
 [[package]]
 name = "zstd"

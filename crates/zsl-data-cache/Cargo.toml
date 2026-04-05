@@ -1,10 +1,8 @@
 [package]
-name = "nanochat-data"
-version.workspace = true
-repository.workspace = true
+name = "zsl-data-cache"
 rust-version.workspace = true
 edition.workspace = true
-license.workspace = true
+publish = false
 
 [lints]
 workspace = true

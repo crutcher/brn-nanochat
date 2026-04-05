@@ -1,10 +1,8 @@
 [package]
 name = "llm-dataloader"
-version.workspace = true
-repository.workspace = true
 rust-version.workspace = true
 edition.workspace = true
-license.workspace = true
+publish = false
 
 [dependencies]
 burn = { workspace = true, features = ["train"] }

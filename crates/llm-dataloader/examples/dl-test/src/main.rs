@@ -17,7 +17,6 @@ use llm_dataloader::{
     },
     support::parquet::read_parquet_shards,
 };
-use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
     Tokenizer,
     UnifiedTokenVocab,
@@ -25,6 +24,7 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
+use zsl_data_cache::dataset::DatasetCacheConfig;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct TokenBatchOptionsArgs {
