@@ -9,11 +9,13 @@ use burn::tensor::{
 };
 use clap::Parser;
 use llm_dataloader::{
-    loader::{
-        TokenBatchIteratorFactory,
+    reader::{
         TokenBatchIteratorOptions,
+        compact_dense_token_blocks,
+        select_text_columns,
+        tokenize_text_batches,
     },
-    reader,
+    support::arrow::parquet_shards::read_parquet_shards,
 };
 use nanochat_data::dataset::DatasetCacheConfig;
 use wordchipper::{
@@ -71,9 +73,6 @@ pub struct Args {
 
     #[command(flatten)]
     pub token_batch_options: TokenBatchOptionsArgs,
-
-    #[arg(long, default_value_t = false)]
-    pub use_arrow: bool,
 
     /// Logging configuration.
     #[clap(flatten)]
@@ -136,23 +135,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    if !args.use_arrow {
-        let loader: TokenBatchIteratorFactory<T> = TokenBatchIteratorFactory::new(
-            tok.clone(),
-            shard_paths.clone(),
-            args.token_batch_options.options(),
-            bos_token,
-        );
+    // Iterator<ArrowResult<RecordBatch>>
+    let parquet_batches = read_parquet_shards(shard_paths);
 
-        for (idx, batch) in loader.iter(true).enumerate() {
-            log::info!("{idx}: {:?}", batch.total_tokens());
-        }
-    } else {
-        // turn a list of paths into a joined iterator over parquet readers.
-        for res in reader::read_tokenized_batches(shard_paths, tok.clone()) {
-            let batch = res?;
-            println!("batch.len: {}", batch.num_rows())
-        }
+    // Iterator<ArrowResult<Vec<String>>>
+    let sample_batches = select_text_columns("text", parquet_batches);
+
+    // Iterator<ArrowResult<Vec<Vec<u32>>>>
+    let token_batches = tokenize_text_batches(tok.clone(), sample_batches);
+
+    // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
+    let dense_blocks = compact_dense_token_blocks(
+        args.token_batch_options.options(),
+        vec![bos_token],
+        vec![],
+        token_batches,
+    );
+
+    for (idx, res) in dense_blocks.enumerate() {
+        let block = res?;
+
+        let b = block.len();
+        let k = block.first().unwrap().len();
+
+        assert_eq!(b, args.token_batch_options.batch_size);
+        block.iter().for_each(|seq| {
+            assert_eq!(seq.len(), args.token_batch_options.batch_seq_len);
+        });
+
+        println!("{idx}: {b} x {k}");
     }
 
     Ok(())
