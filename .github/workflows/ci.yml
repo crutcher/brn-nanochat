@@ -47,5 +47,5 @@ jobs:
         run: cargo clippy --no-deps
 
       - name: Test
-        run: cargo test --workspace --exclude nanochat
+        run: cargo test --workspace --exclude zsl-chat
 
