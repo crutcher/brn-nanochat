@@ -9,7 +9,12 @@ use arrow::{
 };
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
-pub fn read_parquet_shards(paths: Vec<PathBuf>) -> impl Iterator<Item = ArrowResult<RecordBatch>> {
+pub fn read_parquet_shards<'a, I>(
+    paths: I
+) -> impl Iterator<Item = ArrowResult<RecordBatch>> + use<'a, I>
+where
+    I: Iterator<Item = PathBuf> + 'a,
+{
     paths
         .into_iter()
         .map(|path| {

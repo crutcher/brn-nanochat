@@ -5,6 +5,8 @@ use serde::{
     Deserialize,
     Serialize,
 };
+
+#[derive(Debug, Clone)]
 pub struct DenseTokenBlocksOptions {
     pub batch_size: usize,
     pub batch_seq_len: usize,

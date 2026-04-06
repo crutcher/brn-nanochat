@@ -1,13 +1,24 @@
 use std::{
     collections::HashSet,
-    sync::Arc,
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
 
-use burn::tensor::{
-    AsIndex,
-    Slice,
+use burn::{
+    backend::Cuda,
+    data::dataloader::DataLoader,
+    tensor::{
+        AsIndex,
+        Slice,
+    },
 };
 use clap::Parser;
+use rand::{
+    SeedableRng,
+    rngs::StdRng,
+};
 use wordchipper::{
     Tokenizer,
     UnifiedTokenVocab,
@@ -16,14 +27,11 @@ use wordchipper::{
 };
 use wordchipper_cli_util::logging::LogArgs;
 use zsl_chat_data::{
-    arrow::{
-        read_parquet_shards,
-        select_text_column,
-    },
+    self,
+    dataloader::ChatDataLoader,
     tokens::{
         DenseTokenBlocksOptions,
         TokenBatchIteratorOptions,
-        tokenize_text_batches,
     },
 };
 use zsl_data_cache::dataset::DatasetCacheConfig;
@@ -137,37 +145,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_accelerated_lexers(true)
         .build(vocab.into());
 
-    // Iterator<ArrowResult<RecordBatch>>
-    let parquet_batches = read_parquet_shards(shard_paths);
-
-    // Iterator<ArrowResult<Vec<String>>>
-    let sample_batches = select_text_column("text", parquet_batches);
-
-    let mut total_sample_bytes: usize = 0;
-    let sample_batches = sample_batches.map(|batch| match batch {
-        Ok(batch) => {
-            total_sample_bytes += batch.iter().map(|s| s.len()).sum::<usize>();
-            Ok(batch)
-        }
-        Err(err) => Err(err),
-    });
-
-    // Iterator<ArrowResult<Vec<Vec<u32>>>>
-    let token_batches = tokenize_text_batches(tok.clone(), sample_batches);
-
-    // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
-    let dense_blocks = DenseTokenBlocksOptions {
+    let block_options = DenseTokenBlocksOptions {
         batch_size: args.token_batch_options.batch_size,
         batch_seq_len: args.token_batch_options.batch_seq_len,
         min_buffer: args.token_batch_options.min_buffer,
         bos: vec![bos_token],
         eos: vec![],
-    }
-    .build_dense_blocks(token_batches);
+    };
 
-    let t0 = std::time::Instant::now();
+    type B = Cuda;
+
+    let device = Default::default();
+
+    let data_loader: ChatDataLoader<B> = ChatDataLoader::new(
+        shard_paths,
+        Some(Arc::new(Mutex::new(StdRng::seed_from_u64(0)))),
+        &device,
+        tok.clone(),
+        block_options,
+    );
+
     let mut last_idx = 0;
-    for (idx, res) in dense_blocks.enumerate() {
+    let t0 = std::time::Instant::now();
+    for (idx, res) in data_loader.iter().enumerate() {
         let block = res?;
         assert_eq!(block.len(), args.token_batch_options.batch_size);
         block.iter().for_each(|seq| {
@@ -181,18 +181,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "shape: {last_idx} x [{}, {}]",
         args.token_batch_options.batch_size, args.token_batch_options.batch_seq_len,
-    );
-
-    println!(
-        "total sample bytes: {}",
-        humansize::format_size(total_sample_bytes, humansize::BINARY)
-    );
-
-    let token_bytes =
-        last_idx * args.token_batch_options.batch_size * args.token_batch_options.batch_seq_len * 4;
-    println!(
-        "total token bytes: {}",
-        humansize::format_size(token_bytes, humansize::BINARY)
     );
 
     Ok(())

@@ -3287,6 +3287,7 @@ dependencies = [
  "humansize",
  "log",
  "parquet",
+ "rand 0.10.0",
  "serde_json",
  "wordchipper",
  "wordchipper-cli-util",
