@@ -13,15 +13,14 @@ use arrow::array::{
 /// ## Returns
 /// An iterator over batches of the selected column values as strings,
 /// or an error if the operation fails.
-pub fn select_text_column<I, E, S>(
-    column: S,
+pub fn select_text_column<'i, I, E>(
+    column: &str,
     iter: I,
-) -> impl Iterator<Item = Result<Vec<String>, E>>
+) -> impl Iterator<Item = Result<Vec<String>, E>> + use<'i, I, E>
 where
     I: Iterator<Item = Result<RecordBatch, E>>,
-    S: AsRef<str>,
 {
-    let column = column.as_ref().to_string();
+    let column = column.to_string();
     iter.map(move |res| -> Result<Vec<String>, E> {
         let record_batch = res?;
 
