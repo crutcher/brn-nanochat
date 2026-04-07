@@ -1,21 +1,87 @@
-use rand::RngExt;
+use rand::{
+    RngExt,
+    SeedableRng,
+    rngs::StdRng,
+};
 
-/// An iterator that shuffles the items it iterates over.
-pub struct ShuffleIter<I, T>
-where
-    I: Iterator<Item = T>,
-{
-    inner: I,
-    done: bool,
-    buffer: Vec<T>,
+/// Options for [`ShuffleIter`].
+#[derive(Debug, Clone, Copy)]
+pub struct ShuffleIterOptions {
     fill_rate: usize,
     buffer_size: usize,
-    rng: Box<dyn rand::Rng + Send>,
+    seed: u64,
 }
 
-impl<I, T> ShuffleIter<I, T>
+impl Default for ShuffleIterOptions {
+    fn default() -> Self {
+        Self {
+            fill_rate: 8,
+            buffer_size: 128,
+            seed: 0,
+        }
+    }
+}
+
+impl ShuffleIterOptions {
+    pub fn fill_rate(&self) -> usize {
+        self.fill_rate
+    }
+
+    pub fn with_fill_rate(
+        mut self,
+        fill_rate: usize,
+    ) -> Self {
+        self.fill_rate = fill_rate;
+        self
+    }
+
+    pub fn buffer_size(&self) -> usize {
+        self.buffer_size
+    }
+
+    pub fn with_buffer_size(
+        mut self,
+        buffer_size: usize,
+    ) -> Self {
+        self.buffer_size = buffer_size;
+        self
+    }
+
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    pub fn with_seed(
+        mut self,
+        seed: u64,
+    ) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    pub fn init<I: Iterator>(
+        self,
+        inner: I,
+    ) -> ShuffleIter<I> {
+        ShuffleIter::new(inner, self)
+    }
+}
+
+/// An iterator that shuffles the items it iterates over.
+pub struct ShuffleIter<I>
 where
-    I: Iterator<Item = T>,
+    I: Iterator,
+{
+    inner: I,
+    options: ShuffleIterOptions,
+    done: bool,
+    buffer: Vec<I::Item>,
+    rng: StdRng,
+}
+
+impl<I> ShuffleIter<I>
+where
+    I: Iterator,
 {
     /// Creates a new `ShuffleIter`.
     ///
@@ -27,36 +93,37 @@ where
     /// * `inner` - The iterator to shuffle.
     /// * `fill_rate` - The upper limit on calls to `inner.next()` per step.
     /// * `buffer_size` - The size of the shuffle buffer.
-    /// * `rng` - The random number generator to use.
+    /// * `seed` - The rng seed.
     pub fn new(
         inner: I,
-        fill_rate: usize,
-        buffer_size: usize,
-        rng: Box<dyn rand::Rng + Send>,
+        options: ShuffleIterOptions,
     ) -> Self {
-        assert!(fill_rate > 0);
-        assert!(fill_rate <= buffer_size);
-        assert!(buffer_size > 1);
+        assert!(options.fill_rate > 0);
+        assert!(options.fill_rate <= options.buffer_size);
+        assert!(options.buffer_size > 1);
+
+        let buffer = Vec::with_capacity(options.buffer_size);
+        let rng = StdRng::seed_from_u64(options.seed);
+
         Self {
             inner,
+            options,
             done: false,
-            buffer: Vec::with_capacity(buffer_size),
-            fill_rate,
-            buffer_size,
+            buffer,
             rng,
         }
     }
 }
 
-impl<I, T> Iterator for ShuffleIter<I, T>
+impl<I> Iterator for ShuffleIter<I>
 where
-    I: Iterator<Item = T>,
+    I: Iterator,
 {
-    type Item = T;
+    type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for _ in 0..self.fill_rate {
-            if !self.done && self.buffer.len() < self.buffer_size {
+        for _ in 0..self.options.fill_rate {
+            if !self.done && self.buffer.len() < self.options.buffer_size {
                 if let Some(item) = self.inner.next() {
                     self.buffer.push(item);
                     continue;
@@ -86,28 +153,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rand::SeedableRng;
-
     use super::*;
 
     #[test]
     fn test_shuffle_iter() {
-        let items = (0..10).collect::<Vec<u32>>();
+        let source_items = (0..10).collect::<Vec<u32>>();
 
-        let shuffle_buffer_fill_rate = 2;
-        let shuffle_buffer_size = 5;
+        let options = ShuffleIterOptions::default();
 
-        let iter = ShuffleIter::new(
-            items.clone().into_iter(),
-            shuffle_buffer_fill_rate,
-            shuffle_buffer_size,
-            Box::new(rand::rngs::StdRng::seed_from_u64(0)),
-        );
+        let pass1 = ShuffleIter::new(source_items.clone().into_iter(), options.clone())
+            .collect::<Vec<u32>>();
 
-        let mut results = iter.collect::<Vec<u32>>();
+        let pass2 =
+            ShuffleIter::new(source_items.clone().into_iter(), options).collect::<Vec<u32>>();
 
-        results.sort_unstable();
+        assert_eq!(&pass1, &pass2);
 
-        assert_eq!(results, items);
+        let mut pass1 = pass1;
+        pass1.sort_unstable();
+
+        assert_eq!(pass1, source_items);
     }
 }
