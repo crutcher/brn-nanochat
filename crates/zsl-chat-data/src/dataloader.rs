@@ -138,7 +138,6 @@ impl ChatDataLoaderIterator {
             }),
         );
 
-        // TODO: pass in rng
         let inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>> =
             if let Some(shuffle_options) = shuffle_options {
                 Box::new(shuffle_options.init(dense_blocks))
