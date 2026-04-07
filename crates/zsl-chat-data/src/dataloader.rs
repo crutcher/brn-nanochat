@@ -49,7 +49,8 @@ impl ChatDataLoaderIterator {
         tokenizer: Arc<Tokenizer<u32>>,
         shard_paths: Vec<PathBuf>,
         block_options: DenseTokenBlocksOptions,
-        shuffle_buffer: usize,
+        shuffle_buffer_fill_rate: usize,
+        shuffle_buffer_size: usize,
         text_column: &str,
     ) -> Self {
         let items_total = shard_paths.len();
@@ -71,12 +72,13 @@ impl ChatDataLoaderIterator {
 
         // TODO: pass in rng
         let inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>> =
-            if shuffle_buffer == 0 {
+            if shuffle_buffer_size == 0 {
                 Box::new(dense_blocks)
             } else {
                 Box::new(ShuffleIter::new(
                     dense_blocks,
-                    shuffle_buffer,
+                    shuffle_buffer_fill_rate,
+                    shuffle_buffer_size,
                     Box::new(StdRng::seed_from_u64(0)),
                 ))
             };
@@ -143,13 +145,15 @@ where
             shard_paths.shuffle(&mut *rng);
         }
 
-        let shuffle_buffer = if self.rng.is_none() { 0 } else { 1024 };
+        let shuffle_buffer_fill_rate = 2;
+        let shuffle_buffer_size = if self.rng.is_none() { 0 } else { 128 };
 
         Box::new(ChatDataLoaderIterator::new(
             self.tokenizer.clone(),
             shard_paths,
             self.block_options.clone(),
-            shuffle_buffer,
+            shuffle_buffer_fill_rate,
+            shuffle_buffer_size,
             "text",
         ))
     }
