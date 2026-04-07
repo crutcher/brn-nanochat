@@ -16,11 +16,7 @@ use burn::{
     },
     prelude::Backend,
 };
-use rand::{
-    SeedableRng,
-    rngs::StdRng,
-    seq::SliceRandom,
-};
+use rand::seq::SliceRandom;
 use wordchipper::Tokenizer;
 
 use crate::{
@@ -30,7 +26,7 @@ use crate::{
     },
     iterators::{
         IterWatcher,
-        ShuffleIter,
+        ShuffleIterOptions,
     },
     tokens::{
         DenseTokenBlocksOptions,
@@ -95,8 +91,7 @@ impl ChatDataLoaderIterator {
         tokenizer: Arc<Tokenizer<u32>>,
         shard_paths: Vec<PathBuf>,
         block_options: DenseTokenBlocksOptions,
-        shuffle_buffer_fill_rate: usize,
-        shuffle_buffer_size: usize,
+        shuffle_options: Option<ShuffleIterOptions>,
         text_column: &str,
     ) -> Self {
         let items_total = shard_paths.len();
@@ -144,15 +139,10 @@ impl ChatDataLoaderIterator {
 
         // TODO: pass in rng
         let inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>> =
-            if shuffle_buffer_size == 0 {
-                Box::new(dense_blocks)
+            if let Some(shuffle_options) = shuffle_options {
+                Box::new(shuffle_options.init(dense_blocks))
             } else {
-                Box::new(ShuffleIter::new(
-                    dense_blocks,
-                    shuffle_buffer_fill_rate,
-                    shuffle_buffer_size,
-                    Box::new(StdRng::seed_from_u64(0)),
-                ))
+                Box::new(dense_blocks)
             };
 
         Self {
@@ -221,12 +211,17 @@ impl<B: Backend> ChatDataLoader<B> {
         let shuffle_buffer_fill_rate = 2;
         let shuffle_buffer_size = if self.rng.is_none() { 0 } else { 128 };
 
+        let shuffle_options = Some(
+            ShuffleIterOptions::default()
+                .with_fill_rate(shuffle_buffer_fill_rate)
+                .with_buffer_size(shuffle_buffer_size),
+        );
+
         ChatDataLoaderIterator::new(
             self.tokenizer.clone(),
             shard_paths,
             self.block_options.clone(),
-            shuffle_buffer_fill_rate,
-            shuffle_buffer_size,
+            shuffle_options,
             "text",
         )
     }
