@@ -8,7 +8,6 @@ use std::{
 
 use burn::{
     backend::Cuda,
-    data::dataloader::DataLoader,
     tensor::{
         AsIndex,
         Slice,
@@ -165,9 +164,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         block_options,
     );
 
+    let dl_iter = data_loader.start_epoch();
+    let stats = dl_iter.stats().clone();
+
     let mut last_idx = 0;
     let t0 = std::time::Instant::now();
-    for (idx, res) in data_loader.iter().enumerate() {
+    for (idx, res) in dl_iter.enumerate() {
         let block = res?;
         assert_eq!(block.len(), args.token_batch_options.batch_size);
         block.iter().for_each(|seq| {
@@ -177,11 +179,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         last_idx = idx;
     }
     let elapsed = t0.elapsed();
-    println!("elapsed: {:?}", elapsed);
+    println!("elapsed: {:.2?}", elapsed);
+
     println!(
         "shape: {last_idx} x [{}, {}]",
         args.token_batch_options.batch_size, args.token_batch_options.batch_seq_len,
     );
+
+    let human_opts = humansize::FormatSizeOptions::from(humansize::BINARY).decimal_places(1);
+
+    println!(
+        "bps: {}/s",
+        humansize::format_size_i(
+            stats.byte_count() as f64 / elapsed.as_secs_f64(),
+            human_opts
+        )
+    );
+
+    let tps = humansize::format_size_i(
+        stats.token_count() as f64 / elapsed.as_secs_f64(),
+        human_opts,
+    );
+    println!("tps: {}T/s", &tps[..tps.len() - 1]);
 
     Ok(())
 }

@@ -29,7 +29,7 @@ use crate::{
         select_text_column,
     },
     iterators::{
-        CountingIter,
+        IterWatcher,
         ShuffleIter,
     },
     tokens::{
@@ -38,9 +38,55 @@ use crate::{
     },
 };
 
-pub struct ChatDataLoaderIterator {
+pub struct EpochStats {
     file_counter: Arc<AtomicUsize>,
+    byte_counter: Arc<AtomicUsize>,
+    token_counter: Arc<AtomicUsize>,
     items_total: usize,
+}
+
+impl EpochStats {
+    pub fn new(
+        file_counter: Arc<AtomicUsize>,
+        byte_counter: Arc<AtomicUsize>,
+        token_counter: Arc<AtomicUsize>,
+        items_total: usize,
+    ) -> Self {
+        Self {
+            file_counter,
+            byte_counter,
+            token_counter,
+            items_total,
+        }
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.file_counter.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn byte_count(&self) -> usize {
+        self.byte_counter.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn token_count(&self) -> usize {
+        self.token_counter
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn items_total(&self) -> usize {
+        self.items_total
+    }
+
+    pub fn progress(&self) -> Progress {
+        Progress {
+            items_processed: self.file_count(),
+            items_total: self.items_total(),
+        }
+    }
+}
+
+pub struct ChatDataLoaderIterator {
+    stats: Arc<EpochStats>,
     inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>>,
 }
 
@@ -55,20 +101,46 @@ impl ChatDataLoaderIterator {
     ) -> Self {
         let items_total = shard_paths.len();
 
-        let shard_counter = CountingIter::new(shard_paths.into_iter());
-        let file_counter = shard_counter.counter();
+        let file_counter = Arc::new(AtomicUsize::new(0));
+        let file_counter_handle = file_counter.clone();
+        let shard_counter = IterWatcher::new(
+            shard_paths.into_iter(),
+            Box::new(move |_| {
+                file_counter_handle.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }),
+        );
 
         // Iterator<ArrowResult<RecordBatch>>
         let parquet_batches = read_parquet_shards(shard_counter);
 
         // Iterator<ArrowResult<Vec<String>>>
-        let sample_batches = select_text_column(text_column, parquet_batches);
+        let byte_counter = Arc::new(AtomicUsize::new(0));
+        let byte_counter_handle = byte_counter.clone();
+        let sample_batches = IterWatcher::new(
+            select_text_column(text_column, parquet_batches),
+            Box::new(move |result| {
+                if let Ok(batch) = &result {
+                    let bytes = batch.iter().map(|s| s.as_str().len()).sum::<usize>();
+                    byte_counter_handle.fetch_add(bytes, std::sync::atomic::Ordering::Relaxed);
+                }
+            }),
+        );
 
         // Iterator<ArrowResult<Vec<Vec<u32>>>>
         let token_batches = tokenize_text_batches(tokenizer, sample_batches);
 
         // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
-        let dense_blocks = block_options.build_dense_blocks(token_batches);
+        let token_counter = Arc::new(AtomicUsize::new(0));
+        let token_counter_handle = token_counter.clone();
+        let dense_blocks = IterWatcher::new(
+            block_options.build_dense_blocks(token_batches),
+            Box::new(move |result| {
+                if let Ok(batch) = &result {
+                    let tokens = batch.iter().map(|ts| ts.len()).sum::<usize>();
+                    token_counter_handle.fetch_add(tokens, std::sync::atomic::Ordering::Relaxed);
+                }
+            }),
+        );
 
         // TODO: pass in rng
         let inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>> =
@@ -84,10 +156,18 @@ impl ChatDataLoaderIterator {
             };
 
         Self {
-            file_counter,
-            items_total,
+            stats: Arc::new(EpochStats {
+                file_counter,
+                token_counter,
+                byte_counter,
+                items_total,
+            }),
             inner,
         }
+    }
+
+    pub fn stats(&self) -> &Arc<EpochStats> {
+        &self.stats
     }
 }
 
@@ -101,10 +181,7 @@ impl Iterator for ChatDataLoaderIterator {
 
 impl DataLoaderIterator<Result<Vec<Vec<u32>>, ArrowError>> for ChatDataLoaderIterator {
     fn progress(&self) -> Progress {
-        Progress {
-            items_processed: self.file_counter.load(std::sync::atomic::Ordering::Relaxed),
-            items_total: self.items_total,
-        }
+        self.stats.progress()
     }
 }
 
@@ -132,13 +209,9 @@ impl<B: Backend> ChatDataLoader<B> {
             block_options,
         }
     }
-}
 
-impl<B: Backend> DataLoader<B, Result<Vec<Vec<u32>>, ArrowError>> for ChatDataLoader<B>
-where
-    B: Backend,
-{
-    fn iter(&self) -> Box<dyn DataLoaderIterator<Result<Vec<Vec<u32>>, ArrowError>>> {
+    /// Starts a new epoch.
+    pub fn start_epoch(&self) -> ChatDataLoaderIterator {
         let mut shard_paths = self.shard_paths.clone();
         if let Some(mutex) = &self.rng {
             let mut rng = mutex.lock().unwrap();
@@ -148,14 +221,23 @@ where
         let shuffle_buffer_fill_rate = 2;
         let shuffle_buffer_size = if self.rng.is_none() { 0 } else { 128 };
 
-        Box::new(ChatDataLoaderIterator::new(
+        ChatDataLoaderIterator::new(
             self.tokenizer.clone(),
             shard_paths,
             self.block_options.clone(),
             shuffle_buffer_fill_rate,
             shuffle_buffer_size,
             "text",
-        ))
+        )
+    }
+}
+
+impl<B: Backend> DataLoader<B, Result<Vec<Vec<u32>>, ArrowError>> for ChatDataLoader<B>
+where
+    B: Backend,
+{
+    fn iter(&self) -> Box<dyn DataLoaderIterator<Result<Vec<Vec<u32>>, ArrowError>>> {
+        Box::new(self.start_epoch())
     }
 
     fn num_items(&self) -> usize {
