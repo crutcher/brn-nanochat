@@ -34,6 +34,7 @@ use crate::{
     },
 };
 
+#[derive(Debug, Default, Clone)]
 pub struct EpochStats {
     file_counter: Arc<AtomicUsize>,
     byte_counter: Arc<AtomicUsize>,
@@ -94,14 +95,16 @@ impl ChatDataLoaderIterator {
         shuffle_options: Option<ShuffleIterOptions>,
         text_column: &str,
     ) -> Self {
-        let items_total = shard_paths.len();
+        let stats = EpochStats {
+            items_total: shard_paths.len(),
+            ..Default::default()
+        };
 
-        let file_counter = Arc::new(AtomicUsize::new(0));
-        let file_counter_handle = file_counter.clone();
+        let file_counter = stats.file_counter.clone();
         let shard_counter = IterWatcher::new(
             shard_paths.into_iter(),
             Box::new(move |_| {
-                file_counter_handle.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                file_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }),
         );
 
@@ -109,14 +112,13 @@ impl ChatDataLoaderIterator {
         let parquet_batches = read_parquet_shards(shard_counter);
 
         // Iterator<ArrowResult<Vec<String>>>
-        let byte_counter = Arc::new(AtomicUsize::new(0));
-        let byte_counter_handle = byte_counter.clone();
+        let byte_counter = stats.byte_counter.clone();
         let sample_batches = IterWatcher::new(
             select_text_column(text_column, parquet_batches),
             Box::new(move |result| {
                 if let Ok(batch) = &result {
                     let bytes = batch.iter().map(|s| s.as_str().len()).sum::<usize>();
-                    byte_counter_handle.fetch_add(bytes, std::sync::atomic::Ordering::Relaxed);
+                    byte_counter.fetch_add(bytes, std::sync::atomic::Ordering::Relaxed);
                 }
             }),
         );
@@ -125,14 +127,13 @@ impl ChatDataLoaderIterator {
         let token_batches = tokenize_text_batches(tokenizer, sample_batches);
 
         // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
-        let token_counter = Arc::new(AtomicUsize::new(0));
-        let token_counter_handle = token_counter.clone();
+        let token_counter = stats.token_counter.clone();
         let dense_blocks = IterWatcher::new(
             block_options.build_dense_blocks(token_batches),
             Box::new(move |result| {
                 if let Ok(batch) = &result {
                     let tokens = batch.iter().map(|ts| ts.len()).sum::<usize>();
-                    token_counter_handle.fetch_add(tokens, std::sync::atomic::Ordering::Relaxed);
+                    token_counter.fetch_add(tokens, std::sync::atomic::Ordering::Relaxed);
                 }
             }),
         );
@@ -146,12 +147,7 @@ impl ChatDataLoaderIterator {
             };
 
         Self {
-            stats: Arc::new(EpochStats {
-                file_counter,
-                token_counter,
-                byte_counter,
-                items_total,
-            }),
+            stats: Arc::new(stats),
             inner,
         }
     }
