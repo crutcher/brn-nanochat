@@ -15,6 +15,18 @@ pub struct DenseTokenBlocksOptions {
     pub eos: Vec<u32>,
 }
 
+impl Default for DenseTokenBlocksOptions {
+    fn default() -> Self {
+        Self {
+            batch_size: 32,
+            batch_seq_len: 2048,
+            min_buffer: 512,
+            bos: vec![],
+            eos: vec![],
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenBatchIteratorOptions {
     /// The number of sequences to load per batch.

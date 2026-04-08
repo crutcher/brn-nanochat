@@ -9,6 +9,7 @@ zsl-chat = { path = "../../crates/zsl-chat" }
 zsl-data-cache = { path = "../../crates/zsl-data-cache" }
 zsl-chat-data = { path = "../../crates/zsl-chat-data" }
 
+rand = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 log = { workspace = true }

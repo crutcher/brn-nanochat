@@ -7771,6 +7771,7 @@ dependencies = [
  "burn 0.20.1",
  "clap",
  "log",
+ "rand 0.10.0",
  "wordchipper",
  "wordchipper-cli-util",
  "zsl-chat",
