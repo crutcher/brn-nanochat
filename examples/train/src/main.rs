@@ -28,15 +28,16 @@ use burn::{
         Slice,
         Tensor,
         backend::AutodiffBackend,
+        s,
     },
     train::{
+        ClassificationOutput,
         InferenceStep,
         Learner,
         SupervisedTraining,
         TrainOutput,
         TrainStep,
         metric::{
-            HammingScore,
             LearningRateMetric,
             LossMetric,
         },
@@ -138,11 +139,15 @@ pub struct Args {
     pub num_epochs: usize,
 
     /// Batch size for processing
-    #[arg(short, long, default_value_t = 24)]
+    #[arg(short, long, default_value_t = 4)]
     pub batch_size: usize,
 
+    /// The training seq len..
+    #[clap(long, default_value = "512")]
+    pub seq_len: usize,
+
     /// Grads accumulation size for processing
-    #[arg(short, long, default_value_t = 4)]
+    #[arg(short, long, default_value_t = 1)]
     pub grads_accumulation: usize,
 
     /// Directory to save the artifacts.
@@ -236,18 +241,23 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     };
     let vocab = Arc::new(vocab);
 
+    let seq_len = args.seq_len;
+
     let tok = wordchipper::TokenizerOptions::default()
         .with_accelerated_lexers(true)
         .with_parallel(true)
         .build(vocab);
 
-    let gpt_config = GPTConfig::new().with_vocab_size(vocab_size);
+    let gpt_config = GPTConfig::new()
+        //.with_n_layer(8)
+        .with_vocab_size(vocab_size);
 
     let gpt: GPT<B> = gpt_config.init::<B>(&device);
 
     let host = GptHost { gpt };
 
     let mut dl_config: DenseTokenBlocksOptions = Default::default();
+    dl_config.batch_seq_len = seq_len;
     dl_config.batch_size = args.batch_size;
     dl_config.bos = vec![bos_token];
 
@@ -256,7 +266,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         Some(Arc::new(Mutex::new(StdRng::seed_from_u64(0)))),
         &device,
         tok.clone(),
-        dl_config,
+        dl_config.clone(),
     );
 
     let validation_data_loader: ChatDataLoader<B::InnerBackend> =
@@ -285,11 +295,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     )
     .grads_accumulation(args.grads_accumulation)
     .num_epochs(args.num_epochs)
-    .metrics((
-        HammingScore::new(),
-        LossMetric::new(),
-        LearningRateMetric::new(),
-    ))
+    .metrics((LossMetric::new(), LearningRateMetric::new()))
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
@@ -315,40 +321,68 @@ pub struct GptHost<B: Backend> {
 
 impl<B: AutodiffBackend> TrainStep for GptHost<B> {
     type Input = Tensor<B, 2, burn::prelude::Int>;
-    type Output = TrainOutput<Tensor<B, 3>>;
+    type Output = ClassificationOutput<B>;
 
     fn step(
         &self,
         input: Self::Input,
-    ) -> Self::Output {
-        let x: Tensor<B, 2, burn::prelude::Int> = input.slice([.., ..-1]);
-        let targets: Tensor<B, 2, burn::prelude::Int> = input.slice([.., 1..]);
+    ) -> TrainOutput<Self::Output> {
+        let x: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
+        let targets: Tensor<B, 2, burn::prelude::Int> = input.slice(s![.., 1..]);
+
+        let mut kv_cache = None;
 
         // Logits.
-        let output: Tensor<B, 3> = self.gpt.forward(x);
+        let output: Tensor<B, 3> = self.gpt.forward(x, &mut kv_cache);
+
+        let output_flatten: Tensor<B, 2> = output.flatten(0, 1);
+        let targets_flatten: Tensor<B, 1, burn::prelude::Int> = targets.flatten(0, 1);
 
         let loss = CrossEntropyLossConfig::new()
-            .init(&output.device())
-            .forward(output.clone(), targets.clone());
+            .init(&output_flatten.device())
+            .forward(output_flatten.clone(), targets_flatten.clone());
 
         let grads = loss.backward();
 
-        TrainOutput::new(&self.gpt, grads, output)
+        TrainOutput::new(
+            self,
+            grads,
+            ClassificationOutput {
+                loss,
+                output: output_flatten,
+                targets: targets_flatten,
+            },
+        )
     }
 }
 
 impl<B: Backend> InferenceStep for GptHost<B> {
     type Input = Tensor<B, 2, burn::prelude::Int>;
-    type Output = Tensor<B, 3>;
+    type Output = ClassificationOutput<B>;
 
     fn step(
         &self,
         input: Self::Input,
     ) -> Self::Output {
-        let x: Tensor<B, 2, burn::prelude::Int> = input.slice([.., ..-1]);
+        let x: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
+        let targets: Tensor<B, 2, burn::prelude::Int> = input.slice(s![.., 1..]);
 
-        let output: Tensor<B, 3> = self.gpt.forward(x);
+        let mut kv_cache = None;
 
-        output
+        // Logits.
+        let output: Tensor<B, 3> = self.gpt.forward(x, &mut kv_cache);
+
+        let output_flatten: Tensor<B, 2> = output.flatten(0, 1);
+        let targets_flatten: Tensor<B, 1, burn::prelude::Int> = targets.flatten(0, 1);
+
+        let loss = CrossEntropyLossConfig::new()
+            .init(&output_flatten.device())
+            .forward(output_flatten.clone(), targets_flatten.clone());
+
+        ClassificationOutput {
+            loss,
+            output: output_flatten,
+            targets: targets_flatten,
+        }
     }
 }
