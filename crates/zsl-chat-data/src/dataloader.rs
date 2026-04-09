@@ -154,9 +154,10 @@ impl<B: Backend> ChatDataLoaderIterator<B> {
 
         let tensors = shuffle.map(move |result| {
             let batch = &result.unwrap();
-            let flat_data = batch.iter().flatten().copied().collect();
-            let tensor: Tensor<B, 2, burn::prelude::Int> =
-                Tensor::from_data(TensorData::new(flat_data, shape), &device);
+            let tensor: Tensor<B, 2, burn::prelude::Int> = Tensor::from_ints(
+                TensorData::new(batch.iter().flatten().copied().collect(), shape),
+                &device,
+            );
             tensor
         });
 
@@ -221,14 +222,15 @@ impl<B: Backend> ChatDataLoader<B> {
             shard_paths.shuffle(&mut *rng);
         }
 
-        let shuffle_buffer_fill_rate = 2;
-        let shuffle_buffer_size = if self.rng.is_none() { 0 } else { 128 };
-
-        let shuffle_options = Some(
-            ShuffleIterOptions::default()
-                .with_fill_rate(shuffle_buffer_fill_rate)
-                .with_buffer_size(shuffle_buffer_size),
-        );
+        let shuffle_options = if self.rng.is_none() {
+            None
+        } else {
+            Some(
+                ShuffleIterOptions::default()
+                    .with_fill_rate(2)
+                    .with_buffer_size(128),
+            )
+        };
 
         ChatDataLoaderIterator::new(
             self.device.clone(),

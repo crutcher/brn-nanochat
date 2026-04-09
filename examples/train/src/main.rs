@@ -28,6 +28,7 @@ use burn::{
         Slice,
         Tensor,
         backend::AutodiffBackend,
+        bf16,
         s,
     },
     train::{
@@ -143,7 +144,7 @@ pub struct Args {
     pub batch_size: usize,
 
     /// The training seq len..
-    #[clap(long, default_value = "512")]
+    #[clap(long, default_value = "2048")]
     pub seq_len: usize,
 
     /// Grads accumulation size for processing
@@ -164,9 +165,9 @@ fn ensure_artifact_dir(artifact_dir: &str) -> anyhow::Result<()> {
 #[cfg(feature = "cuda")]
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    args.logging.setup_logging(3).unwrap();
+    // args.logging.setup_logging(3).unwrap();
 
-    run::<burn::backend::Autodiff<burn::backend::cuda::Cuda>>(&args)
+    run::<burn::backend::Autodiff<burn::backend::cuda::Cuda<bf16>>>(&args)
 }
 
 fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
@@ -210,14 +211,8 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     );
     let num_training_shards = shard_paths.len() - num_validation_shards;
 
-    let training_paths: Vec<PathBuf> = shard_paths[..num_training_shards]
-        .iter()
-        .map(|p| p.clone())
-        .collect();
-    let validation_paths: Vec<PathBuf> = shard_paths[num_training_shards..]
-        .iter()
-        .map(|p| p.clone())
-        .collect();
+    let training_paths: Vec<PathBuf> = shard_paths[..num_training_shards].to_vec();
+    let validation_paths: Vec<PathBuf> = shard_paths[num_training_shards..].to_vec();
 
     let mut vocab: UnifiedTokenVocab<T> =
         wordchipper::load_vocab(&args.pretrained_vocab, &mut disk_cache)?
@@ -235,13 +230,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         } else {
             let tok = max_token + 1;
             specials.add_str_word(&args.bos_token, tok);
-            vocab_size = vocab_size + 1;
+            vocab_size += 1;
             tok
         }
     };
     let vocab = Arc::new(vocab);
-
-    let seq_len = args.seq_len;
 
     let tok = wordchipper::TokenizerOptions::default()
         .with_accelerated_lexers(true)
@@ -256,10 +249,12 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let host = GptHost { gpt };
 
-    let mut dl_config: DenseTokenBlocksOptions = Default::default();
-    dl_config.batch_seq_len = seq_len;
-    dl_config.batch_size = args.batch_size;
-    dl_config.bos = vec![bos_token];
+    let dl_config = DenseTokenBlocksOptions {
+        batch_seq_len: args.seq_len,
+        batch_size: args.batch_size,
+        bos: vec![bos_token],
+        ..Default::default()
+    };
 
     let training_data_loader: ChatDataLoader<B> = ChatDataLoader::new(
         training_paths,
