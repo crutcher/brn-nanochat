@@ -15,6 +15,10 @@ use burn::{
         Progress,
     },
     prelude::Backend,
+    tensor::{
+        Tensor,
+        TensorData,
+    },
 };
 use rand::seq::SliceRandom;
 use wordchipper::Tokenizer;
@@ -82,13 +86,14 @@ impl EpochStats {
     }
 }
 
-pub struct ChatDataLoaderIterator {
+pub struct ChatDataLoaderIterator<B: Backend> {
     stats: Arc<EpochStats>,
-    inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>>,
+    inner: Box<dyn Iterator<Item = Tensor<B, 2, burn::prelude::Int>>>,
 }
 
-impl ChatDataLoaderIterator {
+impl<B: Backend> ChatDataLoaderIterator<B> {
     pub fn new(
+        device: B::Device,
         tokenizer: Arc<Tokenizer<u32>>,
         shard_paths: Vec<PathBuf>,
         block_options: DenseTokenBlocksOptions,
@@ -126,6 +131,8 @@ impl ChatDataLoaderIterator {
         // Iterator<ArrowResult<Vec<Vec<u32>>>>
         let token_batches = tokenize_text_batches(tokenizer, sample_batches);
 
+        let shape = [block_options.batch_size, block_options.batch_seq_len];
+
         // Iterator<ArrowResult<Vec<Vec<u32>>>> (batch_size x batch_seq_len)
         let token_counter = stats.token_counter.clone();
         let dense_blocks = IterWatcher::new(
@@ -138,17 +145,25 @@ impl ChatDataLoaderIterator {
             }),
         );
 
-        // TODO: pass in rng
-        let inner: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>> =
+        let shuffle: Box<dyn Iterator<Item = Result<Vec<Vec<u32>>, ArrowError>>> =
             if let Some(shuffle_options) = shuffle_options {
                 Box::new(shuffle_options.init(dense_blocks))
             } else {
                 Box::new(dense_blocks)
             };
 
+        let tensors = shuffle.map(move |result| {
+            let batch = &result.unwrap();
+            let tensor: Tensor<B, 2, burn::prelude::Int> = Tensor::from_ints(
+                TensorData::new(batch.iter().flatten().copied().collect(), shape),
+                &device,
+            );
+            tensor
+        });
+
         Self {
             stats: Arc::new(stats),
-            inner,
+            inner: Box::new(tensors),
         }
     }
 
@@ -157,20 +172,23 @@ impl ChatDataLoaderIterator {
     }
 }
 
-impl Iterator for ChatDataLoaderIterator {
-    type Item = Result<Vec<Vec<u32>>, ArrowError>;
+impl<B: Backend> Iterator for ChatDataLoaderIterator<B> {
+    type Item = Tensor<B, 2, burn::prelude::Int>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 
-impl DataLoaderIterator<Result<Vec<Vec<u32>>, ArrowError>> for ChatDataLoaderIterator {
+impl<B: Backend> DataLoaderIterator<Tensor<B, 2, burn::prelude::Int>>
+    for ChatDataLoaderIterator<B>
+{
     fn progress(&self) -> Progress {
         self.stats.progress()
     }
 }
 
+#[derive(Clone)]
 pub struct ChatDataLoader<B: Backend> {
     shard_paths: Vec<PathBuf>,
     rng: Option<Arc<Mutex<dyn rand::Rng + Send>>>,
@@ -197,23 +215,25 @@ impl<B: Backend> ChatDataLoader<B> {
     }
 
     /// Starts a new epoch.
-    pub fn start_epoch(&self) -> ChatDataLoaderIterator {
+    pub fn start_epoch(&self) -> ChatDataLoaderIterator<B> {
         let mut shard_paths = self.shard_paths.clone();
         if let Some(mutex) = &self.rng {
             let mut rng = mutex.lock().unwrap();
             shard_paths.shuffle(&mut *rng);
         }
 
-        let shuffle_buffer_fill_rate = 2;
-        let shuffle_buffer_size = if self.rng.is_none() { 0 } else { 128 };
-
-        let shuffle_options = Some(
-            ShuffleIterOptions::default()
-                .with_fill_rate(shuffle_buffer_fill_rate)
-                .with_buffer_size(shuffle_buffer_size),
-        );
+        let shuffle_options = if self.rng.is_none() {
+            None
+        } else {
+            Some(
+                ShuffleIterOptions::default()
+                    .with_fill_rate(2)
+                    .with_buffer_size(128),
+            )
+        };
 
         ChatDataLoaderIterator::new(
+            self.device.clone(),
             self.tokenizer.clone(),
             shard_paths,
             self.block_options.clone(),
@@ -223,11 +243,11 @@ impl<B: Backend> ChatDataLoader<B> {
     }
 }
 
-impl<B: Backend> DataLoader<B, Result<Vec<Vec<u32>>, ArrowError>> for ChatDataLoader<B>
+impl<B: Backend> DataLoader<B, Tensor<B, 2, burn::prelude::Int>> for ChatDataLoader<B>
 where
     B: Backend,
 {
-    fn iter(&self) -> Box<dyn DataLoaderIterator<Result<Vec<Vec<u32>>, ArrowError>>> {
+    fn iter(&self) -> Box<dyn DataLoaderIterator<Tensor<B, 2, burn::prelude::Int>>> {
         Box::new(self.start_epoch())
     }
 
@@ -238,7 +258,7 @@ where
     fn to_device(
         &self,
         device: &B::Device,
-    ) -> Arc<dyn DataLoader<B, Result<Vec<Vec<u32>>, ArrowError>>> {
+    ) -> Arc<dyn DataLoader<B, Tensor<B, 2, burn::prelude::Int>>> {
         Arc::new(Self {
             shard_paths: self.shard_paths.clone(),
             rng: self.rng.clone(),
@@ -252,7 +272,7 @@ where
         &self,
         start: usize,
         end: usize,
-    ) -> Arc<dyn DataLoader<B, Result<Vec<Vec<u32>>, ArrowError>>> {
+    ) -> Arc<dyn DataLoader<B, Tensor<B, 2, burn::prelude::Int>>> {
         Arc::new(Self {
             shard_paths: self.shard_paths[start..end].to_vec(),
             rng: self.rng.clone(),

@@ -167,24 +167,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dl_iter = data_loader.start_epoch();
     let stats = dl_iter.stats().clone();
 
+    let shape = [
+        args.token_batch_options.batch_size,
+        args.token_batch_options.batch_seq_len,
+    ];
+
     let mut last_idx = 0;
     let t0 = std::time::Instant::now();
-    for (idx, res) in dl_iter.enumerate() {
-        let block = res?;
-        assert_eq!(block.len(), args.token_batch_options.batch_size);
-        block.iter().for_each(|seq| {
-            assert_eq!(seq.len(), args.token_batch_options.batch_seq_len);
-        });
-
+    for (idx, tensor) in dl_iter.enumerate() {
+        assert_eq!(&tensor.dims(), &shape);
         last_idx = idx;
     }
     let elapsed = t0.elapsed();
     println!("elapsed: {:.2?}", elapsed);
 
-    println!(
-        "shape: {last_idx} x [{}, {}]",
-        args.token_batch_options.batch_size, args.token_batch_options.batch_seq_len,
-    );
+    println!("shape: {last_idx} x {shape:?}");
 
     let human_opts = humansize::FormatSizeOptions::from(humansize::BINARY).decimal_places(1);
 
