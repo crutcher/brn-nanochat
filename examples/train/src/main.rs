@@ -10,6 +10,7 @@ use std::{
 
 use burn::{
     data::dataloader::DataLoader,
+    grad_clipping::GradientClippingConfig,
     lr_scheduler::{
         composed::{
             ComposedLrSchedulerConfig,
@@ -120,19 +121,20 @@ pub struct Args {
     pub dataset_dir: String,
 
     /// Learning rate
-    #[arg(long, default_value_t = 5e-3)]
+    #[arg(long, default_value_t = 5e-5)]
     pub learning_rate: f64,
 
+    /*
     /// Warm-up epochs.
     #[arg(long, default_value_t = 5)]
     pub warmup_epochs: usize,
-
+     */
     /// Enable cautious weight decay.
     #[arg(long, default_value = "false")]
     pub cautious_weight_decay: bool,
 
     /// Optimizer Weight decay.
-    #[arg(long, default_value_t = 5e-3)]
+    #[arg(long, default_value_t = 5e-2)]
     pub weight_decay: f32,
 
     /// Number of epochs to train the model.
@@ -269,12 +271,9 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     // TODO: This is ... a hack.
     let iters_per_epoch = training_data_loader.num_items() * 500;
+
     let lr_scheduler = ComposedLrSchedulerConfig::new()
-        .linear(LinearLrSchedulerConfig::new(
-            1e-7,
-            1.0,
-            iters_per_epoch * args.warmup_epochs,
-        ))
+        .linear(LinearLrSchedulerConfig::new(1e-10, 1.0, 300))
         .cosine(CosineAnnealingLrSchedulerConfig::new(
             args.learning_rate,
             iters_per_epoch * args.num_epochs,
@@ -297,6 +296,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let optimizer = AdamWConfig::new()
         .with_cautious_weight_decay(args.cautious_weight_decay)
         .with_weight_decay(args.weight_decay)
+        .with_grad_clipping(Some(GradientClippingConfig::Norm(2.0)))
         .init();
 
     let result = training.launch(Learner::new(host, optimizer, lr_scheduler));
