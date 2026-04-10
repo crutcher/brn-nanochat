@@ -6,9 +6,10 @@ publish = false
 
 [dependencies]
 burn = { workspace = true }
+bunsen = { workspace = true }
 bimm-contracts = { workspace = true, features = ["burn"] }
 
-anyhow = { workspace = true, features = ["std"]}
+anyhow = { workspace = true, features = ["std"] }
 
 [dev-dependencies]
 burn = { workspace = true, features = ["wgpu"] }

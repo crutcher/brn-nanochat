@@ -1,4 +1,4 @@
 //! # Nanochat Lib
 
-pub mod burn_ext;
+pub use bunsen;
 pub mod gpt;

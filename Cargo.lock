@@ -740,6 +740,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
+name = "bunsen"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4ad84624999fb6209de813fb22770faf69bffa6c3962e5baa480d6ca9cd4e8f"
+dependencies = [
+ "anyhow",
+ "bimm-contracts",
+ "burn 0.20.1",
+ "crc",
+ "dirs",
+ "num-traits",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "burn"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2114,6 +2130,21 @@ checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crc"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eb8a2a1cd12ab0d987a5d5e825195d372001a4094a0376319d5a0ad71c1ba0d"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
 name = "crc32fast"
@@ -9114,6 +9145,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bimm-contracts",
+ "bunsen",
  "burn 0.20.1",
 ]
 
