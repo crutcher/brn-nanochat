@@ -161,8 +161,8 @@ mod tests {
 
         let options = ShuffleIterOptions::default();
 
-        let pass1 = ShuffleIter::new(source_items.clone().into_iter(), options.clone())
-            .collect::<Vec<u32>>();
+        let pass1 =
+            ShuffleIter::new(source_items.clone().into_iter(), options).collect::<Vec<u32>>();
 
         let pass2 =
             ShuffleIter::new(source_items.clone().into_iter(), options).collect::<Vec<u32>>();

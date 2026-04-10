@@ -82,7 +82,7 @@ mod tests {
         assert_eq!(results.len(), 3);
 
         assert_eq!(
-            results.get(0).unwrap().as_ref().unwrap(),
+            results.first().unwrap().as_ref().unwrap(),
             &vec!["hello world".to_string(), "abc xyz".to_string()],
         );
 

@@ -108,7 +108,7 @@ pub struct Args {
     #[clap(long, default_value = "openai:p50k_edit")]
     pub pretrained_vocab: String,
 
-    /// Beginning of sequence token.
+    /// Beginning-of-Sequence token.
     #[arg(long, default_value = "<|bos|>")]
     pub bos_token: String,
 
@@ -116,7 +116,7 @@ pub struct Args {
     #[arg(short, long, value_delimiter = ',', default_value = "0")]
     pub shards: Vec<Slice>,
 
-    /// Path to dataset directory.
+    /// Path to the dataset directory.
     #[arg(long)]
     pub dataset_dir: String,
 
@@ -145,7 +145,7 @@ pub struct Args {
     #[arg(short, long, default_value_t = 4)]
     pub batch_size: usize,
 
-    /// The training seq len..
+    /// The training seq len.
     #[clap(long, default_value = "2048")]
     pub seq_len: usize,
 
@@ -296,7 +296,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     let optimizer = AdamWConfig::new()
         .with_cautious_weight_decay(args.cautious_weight_decay)
         .with_weight_decay(args.weight_decay)
-        .with_grad_clipping(Some(GradientClippingConfig::Norm(2.0)))
+        .with_grad_clipping(Some(GradientClippingConfig::Value(2.0)))
         .init();
 
     let result = training.launch(Learner::new(host, optimizer, lr_scheduler));
