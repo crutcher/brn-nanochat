@@ -27,7 +27,7 @@ use burn::{
 };
 
 use crate::{
-    burn_ext::nn::{
+    bunsen::nn::{
         attention::{
             csa::{
                 CausalSelfAttentionConfig,

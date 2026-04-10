@@ -25,15 +25,15 @@ doc_markdown = "deny"
 
 
 [workspace.dependencies]
-derive-new = "0.7.0"
-
+burn = "0.20.1"
+bunsen = "0.0.2"
 wordchipper = { version = "0.9.1" }
 wordchipper-cli-util = { version = "0.9.1" }
 
+derive-new = "0.7.0"
 humansize = "2.1.3"
 arrow = "58.1.0"
 bimm-contracts = "0.19.2"
-burn = "0.20.1"
 clap = "4.5"
 dary_heap = "0.3"
 downloader = "0.2"

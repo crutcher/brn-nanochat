@@ -1,5 +1,16 @@
 //! # GPT Block
 
+use bunsen::nn::{
+    attention::{
+        csa::{
+            CausalSelfAttention,
+            CausalSelfAttentionConfig,
+            CausalSelfAttentionMeta,
+        },
+        kvcache::KVCache,
+    },
+    embedding::rotary::RotaryEmbedding,
+};
 use burn::{
     Tensor,
     config::Config,
@@ -12,23 +23,10 @@ use burn::{
     prelude::Backend,
 };
 
-use crate::{
-    burn_ext::nn::{
-        attention::{
-            csa::{
-                CausalSelfAttention,
-                CausalSelfAttentionConfig,
-                CausalSelfAttentionMeta,
-            },
-            kvcache::KVCache,
-        },
-        embedding::rotary::RotaryEmbedding,
-    },
-    gpt::mlp::{
-        MLP,
-        MLPConfig,
-        MLPMeta,
-    },
+use crate::gpt::mlp::{
+    MLP,
+    MLPConfig,
+    MLPMeta,
 };
 
 /// Common meta for [`GPTBlock`] and [`GPTBlockConfig`].
@@ -121,13 +119,22 @@ impl<B: Backend> GPTBlock<B> {
 #[cfg(test)]
 mod tests {
     use bimm_contracts::assert_shape_contract;
+    use bunsen::nn::{
+        attention::{
+            csa::{
+                CausalSelfAttentionConfig,
+                CausalSelfAttentionMeta,
+            },
+            kvcache::KVCache,
+        },
+        embedding::rotary::RotaryEmbeddingConfig,
+    };
     use burn::{
         backend::Wgpu,
         tensor::Distribution,
     };
 
     use super::*;
-    use crate::burn_ext::nn::embedding::rotary::RotaryEmbeddingConfig;
 
     #[test]
     fn test_gpt_block_config() {
