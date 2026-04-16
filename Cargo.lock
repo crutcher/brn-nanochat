@@ -8212,7 +8212,7 @@ checksum = "02aae0f83f69aafc94776e879363e9771d7ecbffe2c7fbb6c14c5e00dfe88439"
 
 [[package]]
 name = "zsl-chat"
-version = "0.0.0"
+version = "0.0.9"
 dependencies = [
  "anyhow",
  "bimm-contracts",
@@ -8223,7 +8223,7 @@ dependencies = [
 
 [[package]]
 name = "zsl-chat-data"
-version = "0.0.0"
+version = "0.0.9"
 dependencies = [
  "arrow",
  "burn",
@@ -8238,7 +8238,7 @@ dependencies = [
 
 [[package]]
 name = "zsl-data-cache"
-version = "0.0.0"
+version = "0.0.9"
 dependencies = [
  "anyhow",
  "burn",

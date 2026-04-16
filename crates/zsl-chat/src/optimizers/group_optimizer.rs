@@ -1,9 +1,3 @@
-//! Group optimizer adaptor for composing two `SimpleOptimizer` types
-//! with per-parameter group assignment.
-//!
-//! Each parameter is assigned to exactly one optimizer instance.
-//! Multiple instances of the same optimizer type (with different configs)
-//! are supported via `Vec<GroupOptimizer<O>>`.
 use std::marker::PhantomData;
 
 use burn::{
@@ -32,36 +26,33 @@ use hashbrown::{
     HashSet,
 };
 
-/// A single optimizer instance and its assigned parameter set.
+use crate::optimizers::{
+    clone_simple_optimizer,
+    compat::GradAdaptor,
+};
+
+/// A group of [`ParamId`] assigned to a single optimizer instance.
 #[derive(Clone)]
-pub struct GroupOptimizer<B, O>
+pub struct OptimizerGroup<B, O>
 where
     B: AutodiffBackend,
     O: SimpleOptimizer<B::InnerBackend>,
 {
+    /// The Parameters assigned to this group.
     pub params: HashSet<ParamId>,
+
+    /// The optimizer instance assigned to this group.
     pub optim: O,
+
     phantom: PhantomData<B>,
 }
 
-#[allow(unused)]
-struct XOptimizerAdaptor<O, M, B>
-where
-    O: SimpleOptimizer<B::InnerBackend>,
-    M: AutodiffModule<B>,
-    B: AutodiffBackend,
-{
-    optim: O,
-    records: HashMap<ParamId, AdaptorRecord<O, B>>,
-    module: PhantomData<M>,
-    grad_clipping: Option<GradientClipping>,
-}
-
-impl<B, O> GroupOptimizer<B, O>
+impl<B, O> OptimizerGroup<B, O>
 where
     B: AutodiffBackend,
     O: SimpleOptimizer<B::InnerBackend>,
 {
+    /// Create a new `GroupOptimizer` with the given parameters and optimizer.
     pub fn new(
         params: HashSet<ParamId>,
         optim: O,
@@ -73,7 +64,7 @@ where
         }
     }
 
-    /// Build a [`GroupOptimizer`] from a [`OptimizerAdaptor`].
+    /// Build a [`OptimizerGroup`] from a [`OptimizerAdaptor`].
     pub fn from_adaptor<M>(
         params: HashSet<ParamId>,
         adaptor: &OptimizerAdaptor<O, M, B>,
@@ -81,12 +72,7 @@ where
     where
         M: AutodiffModule<B>,
     {
-        let optim: O = unsafe {
-            let adaptor: &XOptimizerAdaptor<O, M, B> = std::mem::transmute(adaptor);
-            adaptor.optim.clone()
-        };
-
-        Self::new(params, optim)
+        Self::new(params, clone_simple_optimizer(adaptor))
     }
 }
 
@@ -103,12 +89,7 @@ pub enum GroupOptimizerError {
     },
 }
 
-/// Adaptor that composes two `SimpleOptimizer` types with per-parameter
-/// routing.
-///
-/// Record type is `(Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
-///                  Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>)`,
-/// composed entirely from existing `Record` impls (tuple, Vec, `HashMap`).
+/// Parameter group optimizer adaptor for N=2 `SimpleOptimizer` types.
 #[derive(Clone)]
 pub struct GroupOptimizerAdaptor2<O1, O2, M, B>
 where
@@ -117,13 +98,14 @@ where
     M: AutodiffModule<B>,
     B: AutodiffBackend,
 {
-    groups1: Vec<GroupOptimizer<B, O1>>,
-    groups2: Vec<GroupOptimizer<B, O2>>,
+    groups1: Vec<OptimizerGroup<B, O1>>,
+    groups2: Vec<OptimizerGroup<B, O2>>,
 
     /// `ParamId` → (`type_tag`, `group_index`)
     /// `type_tag`: 0 → O1, 1 → O2
     dispatch: HashMap<ParamId, (usize, usize)>,
 
+    #[allow(clippy::type_complexity)]
     records: (
         Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
         Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
@@ -144,8 +126,8 @@ where
     ///
     /// Returns an error if any `ParamId` appears in more than one group.
     pub fn new(
-        groups1: Vec<GroupOptimizer<B, O1>>,
-        groups2: Vec<GroupOptimizer<B, O2>>,
+        groups1: Vec<OptimizerGroup<B, O1>>,
+        groups2: Vec<OptimizerGroup<B, O2>>,
     ) -> Result<Self, GroupOptimizerError> {
         let mut dispatch = HashMap::new();
 
@@ -190,12 +172,60 @@ where
         })
     }
 
+    /// Accces group1.
+    pub fn groups1(&self) -> &[OptimizerGroup<B, O1>] {
+        &self.groups1
+    }
+
+    /// Accces group2.
+    pub fn groups2(&self) -> &[OptimizerGroup<B, O2>] {
+        &self.groups2
+    }
+
+    /// Mutate group1.
+    pub fn groups1_mut(&mut self) -> &mut [OptimizerGroup<B, O1>] {
+        &mut self.groups1
+    }
+
+    /// Mutate group2.
+    pub fn groups2_mut(&mut self) -> &mut [OptimizerGroup<B, O2>] {
+        &mut self.groups2
+    }
+
+    /// Sets the gradient clipping.
+    ///
+    /// # Arguments
+    ///
+    /// * `gradient_clipping` - The gradient clipping.
+    ///
+    /// # Returns
+    ///
+    /// The optimizer.
     pub fn with_grad_clipping(
         mut self,
         grad_clipping: GradientClipping,
     ) -> Self {
         self.grad_clipping = Some(grad_clipping);
         self
+    }
+
+    fn step_common(
+        &mut self,
+        lr: LearningRate,
+        module: M,
+        mut grads: GradAdaptor,
+    ) -> M {
+        module.map(&mut GroupOptimizerMapper2 {
+            groups1: &self.groups1,
+            groups2: &self.groups2,
+            dispatch: &self.dispatch,
+            records1: &mut self.records.0,
+            records2: &mut self.records.1,
+            grads: &mut grads,
+            lr,
+            grad_clipping: self.grad_clipping.as_ref(),
+            _phantom: PhantomData::<M>,
+        })
     }
 }
 
@@ -219,19 +249,7 @@ where
         module: M,
         grads: GradientsParams,
     ) -> M {
-        let mut grads = GradAdaptor::Single(grads);
-        let mut mapper = GroupOptimizerMapper2 {
-            groups1: &self.groups1,
-            groups2: &self.groups2,
-            dispatch: &self.dispatch,
-            records1: &mut self.records.0,
-            records2: &mut self.records.1,
-            grads: &mut grads,
-            lr,
-            grad_clipping: self.grad_clipping.as_ref(),
-            _phantom: PhantomData::<M>,
-        };
-        module.map(&mut mapper)
+        self.step_common(lr, module, grads.into())
     }
 
     fn step_multi(
@@ -240,19 +258,7 @@ where
         module: M,
         grads: MultiGradientsParams,
     ) -> M {
-        let mut grads = GradAdaptor::Multi(grads);
-        let mut mapper = GroupOptimizerMapper2 {
-            groups1: &self.groups1,
-            groups2: &self.groups2,
-            dispatch: &self.dispatch,
-            records1: &mut self.records.0,
-            records2: &mut self.records.1,
-            grads: &mut grads,
-            lr,
-            grad_clipping: self.grad_clipping.as_ref(),
-            _phantom: PhantomData::<M>,
-        };
-        module.map(&mut mapper)
+        self.step_common(lr, module, grads.into())
     }
 
     fn to_record(&self) -> Self::Record {
@@ -268,26 +274,6 @@ where
     }
 }
 
-enum GradAdaptor {
-    Single(GradientsParams),
-    Multi(MultiGradientsParams),
-}
-
-impl GradAdaptor {
-    fn remove<B: Backend, const D: usize>(
-        &mut self,
-        id: ParamId,
-    ) -> Option<(Tensor<B, D>, B::Device)> {
-        match self {
-            GradAdaptor::Single(grads) => grads.remove(id).map(|t| {
-                let device = t.device();
-                (t, device)
-            }),
-            GradAdaptor::Multi(grads) => grads.remove(id),
-        }
-    }
-}
-
 struct GroupOptimizerMapper2<'a, M, B, O1, O2>
 where
     M: AutodiffModule<B>,
@@ -295,14 +281,18 @@ where
     O1: SimpleOptimizer<B::InnerBackend>,
     O2: SimpleOptimizer<B::InnerBackend>,
 {
-    groups1: &'a Vec<GroupOptimizer<B, O1>>,
-    groups2: &'a Vec<GroupOptimizer<B, O2>>,
+    groups1: &'a Vec<OptimizerGroup<B, O1>>,
+    groups2: &'a Vec<OptimizerGroup<B, O2>>,
+
     dispatch: &'a HashMap<ParamId, (usize, usize)>,
+
     records1: &'a mut Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
     records2: &'a mut Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
+
     grads: &'a mut GradAdaptor,
     lr: LearningRate,
     grad_clipping: Option<&'a GradientClipping>,
+
     _phantom: PhantomData<M>,
 }
 
