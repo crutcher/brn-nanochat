@@ -29,27 +29,73 @@ use burn::{
         backend::AutodiffBackend,
     },
 };
+use burn::optim::adaptor::OptimizerAdaptor;
 use hashbrown::{
     HashMap,
     HashSet,
 };
+
 // ---------------------------------------------------------------------------
 // GroupOptimizer: backend-agnostic bundle of param set + optimizer instance
 // ---------------------------------------------------------------------------
 
 /// A single optimizer instance and its assigned parameter set.
 #[derive(Clone)]
-pub struct GroupOptimizer<O: Clone> {
+pub struct GroupOptimizer<B, O>
+where
+    B: AutodiffBackend,
+    O: SimpleOptimizer<B::InnerBackend>,
+{
     pub params: HashSet<ParamId>,
     pub optim: O,
+    phantom: PhantomData<B>,
 }
 
-impl<O: Clone> GroupOptimizer<O> {
+#[allow(unused)]
+struct XOptimizerAdaptor<O, M, B>
+where
+    O: SimpleOptimizer<B::InnerBackend>,
+    M: AutodiffModule<B>,
+    B: AutodiffBackend,
+{
+    optim: O,
+    records: HashMap<ParamId, AdaptorRecord<O, B>>,
+    module: PhantomData<M>,
+    grad_clipping: Option<GradientClipping>,
+}
+
+impl<B, O> GroupOptimizer<B, O>
+where
+    B: AutodiffBackend,
+    O: SimpleOptimizer<B::InnerBackend>,
+{
     pub fn new(
         params: HashSet<ParamId>,
         optim: O,
     ) -> Self {
-        Self { params, optim }
+        Self {
+            params,
+            optim,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Build a [`GroupOptimizer`] from a [`OptimizerAdaptor`].
+    pub fn from_adaptor<M>(
+        params: HashSet<ParamId>,
+        adaptor: &OptimizerAdaptor<O, M, B>
+    ) -> Self
+    where M: AutodiffModule<B>
+    {
+        let optim: O = unsafe {
+            let adaptor: &XOptimizerAdaptor<O, M, B> = std::mem::transmute(adaptor);
+            adaptor.optim.clone()
+        };
+
+        Self::new(
+            params,
+            optim,
+        )
     }
 }
 
@@ -88,8 +134,8 @@ where
     M: AutodiffModule<B>,
     B: AutodiffBackend,
 {
-    groups1: Vec<GroupOptimizer<O1>>,
-    groups2: Vec<GroupOptimizer<O2>>,
+    groups1: Vec<GroupOptimizer<B, O1>>,
+    groups2: Vec<GroupOptimizer<B, O2>>,
 
     /// `ParamId` → (`type_tag`, `group_index`)
     /// `type_tag`: 0 → O1, 1 → O2
@@ -115,8 +161,8 @@ where
     ///
     /// Returns an error if any `ParamId` appears in more than one group.
     pub fn new(
-        groups1: Vec<GroupOptimizer<O1>>,
-        groups2: Vec<GroupOptimizer<O2>>,
+        groups1: Vec<GroupOptimizer<B, O1>>,
+        groups2: Vec<GroupOptimizer<B, O2>>,
     ) -> Result<Self, GroupOptimizerError> {
         let mut dispatch = HashMap::new();
 
@@ -278,8 +324,8 @@ where
     O1: SimpleOptimizer<B::InnerBackend>,
     O2: SimpleOptimizer<B::InnerBackend>,
 {
-    groups1: &'a Vec<GroupOptimizer<O1>>,
-    groups2: &'a Vec<GroupOptimizer<O2>>,
+    groups1: &'a Vec<GroupOptimizer<B, O1>>,
+    groups2: &'a Vec<GroupOptimizer<B, O2>>,
     dispatch: &'a HashMap<ParamId, (usize, usize)>,
     records1: &'a mut Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
     records2: &'a mut Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
@@ -384,4 +430,11 @@ where
     }
 
     tensor
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_nothing() {
+    }
 }
