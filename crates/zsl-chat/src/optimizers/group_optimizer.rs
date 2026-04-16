@@ -105,11 +105,7 @@ where
     /// `type_tag`: 0 → O1, 1 → O2
     dispatch: HashMap<ParamId, (usize, usize)>,
 
-    #[allow(clippy::type_complexity)]
-    records: (
-        Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
-        Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
-    ),
+    records: <Self as Optimizer<M, B>>::Record,
 
     grad_clipping: Option<GradientClipping>,
     _module: PhantomData<M>,
@@ -172,26 +168,6 @@ where
         })
     }
 
-    /// Accces group1.
-    pub fn groups1(&self) -> &[OptimizerGroup<B, O1>] {
-        &self.groups1
-    }
-
-    /// Accces group2.
-    pub fn groups2(&self) -> &[OptimizerGroup<B, O2>] {
-        &self.groups2
-    }
-
-    /// Mutate group1.
-    pub fn groups1_mut(&mut self) -> &mut [OptimizerGroup<B, O1>] {
-        &mut self.groups1
-    }
-
-    /// Mutate group2.
-    pub fn groups2_mut(&mut self) -> &mut [OptimizerGroup<B, O2>] {
-        &mut self.groups2
-    }
-
     /// Sets the gradient clipping.
     ///
     /// # Arguments
@@ -224,15 +200,9 @@ where
             grads: &mut grads,
             lr,
             grad_clipping: self.grad_clipping.as_ref(),
-            _phantom: PhantomData::<M>,
         })
     }
 }
-
-type GroupRecord2<O1, O2, B> = (
-    Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
-    Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
-);
 
 impl<O1, O2, M, B> Optimizer<M, B> for GroupOptimizerAdaptor2<O1, O2, M, B>
 where
@@ -241,7 +211,11 @@ where
     O1: SimpleOptimizer<B::InnerBackend>,
     O2: SimpleOptimizer<B::InnerBackend>,
 {
-    type Record = GroupRecord2<O1, O2, B>;
+    #[allow(clippy::type_complexity)]
+    type Record = (
+        Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
+        Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
+    );
 
     fn step(
         &mut self,
@@ -274,9 +248,9 @@ where
     }
 }
 
-struct GroupOptimizerMapper2<'a, M, B, O1, O2>
+/// The private mapper for `GroupOptimizerAdaptor2`.
+struct GroupOptimizerMapper2<'a, B, O1, O2>
 where
-    M: AutodiffModule<B>,
     B: AutodiffBackend,
     O1: SimpleOptimizer<B::InnerBackend>,
     O2: SimpleOptimizer<B::InnerBackend>,
@@ -292,13 +266,10 @@ where
     grads: &'a mut GradAdaptor,
     lr: LearningRate,
     grad_clipping: Option<&'a GradientClipping>,
-
-    _phantom: PhantomData<M>,
 }
 
-impl<M, B, O1, O2> ModuleMapper<B> for GroupOptimizerMapper2<'_, M, B, O1, O2>
+impl<B, O1, O2> ModuleMapper<B> for GroupOptimizerMapper2<'_, B, O1, O2>
 where
-    M: AutodiffModule<B>,
     B: AutodiffBackend,
     O1: SimpleOptimizer<B::InnerBackend>,
     O2: SimpleOptimizer<B::InnerBackend>,
@@ -368,6 +339,7 @@ where
 /// load/store.
 ///
 /// Factored out to avoid duplicating the record-management logic per type arm.
+#[inline(always)]
 fn step_group<B, O, const D: usize>(
     optim: &O,
     records: &mut HashMap<ParamId, AdaptorRecord<O, B>>,
