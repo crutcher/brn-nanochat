@@ -9,6 +9,7 @@ burn = { workspace = true }
 bunsen = { workspace = true }
 bimm-contracts = { workspace = true, features = ["burn"] }
 
+hashbrown = { workspace = true }
 anyhow = { workspace = true, features = ["std"] }
 
 [dev-dependencies]

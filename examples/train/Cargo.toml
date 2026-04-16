@@ -8,6 +8,7 @@ publish = false
 zsl-chat = { path = "../../crates/zsl-chat" }
 zsl-data-cache = { path = "../../crates/zsl-data-cache" }
 zsl-chat-data = { path = "../../crates/zsl-chat-data" }
+bunsen = { workspace = true }
 
 rand = { workspace = true }
 anyhow = { workspace = true }

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     cmp::max,
     collections::HashSet,
@@ -8,6 +10,7 @@ use std::{
     },
 };
 
+use bunsen::nn::module_util::param_map::ParamMap;
 use burn::{
     data::dataloader::DataLoader,
     grad_clipping::GradientClippingConfig,
@@ -19,10 +22,23 @@ use burn::{
         cosine::CosineAnnealingLrSchedulerConfig,
         linear::LinearLrSchedulerConfig,
     },
-    module::Module,
+    module::{
+        Module,
+        ModuleVisitor,
+        Param,
+        ParamId,
+    },
     nn::loss::CrossEntropyLossConfig,
-    optim::AdamWConfig,
-    prelude::Backend,
+    optim::{
+        AdamWConfig,
+        Optimizer,
+    },
+    prelude::{
+        Backend,
+        Bool,
+        Float,
+        Int,
+    },
     record::CompactRecorder,
     tensor::{
         AsIndex,
@@ -290,8 +306,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .grads_accumulation(args.grads_accumulation)
     .num_epochs(args.num_epochs)
     .metrics((LossMetric::new(), LearningRateMetric::new()))
-    .with_file_checkpointer(CompactRecorder::new())
-    .summary();
+    .with_file_checkpointer(CompactRecorder::new());
+    //.summary();
+
+    let param_map = ParamMap::collect(&host);
+    println!("PARAMS: {:#?}", param_map);
 
     let optimizer = AdamWConfig::new()
         .with_cautious_weight_decay(args.cautious_weight_decay)
@@ -314,60 +333,20 @@ pub struct GptHost<B: Backend> {
     pub gpt: GPT<B>,
 }
 
-impl<B: AutodiffBackend> TrainStep for GptHost<B> {
-    type Input = Tensor<B, 2, burn::prelude::Int>;
-    type Output = ClassificationOutput<B>;
-
-    fn step(
+impl<B: Backend> GptHost<B> {
+    fn loss_step(
         &self,
-        input: Self::Input,
-    ) -> TrainOutput<Self::Output> {
-        let x: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
+        input: Tensor<B, 2, burn::prelude::Int>,
+    ) -> ClassificationOutput<B> {
+        let inputs: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
         let targets: Tensor<B, 2, burn::prelude::Int> = input.slice(s![.., 1..]);
 
         let mut kv_cache = None;
 
         // Logits.
-        let output: Tensor<B, 3> = self.gpt.forward(x, &mut kv_cache);
+        let outputs: Tensor<B, 3> = self.gpt.forward(inputs, &mut kv_cache);
 
-        let output_flatten: Tensor<B, 2> = output.flatten(0, 1);
-        let targets_flatten: Tensor<B, 1, burn::prelude::Int> = targets.flatten(0, 1);
-
-        let loss = CrossEntropyLossConfig::new()
-            .init(&output_flatten.device())
-            .forward(output_flatten.clone(), targets_flatten.clone());
-
-        let grads = loss.backward();
-
-        TrainOutput::new(
-            self,
-            grads,
-            ClassificationOutput {
-                loss,
-                output: output_flatten,
-                targets: targets_flatten,
-            },
-        )
-    }
-}
-
-impl<B: Backend> InferenceStep for GptHost<B> {
-    type Input = Tensor<B, 2, burn::prelude::Int>;
-    type Output = ClassificationOutput<B>;
-
-    fn step(
-        &self,
-        input: Self::Input,
-    ) -> Self::Output {
-        let x: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
-        let targets: Tensor<B, 2, burn::prelude::Int> = input.slice(s![.., 1..]);
-
-        let mut kv_cache = None;
-
-        // Logits.
-        let output: Tensor<B, 3> = self.gpt.forward(x, &mut kv_cache);
-
-        let output_flatten: Tensor<B, 2> = output.flatten(0, 1);
+        let output_flatten: Tensor<B, 2> = outputs.flatten(0, 1);
         let targets_flatten: Tensor<B, 1, burn::prelude::Int> = targets.flatten(0, 1);
 
         let loss = CrossEntropyLossConfig::new()
@@ -379,5 +358,32 @@ impl<B: Backend> InferenceStep for GptHost<B> {
             output: output_flatten,
             targets: targets_flatten,
         }
+    }
+}
+
+impl<B: AutodiffBackend> TrainStep for GptHost<B> {
+    type Input = Tensor<B, 2, burn::prelude::Int>;
+    type Output = ClassificationOutput<B>;
+
+    fn step(
+        &self,
+        input: Self::Input,
+    ) -> TrainOutput<Self::Output> {
+        let classification_output = self.loss_step(input);
+        let grads = classification_output.loss.backward();
+
+        TrainOutput::new(self, grads, classification_output)
+    }
+}
+
+impl<B: Backend> InferenceStep for GptHost<B> {
+    type Input = Tensor<B, 2, burn::prelude::Int>;
+    type Output = ClassificationOutput<B>;
+
+    fn step(
+        &self,
+        input: Self::Input,
+    ) -> Self::Output {
+        self.loss_step(input)
     }
 }
