@@ -8219,6 +8219,8 @@ dependencies = [
  "bunsen",
  "burn",
  "hashbrown 0.16.1",
+ "paste",
+ "serde",
 ]
 
 [[package]]

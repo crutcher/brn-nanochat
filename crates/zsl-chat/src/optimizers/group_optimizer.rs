@@ -89,252 +89,6 @@ pub enum GroupOptimizerError {
     },
 }
 
-/// Parameter group optimizer adaptor for N=2 `SimpleOptimizer` types.
-#[derive(Clone)]
-pub struct GroupOptimizerAdaptor2<O1, O2, M, B>
-where
-    O1: SimpleOptimizer<B::InnerBackend>,
-    O2: SimpleOptimizer<B::InnerBackend>,
-    M: AutodiffModule<B>,
-    B: AutodiffBackend,
-{
-    groups1: Vec<OptimizerGroup<B, O1>>,
-    groups2: Vec<OptimizerGroup<B, O2>>,
-
-    /// `ParamId` → (`type_tag`, `group_index`)
-    /// `type_tag`: 0 → O1, 1 → O2
-    dispatch: HashMap<ParamId, (usize, usize)>,
-
-    records: <Self as Optimizer<M, B>>::Record,
-
-    grad_clipping: Option<GradientClipping>,
-    _module: PhantomData<M>,
-}
-
-impl<O1, O2, M, B> GroupOptimizerAdaptor2<O1, O2, M, B>
-where
-    O1: SimpleOptimizer<B::InnerBackend>,
-    O2: SimpleOptimizer<B::InnerBackend>,
-    M: AutodiffModule<B>,
-    B: AutodiffBackend,
-{
-    /// Construct and validate.
-    ///
-    /// Returns an error if any `ParamId` appears in more than one group.
-    pub fn new(
-        groups1: Vec<OptimizerGroup<B, O1>>,
-        groups2: Vec<OptimizerGroup<B, O2>>,
-    ) -> Result<Self, GroupOptimizerError> {
-        let mut dispatch = HashMap::new();
-
-        for (idx, group) in groups1.iter().enumerate() {
-            for &param_id in &group.params {
-                if let Some(&first) = dispatch.get(&param_id) {
-                    return Err(GroupOptimizerError::DuplicateParamId {
-                        param_id,
-                        first,
-                        second: (0, idx),
-                    });
-                }
-                dispatch.insert(param_id, (0, idx));
-            }
-        }
-
-        for (idx, group) in groups2.iter().enumerate() {
-            for &param_id in &group.params {
-                if let Some(&first) = dispatch.get(&param_id) {
-                    return Err(GroupOptimizerError::DuplicateParamId {
-                        param_id,
-                        first,
-                        second: (1, idx),
-                    });
-                }
-                dispatch.insert(param_id, (1, idx));
-            }
-        }
-
-        let records = (
-            vec![HashMap::new(); groups1.len()],
-            vec![HashMap::new(); groups2.len()],
-        );
-
-        Ok(Self {
-            groups1,
-            groups2,
-            dispatch,
-            records,
-            grad_clipping: None,
-            _module: PhantomData,
-        })
-    }
-
-    /// Sets the gradient clipping.
-    ///
-    /// # Arguments
-    ///
-    /// * `gradient_clipping` - The gradient clipping.
-    ///
-    /// # Returns
-    ///
-    /// The optimizer.
-    pub fn with_grad_clipping(
-        mut self,
-        grad_clipping: GradientClipping,
-    ) -> Self {
-        self.grad_clipping = Some(grad_clipping);
-        self
-    }
-
-    fn step_common(
-        &mut self,
-        lr: LearningRate,
-        module: M,
-        mut grads: GradAdaptor,
-    ) -> M {
-        module.map(&mut GroupOptimizerMapper2 {
-            groups1: &self.groups1,
-            groups2: &self.groups2,
-            dispatch: &self.dispatch,
-            records1: &mut self.records.0,
-            records2: &mut self.records.1,
-            grads: &mut grads,
-            lr,
-            grad_clipping: self.grad_clipping.as_ref(),
-        })
-    }
-}
-
-impl<O1, O2, M, B> Optimizer<M, B> for GroupOptimizerAdaptor2<O1, O2, M, B>
-where
-    B: AutodiffBackend,
-    M: AutodiffModule<B>,
-    O1: SimpleOptimizer<B::InnerBackend>,
-    O2: SimpleOptimizer<B::InnerBackend>,
-{
-    #[allow(clippy::type_complexity)]
-    type Record = (
-        Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
-        Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
-    );
-
-    fn step(
-        &mut self,
-        lr: LearningRate,
-        module: M,
-        grads: GradientsParams,
-    ) -> M {
-        self.step_common(lr, module, grads.into())
-    }
-
-    fn step_multi(
-        &mut self,
-        lr: LearningRate,
-        module: M,
-        grads: MultiGradientsParams,
-    ) -> M {
-        self.step_common(lr, module, grads.into())
-    }
-
-    fn to_record(&self) -> Self::Record {
-        self.records.clone()
-    }
-
-    fn load_record(
-        mut self,
-        record: Self::Record,
-    ) -> Self {
-        self.records = record;
-        self
-    }
-}
-
-/// The private mapper for `GroupOptimizerAdaptor2`.
-struct GroupOptimizerMapper2<'a, B, O1, O2>
-where
-    B: AutodiffBackend,
-    O1: SimpleOptimizer<B::InnerBackend>,
-    O2: SimpleOptimizer<B::InnerBackend>,
-{
-    groups1: &'a Vec<OptimizerGroup<B, O1>>,
-    groups2: &'a Vec<OptimizerGroup<B, O2>>,
-
-    dispatch: &'a HashMap<ParamId, (usize, usize)>,
-
-    records1: &'a mut Vec<HashMap<ParamId, AdaptorRecord<O1, B>>>,
-    records2: &'a mut Vec<HashMap<ParamId, AdaptorRecord<O2, B>>>,
-
-    grads: &'a mut GradAdaptor,
-    lr: LearningRate,
-    grad_clipping: Option<&'a GradientClipping>,
-}
-
-impl<B, O1, O2> ModuleMapper<B> for GroupOptimizerMapper2<'_, B, O1, O2>
-where
-    B: AutodiffBackend,
-    O1: SimpleOptimizer<B::InnerBackend>,
-    O2: SimpleOptimizer<B::InnerBackend>,
-{
-    fn map_float<const D: usize>(
-        &mut self,
-        param: Param<Tensor<B, D>>,
-    ) -> Param<Tensor<B, D>> {
-        let (id, tensor, mapper) = param.consume();
-
-        let Some((grad, device)) = self.grads.remove::<B::InnerBackend, D>(id) else {
-            return Param::from_mapped_value(id, tensor, mapper);
-        };
-
-        // ParamIds not in dispatch are left untouched (no gradient applied).
-        // This handles params not assigned to any group gracefully.
-        let Some(&(type_tag, idx)) = self.dispatch.get(&id) else {
-            return Param::from_mapped_value(id, tensor, mapper);
-        };
-
-        let is_require_grad = tensor.is_require_grad();
-
-        let tensor = if tensor.device() != device {
-            tensor.to_device(&device)
-        } else {
-            tensor
-        };
-
-        let grad = if let Some(clipping) = self.grad_clipping {
-            clipping.clip_gradient(grad)
-        } else {
-            grad
-        };
-
-        let tensor = match type_tag {
-            0 => step_group::<B, O1, D>(
-                &self.groups1[idx].optim,
-                &mut self.records1[idx],
-                id,
-                tensor.inner(),
-                grad,
-                &device,
-                self.lr,
-            ),
-            1 => step_group::<B, O2, D>(
-                &self.groups2[idx].optim,
-                &mut self.records2[idx],
-                id,
-                tensor.inner(),
-                grad,
-                &device,
-                self.lr,
-            ),
-            _ => unreachable!("GroupOptimizerAdaptor2 only has type tags 0 and 1"),
-        };
-
-        let mut tensor = Tensor::from_inner(tensor);
-        if is_require_grad {
-            tensor = tensor.require_grad();
-        }
-
-        Param::from_mapped_value(id, tensor, mapper)
-    }
-}
-
 /// Execute a single optimizer step for one parameter, managing record
 /// load/store.
 ///
@@ -364,6 +118,267 @@ where
 
     tensor
 }
+
+// ---------------------------------------------------------------------------
+// Macro
+// ---------------------------------------------------------------------------
+
+/// Define a `GroupOptimizerAdaptorN` and its associated mapper for N
+/// `SimpleOptimizer` types.
+///
+/// # Usage
+///
+/// ```ignore
+/// define_group_optimizer_adaptor!(2, [(O1, 0), (O2, 1)]);
+/// define_group_optimizer_adaptor!(3, [(O1, 0), (O2, 1), (O3, 2)]);
+/// ```
+///
+/// Each invocation generates:
+/// - `GroupOptimizerAdaptorN<O1, ..., ON, M, B>` — the adaptor struct
+/// - `Optimizer<M, B>` impl with `Record` as a tuple of `Vec<HashMap<ParamId,
+///   AdaptorRecord<Oi, B>>>`
+macro_rules! define_group_optimizer_adaptor {
+    ($N:tt, [$(($O:ident, $idx:tt)),+ $(,)?]) => {
+        paste::paste! {
+            #[doc=concat!("[`OptimizerGroup`] adapter for ", $N, "types")]
+            #[derive(Clone)]
+            pub struct [<GroupOptimizerAdaptor $N>]<$($O,)+ M, B>
+            where
+                $( $O: SimpleOptimizer<B::InnerBackend>, )+
+                M: AutodiffModule<B>,
+                B: AutodiffBackend,
+            {
+                $( [<groups_ $idx>]: Vec<OptimizerGroup<B, $O>>, )+
+
+                /// `ParamId` → (`type_tag`, `group_index`)
+                dispatch: HashMap<ParamId, (usize, usize)>,
+
+                records: <Self as Optimizer<M, B>>::Record,
+
+                grad_clipping: Option<GradientClipping>,
+                _module: PhantomData<M>,
+            }
+
+            impl<$($O,)+ M, B> [<GroupOptimizerAdaptor $N>]<$($O,)+ M, B>
+            where
+                $( $O: SimpleOptimizer<B::InnerBackend>, )+
+                M: AutodiffModule<B>,
+                B: AutodiffBackend,
+            {
+                /// Construct and validate.
+                ///
+                /// Returns an error if any `ParamId` appears in more than one
+                /// group.
+                pub fn new(
+                    $( [<groups_ $idx>]: Vec<OptimizerGroup<B, $O>>, )+
+                ) -> Result<Self, GroupOptimizerError> {
+                    let mut dispatch = HashMap::new();
+
+                    $(
+                        for (group_idx, group) in [<groups_ $idx>].iter().enumerate() {
+                            for &param_id in &group.params {
+                                if let Some(&first) = dispatch.get(&param_id) {
+                                    return Err(GroupOptimizerError::DuplicateParamId {
+                                        param_id,
+                                        first,
+                                        second: ($idx, group_idx),
+                                    });
+                                }
+                                dispatch.insert(param_id, ($idx, group_idx));
+                            }
+                        }
+                    )+
+
+                    let records = (
+                        $( vec![HashMap::new(); [<groups_ $idx>].len()], )+
+                    );
+
+                    Ok(Self {
+                        $( [<groups_ $idx>], )+
+                        dispatch,
+                        records,
+                        grad_clipping: None,
+                        _module: PhantomData,
+                    })
+                }
+
+                /// Sets the gradient clipping.
+                pub fn with_grad_clipping(
+                    mut self,
+                    grad_clipping: GradientClipping,
+                ) -> Self {
+                    self.grad_clipping = Some(grad_clipping);
+                    self
+                }
+
+                fn step_common(
+                    &mut self,
+                    lr: LearningRate,
+                    module: M,
+                    mut grads: GradAdaptor,
+                ) -> M {
+                    module.map(&mut [<GroupOptimizerMapper $N>] {
+                        $( [<groups_ $idx>]: &self.[<groups_ $idx>], )+
+                        dispatch: &self.dispatch,
+                        $( [<records_ $idx>]: &mut self.records.$idx, )+
+                        grads: &mut grads,
+                        lr,
+                        grad_clipping: self.grad_clipping.as_ref(),
+                    })
+                }
+            }
+
+            impl<$($O,)+ M, B> Optimizer<M, B>
+                for [<GroupOptimizerAdaptor $N>]<$($O,)+ M, B>
+            where
+                $( $O: SimpleOptimizer<B::InnerBackend>, )+
+                M: AutodiffModule<B>,
+                B: AutodiffBackend,
+            {
+                #[allow(clippy::type_complexity)]
+                type Record = (
+                    $( Vec<HashMap<ParamId, AdaptorRecord<$O, B>>>, )+
+                );
+
+                fn step(
+                    &mut self,
+                    lr: LearningRate,
+                    module: M,
+                    grads: GradientsParams,
+                ) -> M {
+                    self.step_common(lr, module, grads.into())
+                }
+
+                fn step_multi(
+                    &mut self,
+                    lr: LearningRate,
+                    module: M,
+                    grads: MultiGradientsParams,
+                ) -> M {
+                    self.step_common(lr, module, grads.into())
+                }
+
+                fn to_record(&self) -> Self::Record {
+                    self.records.clone()
+                }
+
+                fn load_record(
+                    mut self,
+                    record: Self::Record,
+                ) -> Self {
+                    self.records = record;
+                    self
+                }
+            }
+
+            #[doc=concat!("Mapper for [`GroupOptimizer", $N, "'].")]
+            struct [<GroupOptimizerMapper $N>]<'a, B, $($O,)+>
+            where
+                B: AutodiffBackend,
+                $( $O: SimpleOptimizer<B::InnerBackend>, )+
+            {
+                $( [<groups_ $idx>]: &'a Vec<OptimizerGroup<B, $O>>, )+
+
+                dispatch: &'a HashMap<ParamId, (usize, usize)>,
+
+                $( [<records_ $idx>]: &'a mut Vec<HashMap<ParamId, AdaptorRecord<$O, B>>>, )+
+
+                grads: &'a mut GradAdaptor,
+                lr: LearningRate,
+                grad_clipping: Option<&'a GradientClipping>,
+            }
+
+            impl<B, $($O,)+> ModuleMapper<B>
+                for [<GroupOptimizerMapper $N>]<'_, B, $($O,)+>
+            where
+                B: AutodiffBackend,
+                $( $O: SimpleOptimizer<B::InnerBackend>, )+
+            {
+                fn map_float<const D: usize>(
+                    &mut self,
+                    param: Param<Tensor<B, D>>,
+                ) -> Param<Tensor<B, D>> {
+                    let (id, tensor, mapper) = param.consume();
+
+                    let Some((grad, device)) =
+                        self.grads.remove::<B::InnerBackend, D>(id)
+                    else {
+                        return Param::from_mapped_value(id, tensor, mapper);
+                    };
+
+                    let Some(&(type_tag, idx)) = self.dispatch.get(&id) else {
+                        return Param::from_mapped_value(id, tensor, mapper);
+                    };
+
+                    let is_require_grad = tensor.is_require_grad();
+
+                    let tensor = if tensor.device() != device {
+                        tensor.to_device(&device)
+                    } else {
+                        tensor
+                    };
+
+                    let grad = if let Some(clipping) = self.grad_clipping {
+                        clipping.clip_gradient(grad)
+                    } else {
+                        grad
+                    };
+
+                    let tensor = match type_tag {
+                        $(
+                            $idx => step_group::<B, $O, D>(
+                                &self.[<groups_ $idx>][idx].optim,
+                                &mut self.[<records_ $idx>][idx],
+                                id,
+                                tensor.inner(),
+                                grad,
+                                &device,
+                                self.lr,
+                            ),
+                        )+
+                        _ => unreachable!(
+                            concat!(
+                                stringify!([<GroupOptimizerAdaptor $N>]),
+                                " only has type tags 0..",
+                                $N,
+                            )
+                        ),
+                    };
+
+                    let mut tensor = Tensor::from_inner(tensor);
+                    if is_require_grad {
+                        tensor = tensor.require_grad();
+                    }
+
+                    Param::from_mapped_value(id, tensor, mapper)
+                }
+            }
+
+        } // paste!
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Instantiations
+// ---------------------------------------------------------------------------
+
+define_group_optimizer_adaptor!(2, [(O1, 0), (O2, 1)]);
+define_group_optimizer_adaptor!(3, [(O1, 0), (O2, 1), (O3, 2)]);
+define_group_optimizer_adaptor!(4, [(O1, 0), (O2, 1), (O3, 2), (O4, 3)]);
+define_group_optimizer_adaptor!(5, [(O1, 0), (O2, 1), (O3, 2), (O4, 3), (O5, 4)]);
+define_group_optimizer_adaptor!(6, [(O1, 0), (O2, 1), (O3, 2), (O4, 3), (O5, 4), (O6, 5)]);
+define_group_optimizer_adaptor!(
+    7,
+    [
+        (O1, 0),
+        (O2, 1),
+        (O3, 2),
+        (O4, 3),
+        (O5, 4),
+        (O6, 5),
+        (O7, 6)
+    ]
+);
 
 #[cfg(test)]
 mod tests {
