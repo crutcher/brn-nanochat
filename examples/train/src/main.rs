@@ -13,13 +13,6 @@ use anyhow::{
     Result,
     bail,
 };
-use bunsen::nn::module_util::param_map::{
-    ModulePath,
-    ModulePathNode,
-    ParamKind,
-    ParamMap,
-    ParamTag,
-};
 use burn::{
     data::dataloader::DataLoader,
     grad_clipping::GradientClipping,
@@ -88,6 +81,13 @@ use zsl_chat::{
     gpt::gpt_model::{
         GPT,
         GPTConfig,
+    },
+    module_util::param_map::{
+        ParamKind,
+        ParamMap,
+        ParamPath,
+        ParamPathNode,
+        ParamTag,
     },
     optimizers::{
         GroupOptimizerAdaptor2,
@@ -332,9 +332,9 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let all_params: HashSet<ParamId> = param_map
         .iter()
-        .filter_map(|(_, tag)| {
-            if tag.kind() == ParamKind::Float {
-                Some(tag.id())
+        .filter_map(|(_, desc)| {
+            if desc.kind() == ParamKind::Float {
+                Some(desc.id())
             } else {
                 None
             }
@@ -345,10 +345,10 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let muon_params: HashSet<ParamId> = param_map
         .iter()
-        .filter_map(|(path, tag)| {
-            let p = path_str(path);
-            if muon_regex.is_match(&p) && tag.kind() == ParamKind::Float {
-                Some(tag.id())
+        .filter_map(|(path, desc)| {
+            let p = path.path_str();
+            if muon_regex.is_match(&p) && desc.kind() == ParamKind::Float {
+                Some(desc.id())
             } else {
                 None
             }
@@ -386,26 +386,6 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .expect("Trained model should be saved successfully");
 
     Ok(())
-}
-
-pub fn path_str(module_path: &ModulePath) -> String {
-    struct XModulePath(Vec<ModulePathNode>);
-    struct XModulePathNode {
-        name: String,
-        container: String,
-    }
-
-    let module_path = unsafe { std::mem::transmute::<&ModulePath, &XModulePath>(module_path) };
-
-    module_path
-        .0
-        .iter()
-        .map(|node| {
-            let node = unsafe { std::mem::transmute::<&ModulePathNode, &XModulePathNode>(node) };
-            node.name.clone()
-        })
-        .collect::<Vec<_>>()
-        .join(".")
 }
 
 #[derive(Module, Debug)]
