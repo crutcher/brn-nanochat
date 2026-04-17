@@ -6881,6 +6881,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "log",
  "rand 0.10.0",
+ "regex",
  "wordchipper",
  "wordchipper-cli-util",
  "zsl-chat",

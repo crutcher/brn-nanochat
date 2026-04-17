@@ -30,6 +30,7 @@ bunsen = "0.0.4"
 wordchipper = { version = "0.9.1" }
 wordchipper-cli-util = { version = "0.9.1" }
 bimm-contracts = "0.20.1"
+regex = "1.12.3"
 
 # must match the version used by burn
 hashbrown = { version = "0.16.1" }

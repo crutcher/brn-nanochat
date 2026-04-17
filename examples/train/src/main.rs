@@ -9,6 +9,10 @@ use std::{
     },
 };
 
+use anyhow::{
+    Result,
+    bail,
+};
 use bunsen::nn::module_util::param_map::{
     ModulePath,
     ModulePathNode,
@@ -337,16 +341,23 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         })
         .collect::<HashSet<_>>();
 
+    let muon_regex = regex::Regex::new(r"gpt\.h\..*\.(mlp|attn)\.c_.*\.weight").unwrap();
+
     let muon_params: HashSet<ParamId> = param_map
         .iter()
         .filter_map(|(path, tag)| {
-            if path_str(path).starts_with("gpt.h") && tag.kind() == ParamKind::Float {
+            let p = path_str(path);
+            if muon_regex.is_match(&p) && tag.kind() == ParamKind::Float {
                 Some(tag.id())
             } else {
                 None
             }
         })
         .collect();
+
+    if muon_params.is_empty() {
+        return bail!("No Muon parameters found in the model");
+    }
 
     let mut adamw_params: HashSet<ParamId> = all_params.clone();
     adamw_params.retain(|id| !muon_params.contains(id));
