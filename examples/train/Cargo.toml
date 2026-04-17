@@ -17,6 +17,7 @@ log = { workspace = true }
 wordchipper = { workspace = true, features = ["client"] }
 wordchipper-cli-util = { workspace = true }
 burn = { workspace = true, features = ["train", "fusion", "autotune"] }
+hashbrown = { workspace = true }
 
 [features]
 default = ["cuda"]

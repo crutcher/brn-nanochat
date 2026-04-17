@@ -2,7 +2,6 @@
 
 use std::{
     cmp::max,
-    collections::HashSet,
     path::PathBuf,
     sync::{
         Arc,
@@ -10,10 +9,16 @@ use std::{
     },
 };
 
-use bunsen::nn::module_util::param_map::ParamMap;
+use bunsen::nn::module_util::param_map::{
+    ModulePath,
+    ModulePathNode,
+    ParamKind,
+    ParamMap,
+    ParamTag,
+};
 use burn::{
     data::dataloader::DataLoader,
-    grad_clipping::GradientClippingConfig,
+    grad_clipping::GradientClipping,
     lr_scheduler::{
         composed::{
             ComposedLrSchedulerConfig,
@@ -31,7 +36,9 @@ use burn::{
     nn::loss::CrossEntropyLossConfig,
     optim::{
         AdamWConfig,
+        MuonConfig,
         Optimizer,
+        decay::WeightDecayConfig,
     },
     prelude::{
         Backend,
@@ -62,6 +69,7 @@ use burn::{
     },
 };
 use clap::Parser;
+use hashbrown::HashSet;
 use rand::{
     SeedableRng,
     rngs::StdRng,
@@ -72,9 +80,15 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
-use zsl_chat::gpt::gpt_model::{
-    GPT,
-    GPTConfig,
+use zsl_chat::{
+    gpt::gpt_model::{
+        GPT,
+        GPTConfig,
+    },
+    optimizers::{
+        GroupOptimizerAdaptor2,
+        OptimizerGroup,
+    },
 };
 use zsl_chat_data::{
     dataloader::ChatDataLoader,
@@ -306,17 +320,52 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .grads_accumulation(args.grads_accumulation)
     .num_epochs(args.num_epochs)
     .metrics((LossMetric::new(), LearningRateMetric::new()))
-    .with_file_checkpointer(CompactRecorder::new());
-    //.summary();
+    .with_file_checkpointer(CompactRecorder::new())
+    .summary();
 
     let param_map = ParamMap::collect(&host);
     println!("PARAMS: {:#?}", param_map);
 
-    let optimizer = AdamWConfig::new()
-        .with_cautious_weight_decay(args.cautious_weight_decay)
-        .with_weight_decay(args.weight_decay)
-        .with_grad_clipping(Some(GradientClippingConfig::Value(2.0)))
-        .init();
+    let all_params: HashSet<ParamId> = param_map
+        .iter()
+        .filter_map(|(_, tag)| {
+            if tag.kind() == ParamKind::Float {
+                Some(tag.id())
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>();
+
+    let muon_params: HashSet<ParamId> = param_map
+        .iter()
+        .filter_map(|(path, tag)| {
+            if path_str(path).starts_with("gpt.h") && tag.kind() == ParamKind::Float {
+                Some(tag.id())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let mut adamw_params: HashSet<ParamId> = all_params.clone();
+    adamw_params.retain(|id| !muon_params.contains(id));
+
+    let optimizer = GroupOptimizerAdaptor2::new(
+        vec![OptimizerGroup::from_adaptor(
+            adamw_params,
+            &AdamWConfig::new()
+                .with_cautious_weight_decay(args.cautious_weight_decay)
+                .with_weight_decay(args.weight_decay)
+                .init::<B, GptHost<B>>(),
+        )],
+        vec![OptimizerGroup::from_adaptor(
+            muon_params,
+            &MuonConfig::new().init::<B, GptHost<B>>(),
+        )],
+    )
+    .unwrap()
+    .with_grad_clipping(GradientClipping::Value(2.0));
 
     let result = training.launch(Learner::new(host, optimizer, lr_scheduler));
 
@@ -326,6 +375,26 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .expect("Trained model should be saved successfully");
 
     Ok(())
+}
+
+pub fn path_str(module_path: &ModulePath) -> String {
+    struct XModulePath(Vec<ModulePathNode>);
+    struct XModulePathNode {
+        name: String,
+        container: String,
+    }
+
+    let module_path = unsafe { std::mem::transmute::<&ModulePath, &XModulePath>(module_path) };
+
+    module_path
+        .0
+        .iter()
+        .map(|node| {
+            let node = unsafe { std::mem::transmute::<&ModulePathNode, &XModulePathNode>(node) };
+            node.name.clone()
+        })
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 #[derive(Module, Debug)]

@@ -6878,6 +6878,7 @@ dependencies = [
  "bunsen",
  "burn",
  "clap",
+ "hashbrown 0.16.1",
  "log",
  "rand 0.10.0",
  "wordchipper",
