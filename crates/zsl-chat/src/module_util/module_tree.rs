@@ -30,11 +30,11 @@ pub enum MTreeNodeData {
     Root,
 
     Container {
-        /// The name of the container.
-        name: String,
-
         /// The kind of the container.
         kind: String,
+
+        /// The name of the container.
+        name: String,
     },
 
     Param {
@@ -50,6 +50,19 @@ pub enum MTreeNodeData {
         /// The shape of the parameter.
         shape: Shape,
     },
+}
+
+impl MTreeNodeData {
+    pub fn is_container(&self) -> bool {
+        match self {
+            MTreeNodeData::Root { .. } | MTreeNodeData::Container { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        !self.is_container()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -70,20 +83,49 @@ impl Default for MTree {
 }
 
 impl MTree {
-    fn arena(&self) -> &Arena<MTreeNodeData> {
-        &self.arena
+    pub fn root(&self) -> MTreeNode<'_> {
+        MTreeNode {
+            tree: self,
+            node_id: self.root_id,
+            node: self.arena.get(self.root_id).unwrap(),
+        }
+    }
+}
+
+pub struct MTreeNode<'a> {
+    tree: &'a MTree,
+    node_id: NodeId,
+    node: &'a Node<MTreeNodeData>,
+}
+
+impl MTreeNode<'_> {
+    pub fn data(&self) -> &MTreeNodeData {
+        self.node.get()
     }
 
-    fn arena_mut(&mut self) -> &mut Arena<MTreeNodeData> {
-        &mut self.arena
+    pub fn is_container(&self) -> bool {
+        self.data().is_container()
     }
 
-    fn root_id(&self) -> NodeId {
-        self.root_id
+    pub fn is_leaf(&self) -> bool {
+        self.data().is_leaf()
     }
 
-    pub fn root(&self) -> &Node<MTreeNodeData> {
-        self.arena.get(self.root_id).unwrap()
+    pub fn children(&self) -> impl Iterator<Item = MTreeNode<'_>> {
+        let mut node_ids = vec![];
+
+        let mut cur = self.node.first_child();
+        while let Some(id) = cur {
+            let node = self.tree.arena.get(id).unwrap();
+            node_ids.push(id);
+            cur = node.next_sibling();
+        }
+
+        node_ids.into_iter().map(move |id| MTreeNode {
+            tree: self.tree,
+            node_id: id,
+            node: self.tree.arena.get(id).unwrap(),
+        })
     }
 }
 
@@ -97,7 +139,7 @@ struct MTreeBuildingVistior<B: Backend> {
 impl<B: Backend> Default for MTreeBuildingVistior<B> {
     fn default() -> Self {
         let mtree: MTree = Default::default();
-        let current = mtree.root_id();
+        let current = mtree.root_id;
         Self {
             mtree,
             current,
@@ -115,7 +157,7 @@ impl<B: Backend> MTreeBuildingVistior<B> {
         &mut self,
         node: MTreeNodeData,
     ) -> NodeId {
-        self.current.append_value(node, self.mtree.arena_mut())
+        self.current.append_value(node, &mut self.mtree.arena)
     }
 
     pub fn build(self) -> MTree {
@@ -140,7 +182,7 @@ impl<B: Backend> ModuleVisitor<B> for MTreeBuildingVistior<B> {
         _name: &str,
         _container_type: &str,
     ) {
-        self.current = self.current.parent(self.mtree.arena()).unwrap();
+        self.current = self.current.parent(&self.mtree.arena).unwrap();
     }
 
     fn visit_bool<const D: usize>(
@@ -198,6 +240,7 @@ mod tests {
 
     use crate::module_util::module_tree::{
         MTreeBuildingVistior,
+        MTreeNode,
         MTreeNodeData,
     };
 
@@ -226,23 +269,18 @@ mod tests {
 
         let tree = tree_builder.build();
 
-        let root = tree.root();
-        walk(0, root, tree.arena());
+        walk(0, &tree.root());
     }
 
-    fn walk(
+    fn walk<'a>(
         depth: usize,
-        node: &Node<MTreeNodeData>,
-        arena: &Arena<MTreeNodeData>,
+        node: &MTreeNode<'a>,
     ) {
         let pad = " ".repeat(depth * 2);
-        println!("{}- {:?}", pad, node.get());
+        println!("{}- {:?}", pad, node.data());
 
-        let mut cur = node.first_child();
-        while let Some(child_id) = cur {
-            let child_node = arena.get(child_id).expect("child node not found");
-            walk(depth + 1, child_node, arena);
-            cur = child_node.next_sibling();
+        for child in node.children() {
+            walk(depth + 1, &child);
         }
     }
 }
