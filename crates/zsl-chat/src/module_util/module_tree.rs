@@ -31,17 +31,22 @@ use crate::module_util::kinds::ParamKind;
 
 /// A shadow tree of a module.
 ///
-/// Has nodes shodiwng the structure and parameters of a model.
+/// Has nodes showing the structure and parameters of a model.
 #[derive(Debug, Clone)]
 pub struct MTree {
-    arena: Arena<MTreeNodeData>,
+    arena: Arena<MTreeNode>,
     root_id: NodeId,
 }
 
 impl Default for MTree {
     fn default() -> Self {
         let mut arena = Arena::new();
-        let root = arena.new_node(MTreeNodeData::Root);
+        let root = arena.new_node(MTreeNode {
+            name: None,
+            data: MTreeNodeData::Container(ContainerData {
+                kind: String::new(),
+            }),
+        });
         Self {
             arena,
             root_id: root,
@@ -67,11 +72,20 @@ impl MTree {
     }
 }
 
+/// A node stored in the arena. Combines the relationship name (edge label)
+/// with the node's content, since indextree does not support edge data.
+#[derive(Debug, Clone)]
+pub struct MTreeNode {
+    /// Name within the parent (None for the root).
+    pub name: Option<String>,
+    pub data: MTreeNodeData,
+}
+
 /// Represents a reference to a node in the module tree.
 pub struct MTreeNodeRef<'a> {
     tree: &'a MTree,
     node_id: NodeId,
-    node: &'a Node<MTreeNodeData>,
+    node: &'a Node<MTreeNode>,
 }
 
 impl<'a> Display for MTreeNodeRef<'a> {
@@ -79,15 +93,18 @@ impl<'a> Display for MTreeNodeRef<'a> {
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        match self.data() {
-            MTreeNodeData::Root => write!(f, "/"),
-            MTreeNodeData::Container(ContainerData { kind, name }) => {
+        if let Some(name) = self.name() {
+            write!(f, "\"{name}\": ")?;
+        }
+        let n = self.node.get();
+        match &n.data {
+            MTreeNodeData::Container(ContainerData { kind }) => {
                 let kind = if kind.starts_with("Struct:") {
                     &kind[7..]
                 } else {
-                    kind
+                    kind.as_str()
                 };
-                write!(f, "{name:?}: {kind}")
+                write!(f, "{}", kind)
             }
             MTreeNodeData::Param(ParamData {
                 param_id,
@@ -95,36 +112,34 @@ impl<'a> Display for MTreeNodeRef<'a> {
                 dtype,
                 shape,
             }) => {
-                write!(
-                    f,
-                    "{}: {:?} ({:?}, {:?})",
-                    param_id, kind, dtype, &shape.dims
-                )
+                write!(f, "id={param_id} {kind:?}::{dtype:?} {:?}", &shape.dims)
             }
         }
     }
 }
 
 impl MTreeNodeRef<'_> {
-    /// Get the data associated with this tree node.
-    pub fn data(&self) -> &MTreeNodeData {
-        self.node.get()
+    /// Get the name of this node within its parent (None for the root).
+    pub fn name(&self) -> Option<&str> {
+        self.node.get().name.as_deref()
     }
 
-    /// Is this node a branch node?
-    /// (Can it have children?)
+    /// Get the data associated with this tree node.
+    pub fn data(&self) -> &MTreeNodeData {
+        &self.node.get().data
+    }
+
+    /// Is this node a branch node (can it have children)?
     pub fn is_branch(&self) -> bool {
-        self.data().is_branch()
+        matches!(self.data(), MTreeNodeData::Container(_))
     }
 
     /// Is this node a leaf node?
     pub fn is_leaf(&self) -> bool {
-        self.data().is_leaf()
+        matches!(self.data(), MTreeNodeData::Param(_))
     }
 
     /// Get the NodeIds of the children of this node.
-    ///
-    /// Will return an empty vector if this node has no children; or is a leaf.
     pub fn child_ids(&self) -> Vec<NodeId> {
         let mut node_ids = vec![];
         let mut cur = self.node.first_child();
@@ -148,51 +163,45 @@ impl MTreeNodeRef<'_> {
 
 #[derive(Debug, Clone)]
 pub enum MTreeNodeData {
-    /// The module root.
-    Root,
-
-    /// A named container.
+    /// A container node. The root is a Container with name = None.
     Container(ContainerData),
 
-    /// A parameter.
+    /// A parameter (leaf node).
     Param(ParamData),
 }
 
 impl MTreeNodeData {
-    /// Whether this node/node type can have children.
     pub fn is_branch(&self) -> bool {
-        !self.is_leaf()
+        matches!(self, MTreeNodeData::Container(_))
     }
 
-    /// Whether this node/node type is a leaf.
     pub fn is_leaf(&self) -> bool {
-        matches!(self, MTreeNodeData::Param { .. })
+        matches!(self, MTreeNodeData::Param(_))
     }
 }
 
+/// The type of a container node.
+///
+/// Does not include a name: the name is a property of the parent/child
+/// relationship and is stored in `MTreeNode`.
 #[derive(Debug, Clone)]
 pub struct ContainerData {
-    /// The name of the container.
-    pub name: String,
-
-    /// The kind of the container.
+    /// The type of this container (e.g. "Vec", "Struct:Linear").
+    ///
+    /// Initially empty; filled in when the first child calls `enter_module`,
+    /// which reports the current container's type via its `container_type`
+    /// argument.
     pub kind: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParamData {
-    /// The id of the parameter.
     pub param_id: ParamId,
-
-    /// The kind of the parameter.
     pub kind: ParamKind,
-
-    /// The data type of the parameter.
     pub dtype: DType,
-
-    /// The shape of the parameter.
     pub shape: Shape,
 }
+
 /// A visitor that builds a module tree.
 #[derive(Debug, Clone)]
 struct MTreeBuildingVistior<B: Backend> {
@@ -216,7 +225,7 @@ impl<B: Backend> Default for MTreeBuildingVistior<B> {
 impl<B: Backend> MTreeBuildingVistior<B> {
     fn add_child(
         &mut self,
-        node: MTreeNodeData,
+        node: MTreeNode,
     ) -> NodeId {
         self.current.append_value(node, &mut self.mtree.arena)
     }
@@ -232,10 +241,23 @@ impl<B: Backend> ModuleVisitor<B> for MTreeBuildingVistior<B> {
         name: &str,
         container_type: &str,
     ) {
-        self.current = self.add_child(MTreeNodeData::Container(ContainerData {
-            name: name.to_string(),
-            kind: container_type.to_string(),
-        }));
+        // `container_type` is the type of the CURRENT node (the node we are
+        // visiting, whose child `name` we are about to enter). Update it now
+        // that we know what it is.
+        if let Some(node) = self.mtree.arena.get_mut(self.current) {
+            if let MTreeNodeData::Container(ref mut data) = node.get_mut().data {
+                data.kind = container_type.to_string();
+            }
+        }
+
+        // Create a child container. Its own kind is unknown until its children
+        // call enter_module and reveal this node's type.
+        self.current = self.add_child(MTreeNode {
+            name: Some(name.to_string()),
+            data: MTreeNodeData::Container(ContainerData {
+                kind: String::new(),
+            }),
+        });
     }
 
     fn exit_module(
@@ -250,36 +272,39 @@ impl<B: Backend> ModuleVisitor<B> for MTreeBuildingVistior<B> {
         &mut self,
         param: &Param<Tensor<B, D, Bool>>,
     ) {
-        self.add_child(MTreeNodeData::Param(ParamData {
+        let node = self.mtree.arena.get_mut(self.current).unwrap();
+        node.get_mut().data = MTreeNodeData::Param(ParamData {
             param_id: param.id,
             kind: ParamKind::Bool,
             dtype: param.dtype(),
             shape: param.shape(),
-        }));
+        });
     }
 
     fn visit_float<const D: usize>(
         &mut self,
         param: &Param<Tensor<B, D>>,
     ) {
-        self.add_child(MTreeNodeData::Param(ParamData {
+        let node = self.mtree.arena.get_mut(self.current).unwrap();
+        node.get_mut().data = MTreeNodeData::Param(ParamData {
             param_id: param.id,
             kind: ParamKind::Float,
             dtype: param.dtype(),
             shape: param.shape(),
-        }));
+        });
     }
 
     fn visit_int<const D: usize>(
         &mut self,
         param: &Param<Tensor<B, D, Int>>,
     ) {
-        self.add_child(MTreeNodeData::Param(ParamData {
+        let node = self.mtree.arena.get_mut(self.current).unwrap();
+        node.get_mut().data = MTreeNodeData::Param(ParamData {
             param_id: param.id,
             kind: ParamKind::Int,
             dtype: param.dtype(),
             shape: param.shape(),
-        }));
+        });
     }
 }
 
@@ -292,11 +317,6 @@ mod tests {
             LinearConfig,
         },
     };
-    use indextree::{
-        Arena,
-        Node,
-        macros::tree,
-    };
 
     use super::*;
 
@@ -308,7 +328,10 @@ mod tests {
     impl<B: Backend> TestModule<B> {
         fn init(device: &B::Device) -> Self {
             Self {
-                seq: vec![LinearConfig::new(10, 10).init(device)],
+                seq: vec![
+                    LinearConfig::new(10, 10).init(device),
+                    LinearConfig::new(10, 23).init(device),
+                ],
             }
         }
     }
