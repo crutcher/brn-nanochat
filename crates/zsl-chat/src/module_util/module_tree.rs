@@ -81,86 +81,6 @@ pub struct MTreeNode {
     pub data: MTreeNodeData,
 }
 
-/// Represents a reference to a node in the module tree.
-pub struct MTreeNodeRef<'a> {
-    tree: &'a MTree,
-    node_id: NodeId,
-    node: &'a Node<MTreeNode>,
-}
-
-impl<'a> Display for MTreeNodeRef<'a> {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        if let Some(name) = self.name() {
-            write!(f, "\"{name}\": ")?;
-        }
-        let n = self.node.get();
-        match &n.data {
-            MTreeNodeData::Container(ContainerData { kind }) => {
-                let kind = if kind.starts_with("Struct:") {
-                    &kind[7..]
-                } else {
-                    kind.as_str()
-                };
-                write!(f, "{}", kind)
-            }
-            MTreeNodeData::Param(ParamData {
-                param_id,
-                kind,
-                dtype,
-                shape,
-            }) => {
-                write!(f, "id={param_id} {kind:?}::{dtype:?} {:?}", &shape.dims)
-            }
-        }
-    }
-}
-
-impl MTreeNodeRef<'_> {
-    /// Get the name of this node within its parent (None for the root).
-    pub fn name(&self) -> Option<&str> {
-        self.node.get().name.as_deref()
-    }
-
-    /// Get the data associated with this tree node.
-    pub fn data(&self) -> &MTreeNodeData {
-        &self.node.get().data
-    }
-
-    /// Is this node a branch node (can it have children)?
-    pub fn is_branch(&self) -> bool {
-        matches!(self.data(), MTreeNodeData::Container(_))
-    }
-
-    /// Is this node a leaf node?
-    pub fn is_leaf(&self) -> bool {
-        matches!(self.data(), MTreeNodeData::Param(_))
-    }
-
-    /// Get the NodeIds of the children of this node.
-    pub fn child_ids(&self) -> Vec<NodeId> {
-        let mut node_ids = vec![];
-        let mut cur = self.node.first_child();
-        while let Some(id) = cur {
-            let node = self.tree.arena.get(id).unwrap();
-            node_ids.push(id);
-            cur = node.next_sibling();
-        }
-        node_ids
-    }
-
-    /// Get an iterator over the children of this node.
-    pub fn children(&self) -> impl Iterator<Item = MTreeNodeRef<'_>> {
-        self.child_ids().into_iter().map(move |id| MTreeNodeRef {
-            tree: self.tree,
-            node_id: id,
-            node: self.tree.arena.get(id).unwrap(),
-        })
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum MTreeNodeData {
     /// A container node. The root is a Container with name = None.
@@ -200,6 +120,86 @@ pub struct ParamData {
     pub kind: ParamKind,
     pub dtype: DType,
     pub shape: Shape,
+}
+
+/// Represents a reference to a node in the module tree.
+pub struct MTreeNodeRef<'a> {
+    tree: &'a MTree,
+    node_id: NodeId,
+    node: &'a Node<MTreeNode>,
+}
+
+impl<'a> Display for MTreeNodeRef<'a> {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        if let Some(name) = self.name() {
+            write!(f, "\"{name}\": ")?;
+        }
+        let n = self.node.get();
+        match &n.data {
+            MTreeNodeData::Container(ContainerData { kind }) => {
+                let kind = if let Some(stripped) = kind.strip_prefix("Struct:") {
+                    stripped
+                } else {
+                    kind.as_str()
+                };
+                write!(f, "{}", kind)
+            }
+            MTreeNodeData::Param(ParamData {
+                param_id,
+                kind,
+                dtype,
+                shape,
+            }) => {
+                write!(f, "id={param_id} {kind:?}::{dtype:?} {:?}", &shape.dims)
+            }
+        }
+    }
+}
+
+impl MTreeNodeRef<'_> {
+    /// Get the name of this node within its parent (None for the root).
+    pub fn name(&self) -> Option<&str> {
+        self.node.get().name.as_deref()
+    }
+
+    /// Get the data associated with this tree node.
+    pub fn data(&self) -> &MTreeNodeData {
+        &self.node.get().data
+    }
+
+    /// Is this node a branch node (can it have children)?
+    pub fn is_branch(&self) -> bool {
+        matches!(self.data(), MTreeNodeData::Container(_))
+    }
+
+    /// Is this node a leaf node?
+    pub fn is_leaf(&self) -> bool {
+        matches!(self.data(), MTreeNodeData::Param(_))
+    }
+
+    /// Get the `NodeIds` of the children of this node.
+    pub fn child_ids(&self) -> Vec<NodeId> {
+        let mut node_ids = vec![];
+        let mut cur = self.node.first_child();
+        while let Some(id) = cur {
+            let node = self.tree.arena.get(id).unwrap();
+            node_ids.push(id);
+            cur = node.next_sibling();
+        }
+        node_ids
+    }
+
+    /// Get an iterator over the children of this node.
+    pub fn children(&self) -> impl Iterator<Item = MTreeNodeRef<'_>> {
+        self.child_ids().into_iter().map(move |id| MTreeNodeRef {
+            tree: self.tree,
+            node_id: id,
+            node: self.tree.arena.get(id).unwrap(),
+        })
+    }
 }
 
 /// A visitor that builds a module tree.
@@ -244,10 +244,10 @@ impl<B: Backend> ModuleVisitor<B> for MTreeBuildingVistior<B> {
         // `container_type` is the type of the CURRENT node (the node we are
         // visiting, whose child `name` we are about to enter). Update it now
         // that we know what it is.
-        if let Some(node) = self.mtree.arena.get_mut(self.current) {
-            if let MTreeNodeData::Container(ref mut data) = node.get_mut().data {
-                data.kind = container_type.to_string();
-            }
+        if let Some(node) = self.mtree.arena.get_mut(self.current)
+            && let MTreeNodeData::Container(ref mut data) = node.get_mut().data
+        {
+            data.kind = container_type.to_string();
         }
 
         // Create a child container. Its own kind is unknown until its children

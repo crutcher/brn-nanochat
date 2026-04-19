@@ -82,12 +82,14 @@ use zsl_chat::{
         GPT,
         GPTConfig,
     },
-    module_util::param_map::{
+    module_util::{
         ParamKind,
-        ParamMap,
-        ParamPath,
-        ParamPathNode,
-        ParamTag,
+        param_map::{
+            ParamMap,
+            ParamPath,
+            ParamPathNode,
+            ParamTag,
+        },
     },
     optimizers::{
         GroupOptimizerAdaptor2,
