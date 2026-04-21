@@ -227,7 +227,7 @@ impl ParamData {
 }
 
 /// Represents a reference to a node in the module tree.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MTreeNodeRef<'a> {
     tree: DebugIgnore<&'a MTree>,
     node_id: NodeId,
@@ -547,6 +547,8 @@ mod tests {
         let root = mtree.root();
 
         assert_eq!(root.name(), None);
+        assert_eq!(root.parent(), None);
+
         assert_eq!(root.is_branch(), true);
         assert_eq!(root.is_leaf(), false);
         assert_eq!(root.expect_container().expect_struct(), "TestModule");
@@ -554,6 +556,7 @@ mod tests {
         assert_eq!(root.children().count(), 3);
         {
             let seq = root.expect_child("seq");
+            assert_eq!(seq.parent(), Some(root));
 
             let cont = seq.expect_container();
             assert_eq!(cont.expect_builtin(), "Vec");
@@ -598,6 +601,8 @@ mod tests {
 
         {
             let tup = root.expect_child("tup");
+            assert_eq!(tup.parent(), Some(root));
+
             let cont = tup.expect_container();
             assert_eq!(cont.expect_builtin(), "Tuple");
             assert_eq!(cont.is_tuple(), true);
@@ -606,6 +611,8 @@ mod tests {
 
         {
             let arr = root.expect_child("arr");
+            assert_eq!(arr.parent(), Some(root));
+
             let cont = arr.expect_container();
             assert_eq!(cont.expect_builtin(), "Array");
             assert_eq!(cont.is_array(), true);
