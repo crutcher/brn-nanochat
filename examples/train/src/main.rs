@@ -358,7 +358,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .collect();
 
     if muon_params.is_empty() {
-        return bail!("No Muon parameters found in the model");
+        bail!("No Muon parameters found in the model");
     }
 
     let mut adamw_params: HashSet<ParamId> = all_params.clone();
