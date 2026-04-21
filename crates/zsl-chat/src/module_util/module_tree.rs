@@ -549,17 +549,12 @@ mod tests {
         assert_eq!(root.name(), None);
         assert_eq!(root.is_branch(), true);
         assert_eq!(root.is_leaf(), false);
-        assert_eq!(
-            root.try_container().unwrap().try_struct().unwrap(),
-            "TestModule"
-        );
+        assert_eq!(root.expect_container().expect_struct(), "TestModule");
 
         assert_eq!(root.children().count(), 3);
-
-        let [seq, tup, arr] = root.children().collect::<Vec<_>>().try_into().unwrap();
-
         {
-            assert_eq!(seq.name(), Some("seq"));
+            let seq = root.expect_child("seq");
+
             let cont = seq.expect_container();
             assert_eq!(cont.expect_builtin(), "Vec");
             assert_eq!(cont.is_vec(), true);
@@ -602,7 +597,7 @@ mod tests {
         }
 
         {
-            assert_eq!(tup.name(), Some("tup"));
+            let tup = root.expect_child("tup");
             let cont = tup.expect_container();
             assert_eq!(cont.expect_builtin(), "Tuple");
             assert_eq!(cont.is_tuple(), true);
@@ -610,7 +605,7 @@ mod tests {
         }
 
         {
-            assert_eq!(arr.name(), Some("arr"));
+            let arr = root.expect_child("arr");
             let cont = arr.expect_container();
             assert_eq!(cont.expect_builtin(), "Array");
             assert_eq!(cont.is_array(), true);
