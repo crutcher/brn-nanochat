@@ -3,6 +3,7 @@
 use std::{
     fmt::Display,
     marker::PhantomData,
+    ops::Index,
 };
 
 use burn::{
@@ -357,20 +358,42 @@ impl MTreeNodeRef<'_> {
     }
 
     /// Get a child node by name, if it exists.
-    pub fn get_child(
+    pub fn try_child(
         &self,
         name: &str,
     ) -> Option<MTreeNodeRef<'_>> {
         self.children().find(|child| child.name() == Some(name))
     }
 
+    /// Get a child node by name.
+    /// Panics if the child does not exist.
+    pub fn expect_child(
+        &self,
+        name: &str,
+    ) -> MTreeNodeRef<'_> {
+        match self.try_child(name) {
+            Some(child) => child,
+            None => panic!("child {name:?} not found"),
+        }
+    }
+
     /// Get a child node by index, if it exists.
-    pub fn get_index(
+    pub fn try_index(
         &self,
         idx: usize,
     ) -> Option<MTreeNodeRef<'_>> {
         let name = idx.to_string();
-        self.get_child(&name)
+        self.try_child(&name)
+    }
+
+    /// Get a child node by index.
+    /// Panics if the index is out of bounds.
+    pub fn expect_index(
+        &self,
+        idx: usize,
+    ) -> MTreeNodeRef<'_> {
+        let name = idx.to_string();
+        self.expect_child(&name)
     }
 }
 
@@ -537,44 +560,62 @@ mod tests {
 
         {
             assert_eq!(seq.name(), Some("seq"));
-            assert_eq!(seq.expect_container().expect_builtin(), "Vec");
-            assert_eq!(seq.expect_container().is_sequence(), true);
+            let cont = seq.expect_container();
+            assert_eq!(cont.expect_builtin(), "Vec");
+            assert_eq!(cont.is_vec(), true);
+            assert_eq!(cont.is_sequence(), true);
+
+            assert_eq!(seq.len(), 1);
+            assert_eq!(seq.is_empty(), false);
 
             let [linear] = seq.children().collect::<Vec<_>>().try_into().unwrap();
+            assert_eq!(seq.expect_index(0), linear);
+            assert_eq!(seq.expect_child("0"), linear);
             assert_eq!(linear.name(), Some("0"));
+
             assert_eq!(linear.expect_container().expect_struct(), "Linear");
 
-            assert_eq!(linear, seq.get_index(0).unwrap());
-
-            let w = linear.get_child("weight").unwrap();
+            let w = linear.expect_child("weight");
             assert_eq!(w.name(), Some("weight"));
             assert_eq!(w.is_leaf(), true);
-            let wparam = w.expect_param();
-            assert_eq!(wparam.param_id(), module.seq[0].weight.id);
-            assert_eq!(wparam.kind(), ParamKind::Float);
-            assert_eq!(wparam.dtype(), DType::F32);
-            assert_eq!(wparam.shape().dims(), [10, 10]);
+            {
+                let wparam = w.expect_param();
+                assert_eq!(wparam.param_id(), module.seq[0].weight.id);
+                assert_eq!(wparam.kind(), ParamKind::Float);
+                assert_eq!(wparam.dtype(), DType::F32);
+                assert_eq!(wparam.shape().dims(), [10, 10]);
+            }
 
-            let b = linear.get_child("bias").unwrap();
+            let b = linear.expect_child("bias");
             assert_eq!(b.name(), Some("bias"));
             assert_eq!(b.is_leaf(), true);
-            let bparam = b.expect_param();
-            assert_eq!(
-                bparam.param_id(),
-                (&module.seq[0].bias).as_ref().unwrap().id
-            );
-            assert_eq!(bparam.kind(), ParamKind::Float);
-            assert_eq!(bparam.dtype(), DType::F32);
-            assert_eq!(bparam.shape().dims(), [10]);
+            {
+                let bparam = b.expect_param();
+                assert_eq!(
+                    bparam.param_id(),
+                    (&module.seq[0].bias).as_ref().unwrap().id
+                );
+                assert_eq!(bparam.kind(), ParamKind::Float);
+                assert_eq!(bparam.dtype(), DType::F32);
+                assert_eq!(bparam.shape().dims(), [10]);
+            }
         }
 
-        assert_eq!(tup.name(), Some("tup"));
-        assert_eq!(tup.expect_container().expect_builtin(), "Tuple");
-        assert_eq!(tup.expect_container().is_sequence(), true);
+        {
+            assert_eq!(tup.name(), Some("tup"));
+            let cont = tup.expect_container();
+            assert_eq!(cont.expect_builtin(), "Tuple");
+            assert_eq!(cont.is_tuple(), true);
+            assert_eq!(cont.is_sequence(), true);
+        }
 
-        assert_eq!(arr.name(), Some("arr"));
-        assert_eq!(arr.expect_container().expect_builtin(), "Array");
-        assert_eq!(arr.expect_container().is_sequence(), true);
+        {
+            assert_eq!(arr.name(), Some("arr"));
+            let cont = arr.expect_container();
+            assert_eq!(cont.expect_builtin(), "Array");
+            assert_eq!(cont.is_array(), true);
+            assert_eq!(cont.is_sequence(), true);
+        }
 
         walk(0, &root);
     }
