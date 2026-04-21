@@ -21,6 +21,7 @@ use burn::{
     },
     tensor::DType,
 };
+use debug_ignore::DebugIgnore;
 use indextree::{
     Arena,
     Node,
@@ -65,7 +66,7 @@ impl MTree {
     /// Returns the root node of the tree.
     pub fn root(&self) -> MTreeNodeRef<'_> {
         MTreeNodeRef {
-            tree: self,
+            tree: self.into(),
             node_id: self.root_id,
             node: self.arena.get(self.root_id).unwrap(),
         }
@@ -98,6 +99,22 @@ impl MTreeNodeData {
     pub fn is_leaf(&self) -> bool {
         matches!(self, MTreeNodeData::Param(_))
     }
+
+    pub fn try_container(&self) -> Option<&ContainerData> {
+        if let MTreeNodeData::Container(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_param(&self) -> Option<&ParamData> {
+        if let MTreeNodeData::Param(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
 }
 
 /// The type of a container node.
@@ -111,22 +128,118 @@ pub struct ContainerData {
     /// Initially empty; filled in when the first child calls `enter_module`,
     /// which reports the current container's type via its `container_type`
     /// argument.
-    pub kind: String,
+    kind: String,
+}
+
+impl ContainerData {
+    /// Access the container's type.
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    /// Is this a struct?
+    pub fn is_struct(&self) -> bool {
+        self.kind.starts_with("Struct:")
+    }
+
+    /// If this is a struct, return its name.
+    pub fn try_struct(&self) -> Option<&str> {
+        self.kind.strip_prefix("Struct:")
+    }
+
+    /// If this is a struct, return its name.
+    /// Panics if this is not a struct.
+    pub fn expect_struct(&self) -> &str {
+        self.try_struct().unwrap()
+    }
+
+    /// Is this a builtin?
+    pub fn is_builtin(&self) -> bool {
+        !self.is_struct()
+    }
+
+    /// If this is a builtin, return its name.
+    pub fn try_builtin(&self) -> Option<&str> {
+        if self.is_struct() {
+            None
+        } else {
+            Some(&self.kind)
+        }
+    }
+
+    /// If this is a builtin, return its name.
+    /// Panics if this is not a builtin.
+    pub fn expect_builtin(&self) -> &str {
+        self.try_builtin().unwrap()
+    }
+
+    /// Is this a `Vec`?
+    pub fn is_vec(&self) -> bool {
+        self.kind == "Vec"
+    }
+
+    /// Is this a `Tuple`?
+    pub fn is_tuple(&self) -> bool {
+        self.kind == "Tuple"
+    }
+
+    /// Is this a `Array`?
+    pub fn is_array(&self) -> bool {
+        self.kind == "Array"
+    }
+
+    /// Is this a builtin sequence-type?
+    /// (Does it have dense numeric index-named children?)
+    pub fn is_sequence(&self) -> bool {
+        self.is_vec() || self.is_tuple() || self.is_array()
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ParamData {
-    pub param_id: ParamId,
-    pub kind: ParamKind,
-    pub dtype: DType,
-    pub shape: Shape,
+    param_id: ParamId,
+    kind: ParamKind,
+    dtype: DType,
+    shape: Shape,
+}
+
+impl ParamData {
+    /// Access the parameter's ID.
+    pub fn param_id(&self) -> ParamId {
+        self.param_id
+    }
+
+    /// Access the parameter's kind.
+    pub fn kind(&self) -> ParamKind {
+        self.kind
+    }
+
+    /// Access the parameter's dtype.
+    pub fn dtype(&self) -> DType {
+        self.dtype
+    }
+
+    /// Access the parameter's shape.
+    pub fn shape(&self) -> &Shape {
+        &self.shape
+    }
 }
 
 /// Represents a reference to a node in the module tree.
+#[derive(Debug, Clone)]
 pub struct MTreeNodeRef<'a> {
-    tree: &'a MTree,
+    tree: DebugIgnore<&'a MTree>,
     node_id: NodeId,
     node: &'a Node<MTreeNode>,
+}
+
+impl<'a> PartialEq for MTreeNodeRef<'a> {
+    fn eq(
+        &self,
+        other: &Self,
+    ) -> bool {
+        self.node_id == other.node_id
+    }
 }
 
 impl<'a> Display for MTreeNodeRef<'a> {
@@ -180,6 +293,48 @@ impl MTreeNodeRef<'_> {
         matches!(self.data(), MTreeNodeData::Param(_))
     }
 
+    /// View the container data (if this is a container node).
+    pub fn try_container(&self) -> Option<&ContainerData> {
+        self.data().try_container()
+    }
+
+    /// View the container data (if this is a container node).
+    /// Panics if this is not a container node.
+    pub fn expect_container(&self) -> &ContainerData {
+        self.try_container().unwrap()
+    }
+
+    /// View the parameter data (if this is a param node).
+    pub fn try_param(&self) -> Option<&ParamData> {
+        self.data().as_param()
+    }
+
+    /// View the parameter data (if this is a param node).
+    /// Panics if this is not a param node.
+    pub fn expect_param(&self) -> &ParamData {
+        self.try_param().unwrap()
+    }
+
+    /// Get the number of children of this node.
+    /// Leaf nodes always have zero children.
+    pub fn len(&self) -> usize {
+        self.child_ids().len()
+    }
+
+    /// Is this node empty (no children)?
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Get the parent of this node, if it has one.
+    pub fn parent(&self) -> Option<MTreeNodeRef<'_>> {
+        self.node.parent().map(|id| MTreeNodeRef {
+            tree: self.tree,
+            node_id: id,
+            node: self.tree.arena.get(id).unwrap(),
+        })
+    }
+
     /// Get the `NodeIds` of the children of this node.
     pub fn child_ids(&self) -> Vec<NodeId> {
         let mut node_ids = vec![];
@@ -199,6 +354,23 @@ impl MTreeNodeRef<'_> {
             node_id: id,
             node: self.tree.arena.get(id).unwrap(),
         })
+    }
+
+    /// Get a child node by name, if it exists.
+    pub fn get_child(
+        &self,
+        name: &str,
+    ) -> Option<MTreeNodeRef<'_>> {
+        self.children().find(|child| child.name() == Some(name))
+    }
+
+    /// Get a child node by index, if it exists.
+    pub fn get_index(
+        &self,
+        idx: usize,
+    ) -> Option<MTreeNodeRef<'_>> {
+        let name = idx.to_string();
+        self.get_child(&name)
     }
 }
 
@@ -323,15 +495,19 @@ mod tests {
     #[derive(Module, Debug)]
     struct TestModule<B: Backend> {
         seq: Vec<Linear<B>>,
+        tup: (Linear<B>, Linear<B>),
+        arr: [Linear<B>; 1],
     }
 
     impl<B: Backend> TestModule<B> {
         fn init(device: &B::Device) -> Self {
             Self {
-                seq: vec![
+                seq: vec![LinearConfig::new(10, 10).init(device)],
+                tup: (
                     LinearConfig::new(10, 10).init(device),
                     LinearConfig::new(10, 23).init(device),
-                ],
+                ),
+                arr: [LinearConfig::new(10, 10).init(device)],
             }
         }
     }
@@ -345,7 +521,62 @@ mod tests {
 
         let mtree = MTree::build(&module);
 
-        walk(0, &mtree.root());
+        let root = mtree.root();
+
+        assert_eq!(root.name(), None);
+        assert_eq!(root.is_branch(), true);
+        assert_eq!(root.is_leaf(), false);
+        assert_eq!(
+            root.try_container().unwrap().try_struct().unwrap(),
+            "TestModule"
+        );
+
+        assert_eq!(root.children().count(), 3);
+
+        let [seq, tup, arr] = root.children().collect::<Vec<_>>().try_into().unwrap();
+
+        {
+            assert_eq!(seq.name(), Some("seq"));
+            assert_eq!(seq.expect_container().expect_builtin(), "Vec");
+            assert_eq!(seq.expect_container().is_sequence(), true);
+
+            let [linear] = seq.children().collect::<Vec<_>>().try_into().unwrap();
+            assert_eq!(linear.name(), Some("0"));
+            assert_eq!(linear.expect_container().expect_struct(), "Linear");
+
+            assert_eq!(linear, seq.get_index(0).unwrap());
+
+            let w = linear.get_child("weight").unwrap();
+            assert_eq!(w.name(), Some("weight"));
+            assert_eq!(w.is_leaf(), true);
+            let wparam = w.expect_param();
+            assert_eq!(wparam.param_id(), module.seq[0].weight.id);
+            assert_eq!(wparam.kind(), ParamKind::Float);
+            assert_eq!(wparam.dtype(), DType::F32);
+            assert_eq!(wparam.shape().dims(), [10, 10]);
+
+            let b = linear.get_child("bias").unwrap();
+            assert_eq!(b.name(), Some("bias"));
+            assert_eq!(b.is_leaf(), true);
+            let bparam = b.expect_param();
+            assert_eq!(
+                bparam.param_id(),
+                (&module.seq[0].bias).as_ref().unwrap().id
+            );
+            assert_eq!(bparam.kind(), ParamKind::Float);
+            assert_eq!(bparam.dtype(), DType::F32);
+            assert_eq!(bparam.shape().dims(), [10]);
+        }
+
+        assert_eq!(tup.name(), Some("tup"));
+        assert_eq!(tup.expect_container().expect_builtin(), "Tuple");
+        assert_eq!(tup.expect_container().is_sequence(), true);
+
+        assert_eq!(arr.name(), Some("arr"));
+        assert_eq!(arr.expect_container().expect_builtin(), "Array");
+        assert_eq!(arr.expect_container().is_sequence(), true);
+
+        walk(0, &root);
     }
 
     fn walk<'a>(

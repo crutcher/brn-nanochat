@@ -12,6 +12,7 @@ bimm-contracts = { workspace = true, features = ["burn"] }
 paste = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 indextree = { workspace = true }
+debug-ignore = { workspace = true }
 
 hashbrown = { workspace = true }
 anyhow = { workspace = true, features = ["std"] }
