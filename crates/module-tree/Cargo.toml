@@ -1,0 +1,18 @@
+[package]
+name = "module-tree"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+burn = { workspace = true }
+debug-ignore = { workspace = true }
+indextree = { workspace = true }
+
+[dev-dependencies]
+burn = { workspace = true, features = ["wgpu"] }
+
+[lints]
+workspace = true

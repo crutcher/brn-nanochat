@@ -67,6 +67,15 @@ use burn::{
 };
 use clap::Parser;
 use hashbrown::HashSet;
+use module_tree::module_util::{
+    ParamKind,
+    param_map::{
+        ParamMap,
+        ParamPath,
+        ParamPathNode,
+        ParamTag,
+    },
+};
 use rand::{
     SeedableRng,
     rngs::StdRng,
@@ -81,15 +90,6 @@ use zsl_chat::{
     gpt::gpt_model::{
         GPT,
         GPTConfig,
-    },
-    module_util::{
-        ParamKind,
-        param_map::{
-            ParamMap,
-            ParamPath,
-            ParamPathNode,
-            ParamTag,
-        },
     },
     optimizers::{
         GroupOptimizerAdaptor2,

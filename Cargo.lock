@@ -4395,6 +4395,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a0b3262dc837d2513fe2ef31ff8461352ef932dcca31ba0c0abe33547cf6b9b"
 
 [[package]]
+name = "module-tree"
+version = "0.0.9"
+dependencies = [
+ "burn",
+ "debug-ignore",
+ "indextree",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6910,6 +6919,7 @@ dependencies = [
  "clap",
  "hashbrown 0.16.1",
  "log",
+ "module-tree",
  "rand 0.10.0",
  "regex",
  "wordchipper",
@@ -8250,9 +8260,7 @@ dependencies = [
  "bimm-contracts",
  "bunsen",
  "burn",
- "debug-ignore",
  "hashbrown 0.16.1",
- "indextree",
  "paste",
  "serde",
 ]
