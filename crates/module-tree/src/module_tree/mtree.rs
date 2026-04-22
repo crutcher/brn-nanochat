@@ -20,7 +20,7 @@ use indextree::{
 
 use crate::{
     ParamKind,
-    module_util::builder::MTreeBuildingVistior,
+    module_tree::builder::MTreeBuildingVistior,
 };
 
 /// A shadow tree of a module.

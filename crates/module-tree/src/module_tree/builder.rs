@@ -23,7 +23,7 @@ use burn::{
 use indextree::NodeId;
 
 use crate::{
-    module_util::mtree::{
+    module_tree::mtree::{
         ContainerData,
         MTree,
         MTreeNode,
@@ -150,7 +150,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::module_util::mtree::MTreeNodeRef;
+    use crate::module_tree::mtree::MTreeNodeRef;
 
     #[derive(Module, Debug)]
     struct TestModule<B: Backend> {
