@@ -32,6 +32,9 @@ wordchipper-cli-util = { version = "0.9.1" }
 bimm-contracts = "0.20.1"
 regex = "1.12.3"
 
+sxd-document = "0.3.2"
+sxd-xpath = "0.4.2"
+
 indextree = "4.8.1"
 debug-ignore = "1.0.5"
 

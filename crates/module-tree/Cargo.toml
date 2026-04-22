@@ -10,6 +10,8 @@ license.workspace = true
 burn = { workspace = true }
 debug-ignore = { workspace = true }
 indextree = { workspace = true }
+sxd-document = { workspace = true }
+sxd-xpath = { workspace = true }
 
 [dev-dependencies]
 burn = { workspace = true, features = ["wgpu"] }

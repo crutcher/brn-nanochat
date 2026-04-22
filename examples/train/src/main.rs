@@ -67,7 +67,7 @@ use burn::{
 };
 use clap::Parser;
 use hashbrown::HashSet;
-use module_tree::module_util::{
+use module_tree::{
     ParamKind,
     param_map::{
         ParamMap,
