@@ -18,7 +18,7 @@ use xot::{
     Xot,
 };
 
-use crate::xtree::builder::ModuleShadowTreeBuilder;
+use crate::shadow_tree::builder::ModuleShadowTreeBuilder;
 
 pub struct ModuleShadowTree {
     docs: Documents,
@@ -106,7 +106,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::xtree::{
+    use crate::shadow_tree::{
         builder::ModuleShadowTreeBuilder,
         pretty_print_node,
     };

@@ -23,7 +23,7 @@ use xot::{
 
 use crate::{
     ParamKind,
-    xtree::{
+    shadow_tree::{
         tree_impl::ModuleShadowTree,
         type_util,
     },

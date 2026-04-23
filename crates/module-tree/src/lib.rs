@@ -1,7 +1,7 @@
 #![recursion_limit = "512"]
 
 pub mod param_map;
-pub mod xtree;
+pub mod shadow_tree;
 
 mod param_kind;
 #[doc(inline)]
