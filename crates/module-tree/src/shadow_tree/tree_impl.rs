@@ -156,13 +156,16 @@ mod tests {
     fn test_builder() -> Result<(), Box<dyn std::error::Error>> {
         type B = Wgpu;
         let device = Default::default();
-
         let module = TestModule::<B>::init(&device);
+
         let mut mtree = ModuleShadowTree::build(module);
 
         println!("{:#?}", mtree);
 
         print_node_query(&mut mtree, "//*[@id='1:3:1']")?;
+
+        println!("Id translates to child index");
+        print_node_query(&mut mtree, "/mtree/*[1]/*[3]/*[1]")?;
 
         print_node_query(
             &mut mtree,
