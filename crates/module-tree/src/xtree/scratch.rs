@@ -1,6 +1,10 @@
 #![allow(unused)]
 
-use std::fmt::format;
+use std::fmt::{
+    Debug,
+    Display,
+    format,
+};
 
 use burn::{
     Tensor,
@@ -29,10 +33,66 @@ use xot::{
 
 use crate::ParamKind;
 
-pub struct XTreeBuilder<B: Backend> {
-    documents: Documents,
-    doc: Node,
+pub struct ModuleShadowTree {
+    docs: Documents,
     root: Node,
+}
+
+impl Default for ModuleShadowTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ModuleShadowTree {
+    pub fn new() -> Self {
+        let mut docs = Documents::new();
+        let xot = docs.xot_mut();
+        let mtree_name = xot.add_name("mtree");
+        let root = xot.new_element(mtree_name);
+        let doc = xot.new_document_with_element(root).unwrap();
+
+        Self { docs, root }
+    }
+
+    pub fn xot(&self) -> &Xot {
+        self.docs.xot()
+    }
+
+    pub fn xot_mut(&mut self) -> &mut Xot {
+        self.docs.xot_mut()
+    }
+}
+
+impl Debug for ModuleShadowTree {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        // TODO: serialize_xml_write() directly?
+        // requires fmt::Write to io::Write adaptor
+
+        let contents = self
+            .xot()
+            .serialize_xml_string(
+                xot::output::xml::Parameters {
+                    indentation: if f.alternate() {
+                        Some(Default::default())
+                    } else {
+                        None
+                    },
+                    ..Default::default()
+                },
+                self.root,
+            )
+            .map_err(|e| std::fmt::Error)?;
+
+        f.write_str(&contents)
+    }
+}
+
+pub struct XTreeBuilder<B: Backend> {
+    xtree: ModuleShadowTree,
 
     depth: usize,
     stack: Vec<Node>,
@@ -43,14 +103,10 @@ pub struct XTreeBuilder<B: Backend> {
 
 impl<B: Backend> Default for XTreeBuilder<B> {
     fn default() -> Self {
-        let mut documents = Documents::new();
-        let mtree_name = documents.xot_mut().add_name("mtree");
-        let root = documents.xot_mut().new_element(mtree_name);
-        let doc = documents.xot_mut().new_document_with_element(root).unwrap();
+        let xtree = ModuleShadowTree::new();
+        let root = xtree.root;
         Self {
-            documents,
-            doc,
-            root,
+            xtree,
             depth: 0,
             pending_name: None,
             stack: vec![root],
@@ -66,8 +122,16 @@ fn is_sequence_type(name: &str) -> bool {
 }
 
 impl<B: Backend> XTreeBuilder<B> {
+    fn xot(&self) -> &Xot {
+        self.xtree.xot()
+    }
+
+    fn xot_mut(&mut self) -> &mut Xot {
+        self.xtree.xot_mut()
+    }
+
     fn debug_stack(&self) -> Vec<String> {
-        let xot = self.documents.xot();
+        let xot = self.xot();
         self.stack
             .iter()
             .map(|n| {
@@ -110,7 +174,7 @@ impl<B: Backend> XTreeBuilder<B> {
         name: N,
     ) -> Node {
         let node = self.new_element(name);
-        self.documents.xot_mut().append(parent, node);
+        self.xot_mut().append(parent, node);
         node
     }
 
@@ -118,8 +182,9 @@ impl<B: Backend> XTreeBuilder<B> {
         &mut self,
         name: N,
     ) -> Node {
-        let id = self.documents.xot_mut().add_name(name.as_ref());
-        self.documents.xot_mut().new_element(id)
+        let xot = self.xot_mut();
+        let id = xot.add_name(name.as_ref());
+        xot.new_element(id)
     }
 
     fn set_attribute<N: AsRef<str>, V: AsRef<str>>(
@@ -128,17 +193,17 @@ impl<B: Backend> XTreeBuilder<B> {
         name: N,
         value: V,
     ) {
-        let id = self.documents.xot_mut().add_name(name.as_ref());
-        self.documents
-            .xot_mut()
-            .set_attribute(node, id, value.as_ref());
+        let xot = self.xot_mut();
+        let id = xot.add_name(name.as_ref());
+        xot.set_attribute(node, id, value.as_ref());
     }
 
     fn parent_is_sequence(&self) -> bool {
+        let xot = self.xot();
         let parent = self.stack.last().unwrap();
-        let pelem = self.documents.xot().element(*parent).unwrap();
+        let pelem = xot.element(*parent).unwrap();
         let pname = pelem.name();
-        let parent_type = self.documents.xot().local_name_str(pname);
+        let parent_type = xot.local_name_str(pname);
         is_sequence_type(parent_type)
     }
 
@@ -164,11 +229,11 @@ impl<B: Backend> XTreeBuilder<B> {
         } else {
             container_type
         };
-        self.documents.xot_mut().add_name(elem_name)
+        self.xot_mut().add_name(elem_name)
     }
 
     fn make_id(&self) -> String {
-        let xot = self.documents.xot();
+        let xot = self.xot();
         self.stack
             .iter()
             .map(|n| xot.children(*n).count().to_string())
@@ -192,8 +257,9 @@ impl<B: Backend> ModuleVisitor<B> for XTreeBuilder<B> {
         if self.depth == self.stack.len() {
             let elem_type = self.name_container(container_type);
             let parent = *self.stack.last().unwrap();
-            let node = self.documents.xot_mut().new_element(elem_type);
-            self.documents.xot_mut().append(parent, node);
+            let xot = self.xot_mut();
+            let node = xot.new_element(elem_type);
+            xot.append(parent, node);
 
             self.maybe_name(node);
 
@@ -262,13 +328,8 @@ mod tests {
         prelude::Backend,
     };
     use xee_xpath::{
-        Documents,
         Queries,
         Query,
-    };
-    use xot::{
-        Node,
-        Xot,
     };
 
     use super::*;
@@ -286,22 +347,22 @@ mod tests {
         Ok(())
     }
 
-    fn print_node_query<B: Backend>(
-        builder: &mut XTreeBuilder<B>,
+    fn print_node_query(
+        xtree: &mut ModuleShadowTree,
         selector: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let queries = Queries::default();
         let q = queries.many(selector, |_docs, item| Ok(item.to_node()))?;
 
         let nodes: Vec<xot::Node> = q
-            .execute(&mut builder.documents, builder.doc)?
+            .execute(&mut xtree.docs, xtree.root)?
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
         println!("Query: {selector}");
         for (idx, node) in nodes.into_iter().enumerate() {
             print!("[{idx}]: ");
-            pretty_print(&builder.documents.xot(), node)?;
+            pretty_print(xtree.docs.xot(), node)?;
         }
 
         Ok(())
@@ -336,17 +397,18 @@ mod tests {
 
         let mut builder = XTreeBuilder::default();
         module.visit(&mut builder);
+        let mut xtree = builder.xtree;
 
-        pretty_print(&builder.documents.xot(), builder.doc)?;
+        println!("{:#?}", xtree);
 
-        print_node_query(&mut builder, "//*[@id='1:3:1']")?;
+        print_node_query(&mut xtree, "//*[@id='1:3:1']")?;
 
         print_node_query(
-            &mut builder,
+            &mut xtree,
             "//TestModule/*[@name='tup']/Linear/Param[@rank=2]",
         )?;
 
-        print_node_query(&mut builder, "//TestModule/*[@name='tup']/*[2]")?;
+        print_node_query(&mut xtree, "//TestModule/*[@name='tup']/*[2]")?;
 
         Ok(())
     }
