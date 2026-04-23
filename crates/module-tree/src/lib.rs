@@ -1,6 +1,5 @@
 #![recursion_limit = "512"]
 
-pub mod module_tree;
 pub mod param_map;
 pub mod xtree;
 
