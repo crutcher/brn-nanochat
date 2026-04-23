@@ -1,11 +1,4 @@
 #![allow(unused)]
-
-use std::fmt::{
-    Debug,
-    Display,
-    format,
-};
-
 use burn::{
     Tensor,
     module::{
@@ -18,80 +11,25 @@ use burn::{
         Bool,
         Float,
         Int,
-    },
-    tensor::{
-        DType,
         Shape,
     },
+    tensor::DType,
 };
-use xee_xpath::Documents;
 use xot::{
     NameId,
     Node,
     Xot,
 };
 
-use crate::ParamKind;
+use crate::{
+    ParamKind,
+    xtree::{
+        tree_impl::ModuleShadowTree,
+        type_util,
+    },
+};
 
-pub struct ModuleShadowTree {
-    docs: Documents,
-    root: Node,
-}
-
-impl Default for ModuleShadowTree {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ModuleShadowTree {
-    pub fn new() -> Self {
-        let mut docs = Documents::new();
-        let xot = docs.xot_mut();
-        let mtree_name = xot.add_name("mtree");
-        let root = xot.new_element(mtree_name);
-        let doc = xot.new_document_with_element(root).unwrap();
-
-        Self { docs, root }
-    }
-
-    pub fn xot(&self) -> &Xot {
-        self.docs.xot()
-    }
-
-    pub fn xot_mut(&mut self) -> &mut Xot {
-        self.docs.xot_mut()
-    }
-}
-
-impl Debug for ModuleShadowTree {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        // TODO: serialize_xml_write() directly?
-        // requires fmt::Write to io::Write adaptor
-
-        let contents = self
-            .xot()
-            .serialize_xml_string(
-                xot::output::xml::Parameters {
-                    indentation: if f.alternate() {
-                        Some(Default::default())
-                    } else {
-                        None
-                    },
-                    ..Default::default()
-                },
-                self.root,
-            )
-            .map_err(|e| std::fmt::Error)?;
-
-        f.write_str(&contents)
-    }
-}
-
-pub struct XTreeBuilder<B: Backend> {
+pub struct ModuleShadowTreeBuilder<B: Backend> {
     xtree: ModuleShadowTree,
 
     depth: usize,
@@ -101,10 +39,10 @@ pub struct XTreeBuilder<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend> Default for XTreeBuilder<B> {
+impl<B: Backend> Default for ModuleShadowTreeBuilder<B> {
     fn default() -> Self {
         let xtree = ModuleShadowTree::new();
-        let root = xtree.root;
+        let root = xtree.root();
         Self {
             xtree,
             depth: 0,
@@ -115,13 +53,11 @@ impl<B: Backend> Default for XTreeBuilder<B> {
     }
 }
 
-const SEQUENCE_TYPES: &[&str] = &["Vec", "Array", "Tuple"];
+impl<B: Backend> ModuleShadowTreeBuilder<B> {
+    pub fn build(self) -> ModuleShadowTree {
+        self.xtree
+    }
 
-fn is_sequence_type(name: &str) -> bool {
-    SEQUENCE_TYPES.contains(&name)
-}
-
-impl<B: Backend> XTreeBuilder<B> {
     fn xot(&self) -> &Xot {
         self.xtree.xot()
     }
@@ -204,7 +140,7 @@ impl<B: Backend> XTreeBuilder<B> {
         let pelem = xot.element(*parent).unwrap();
         let pname = pelem.name();
         let parent_type = xot.local_name_str(pname);
-        is_sequence_type(parent_type)
+        type_util::type_is_sequence(parent_type)
     }
 
     fn maybe_name(
@@ -242,11 +178,7 @@ impl<B: Backend> XTreeBuilder<B> {
     }
 }
 
-fn is_struct(name: &str) -> bool {
-    name.starts_with("Struct:")
-}
-
-impl<B: Backend> ModuleVisitor<B> for XTreeBuilder<B> {
+impl<B: Backend> ModuleVisitor<B> for ModuleShadowTreeBuilder<B> {
     fn enter_module(
         &mut self,
         name: &str,
@@ -268,7 +200,7 @@ impl<B: Backend> ModuleVisitor<B> for XTreeBuilder<B> {
             self.set_attribute(
                 node,
                 "class",
-                if is_struct(container_type) {
+                if type_util::type_is_struct(container_type) {
                     "struct"
                 } else {
                     "builtin"
@@ -312,104 +244,5 @@ impl<B: Backend> ModuleVisitor<B> for XTreeBuilder<B> {
         param: &Param<Tensor<B, D, Int>>,
     ) {
         self.add_param(param.id, ParamKind::Int, param.dtype(), param.shape());
-    }
-}
-
-#[cfg(test)]
-#[allow(unused)]
-mod tests {
-    use burn::{
-        backend::Wgpu,
-        module::Module,
-        nn::{
-            Linear,
-            LinearConfig,
-        },
-        prelude::Backend,
-    };
-    use xee_xpath::{
-        Queries,
-        Query,
-    };
-
-    use super::*;
-
-    fn pretty_print(
-        xot: &Xot,
-        node: Node,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut output_params = xot::output::xml::Parameters {
-            indentation: Some(Default::default()),
-            ..Default::default()
-        };
-        println!("{}", xot.serialize_xml_string(output_params, node)?);
-
-        Ok(())
-    }
-
-    fn print_node_query(
-        xtree: &mut ModuleShadowTree,
-        selector: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let queries = Queries::default();
-        let q = queries.many(selector, |_docs, item| Ok(item.to_node()))?;
-
-        let nodes: Vec<xot::Node> = q
-            .execute(&mut xtree.docs, xtree.root)?
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
-
-        println!("Query: {selector}");
-        for (idx, node) in nodes.into_iter().enumerate() {
-            print!("[{idx}]: ");
-            pretty_print(xtree.docs.xot(), node)?;
-        }
-
-        Ok(())
-    }
-
-    #[derive(Module, Debug)]
-    struct TestModule<B: Backend> {
-        seq: Vec<Linear<B>>,
-        tup: (Linear<B>, Linear<B>),
-        arr: [Linear<B>; 1],
-    }
-
-    impl<B: Backend> TestModule<B> {
-        fn init(device: &B::Device) -> Self {
-            Self {
-                seq: vec![LinearConfig::new(10, 10).init(device)],
-                tup: (
-                    LinearConfig::new(10, 10).init(device),
-                    LinearConfig::new(10, 23).init(device),
-                ),
-                arr: [LinearConfig::new(10, 10).init(device)],
-            }
-        }
-    }
-
-    #[test]
-    fn test_builder() -> Result<(), Box<dyn std::error::Error>> {
-        type B = Wgpu;
-        let device = Default::default();
-
-        let module = TestModule::<B>::init(&device);
-
-        let mut builder = XTreeBuilder::default();
-        module.visit(&mut builder);
-        let mut xtree = builder.xtree;
-
-        println!("{:#?}", xtree);
-
-        print_node_query(&mut xtree, "//*[@id='1:3:1']")?;
-
-        print_node_query(
-            &mut xtree,
-            "//TestModule/*[@name='tup']/Linear/Param[@rank=2]",
-        )?;
-
-        print_node_query(&mut xtree, "//TestModule/*[@name='tup']/*[2]")?;
-
-        Ok(())
     }
 }
