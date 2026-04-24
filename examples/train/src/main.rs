@@ -68,7 +68,7 @@ use burn::{
 use clap::Parser;
 use hashbrown::HashSet;
 use module_tree::{
-    ModuleShadowTree,
+    ModuleTree,
     ParamKind,
 };
 use rand::{
@@ -324,7 +324,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
-    let mut shadow_tree = ModuleShadowTree::build(&host);
+    let mut shadow_tree = ModuleTree::build(&host);
     println!("SHADOW_TREE:\n{:#?}", shadow_tree);
 
     let all_params = shadow_tree.all_params();

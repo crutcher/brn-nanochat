@@ -22,14 +22,14 @@ use xot::{
 };
 
 use crate::{
-    ModuleShadowTree,
+    ModuleTree,
     ParamKind,
     type_util,
     type_util::parse_container_type,
 };
 
-pub struct ModuleShadowTreeBuilder<B: Backend> {
-    xtree: ModuleShadowTree,
+pub struct ModuleTreeBuilder<B: Backend> {
+    xtree: ModuleTree,
 
     depth: usize,
     base: Node,
@@ -41,9 +41,9 @@ pub struct ModuleShadowTreeBuilder<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend> Default for ModuleShadowTreeBuilder<B> {
+impl<B: Backend> Default for ModuleTreeBuilder<B> {
     fn default() -> Self {
-        let mut xtree = ModuleShadowTree::new();
+        let mut xtree = ModuleTree::new();
         let root = xtree.root();
 
         let xot = xtree.xot_mut();
@@ -64,8 +64,8 @@ impl<B: Backend> Default for ModuleShadowTreeBuilder<B> {
     }
 }
 
-impl<B: Backend> ModuleShadowTreeBuilder<B> {
-    pub fn build(self) -> ModuleShadowTree {
+impl<B: Backend> ModuleTreeBuilder<B> {
+    pub fn build(self) -> ModuleTree {
         self.xtree
     }
 
@@ -180,7 +180,7 @@ impl<B: Backend> ModuleShadowTreeBuilder<B> {
     }
 }
 
-impl<B: Backend> ModuleVisitor<B> for ModuleShadowTreeBuilder<B> {
+impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
     fn enter_module(
         &mut self,
         name: &str,

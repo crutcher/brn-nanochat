@@ -27,22 +27,22 @@ use xot::{
     Xot,
 };
 
-use crate::builder::ModuleShadowTreeBuilder;
+use crate::builder::ModuleTreeBuilder;
 
-pub struct ModuleShadowTree {
+pub struct ModuleTree {
     docs: Documents,
     root: Node,
 }
 
-impl Default for ModuleShadowTree {
+impl Default for ModuleTree {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ModuleShadowTree {
+impl ModuleTree {
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
-        let mut builder = ModuleShadowTreeBuilder::default();
+        let mut builder = ModuleTreeBuilder::default();
         module.visit(&mut builder);
         builder.build()
     }
@@ -124,7 +124,7 @@ impl ModuleShadowTree {
     }
 }
 
-impl Debug for ModuleShadowTree {
+impl Debug for ModuleTree {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
@@ -174,12 +174,12 @@ mod tests {
 
     use super::*;
     use crate::{
-        builder::ModuleShadowTreeBuilder,
+        builder::ModuleTreeBuilder,
         pretty_print_node,
     };
 
     fn print_node_query(
-        xtree: &mut ModuleShadowTree,
+        xtree: &mut ModuleTree,
         selector: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let queries = Queries::default();
@@ -222,7 +222,7 @@ mod tests {
         let device = Default::default();
         let module = TestModule::<B>::init(&device);
 
-        let mut mtree = ModuleShadowTree::build(&module);
+        let mut mtree = ModuleTree::build(&module);
 
         println!("{:#?}", mtree);
 
@@ -250,7 +250,7 @@ mod tests {
 
         let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);
 
-        let mut mtree = ModuleShadowTree::build(&module);
+        let mut mtree = ModuleTree::build(&module);
 
         println!("{:#?}", mtree);
 
