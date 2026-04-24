@@ -22,32 +22,43 @@ use xot::{
 };
 
 use crate::{
+    ModuleShadowTree,
     ParamKind,
-    shadow_tree::{
-        tree_impl::ModuleShadowTree,
-        type_util,
-    },
+    type_util,
+    type_util::parse_container_type,
 };
 
 pub struct ModuleShadowTreeBuilder<B: Backend> {
     xtree: ModuleShadowTree,
 
     depth: usize,
+    base: Node,
     stack: Vec<Node>,
     pending_name: Option<String>,
+
+    next_id: usize,
 
     phantom: std::marker::PhantomData<B>,
 }
 
 impl<B: Backend> Default for ModuleShadowTreeBuilder<B> {
     fn default() -> Self {
-        let xtree = ModuleShadowTree::new();
+        let mut xtree = ModuleShadowTree::new();
         let root = xtree.root();
+
+        let xot = xtree.xot_mut();
+        let nodes_nid = xot.add_name("Nodes");
+        let base = xot.new_element(nodes_nid);
+
+        xot.append(root, base);
+
         Self {
             xtree,
             depth: 0,
+            base,
             pending_name: None,
-            stack: vec![root],
+            stack: vec![],
+            next_id: 0,
             phantom: Default::default(),
         }
     }
@@ -87,7 +98,8 @@ impl<B: Backend> ModuleShadowTreeBuilder<B> {
     ) {
         let node = self.new_child(*self.stack.last().unwrap(), "Param");
 
-        self.set_attribute(node, "id", self.make_id());
+        let id = self.make_id();
+        self.set_attribute(node, "id", id);
 
         self.maybe_name(node);
 
@@ -98,10 +110,16 @@ impl<B: Backend> ModuleShadowTreeBuilder<B> {
         self.set_attribute(node, "dtype", format!("{:?}", dtype));
 
         // Should shape be <Shape rank="1" dims="[10, 2]" />?
-        self.set_attribute(node, "shape", shape.to_string());
+        self.set_attribute(
+            node,
+            "shape",
+            shape
+                .iter()
+                .map(|d| d.to_string())
+                .collect::<Vec<String>>()
+                .join(" "),
+        );
         self.set_attribute(node, "rank", shape.rank().to_string());
-
-        self.stack.push(node);
     }
 
     fn new_child<N: AsRef<str>>(
@@ -119,8 +137,8 @@ impl<B: Backend> ModuleShadowTreeBuilder<B> {
         name: N,
     ) -> Node {
         let xot = self.xot_mut();
-        let id = xot.add_name(name.as_ref());
-        xot.new_element(id)
+        let name_nid = xot.add_name(name.as_ref());
+        xot.new_element(name_nid)
     }
 
     fn set_attribute<N: AsRef<str>, V: AsRef<str>>(
@@ -156,25 +174,9 @@ impl<B: Backend> ModuleShadowTreeBuilder<B> {
         }
     }
 
-    fn name_container(
-        &mut self,
-        container_type: &str,
-    ) -> NameId {
-        let elem_name = if let Some(name) = container_type.strip_prefix("Struct:") {
-            name
-        } else {
-            container_type
-        };
-        self.xot_mut().add_name(elem_name)
-    }
-
-    fn make_id(&self) -> String {
-        let xot = self.xot();
-        self.stack
-            .iter()
-            .map(|n| xot.children(*n).count().to_string())
-            .collect::<Vec<_>>()
-            .join(":")
+    fn make_id(&mut self) -> String {
+        self.next_id += 1;
+        format!("n:{:X}", self.next_id)
     }
 }
 
@@ -184,32 +186,43 @@ impl<B: Backend> ModuleVisitor<B> for ModuleShadowTreeBuilder<B> {
         name: &str,
         container_type: &str,
     ) {
-        self.depth += 1;
-
         if self.depth == self.stack.len() {
-            let elem_type = self.name_container(container_type);
-            let parent = *self.stack.last().unwrap();
+            // enter_module is called on each *child* of a Module.
+            // This means that the first time we learn the type of a Module,
+            // we are seeing the name of its first child.
+            //
+            // If the current depth is the same as the length of the stack,
+            // then we need to create a new container.
+
+            // If the stack is empty, then this is the root node;
+            // and we need to attach it to the document.
+            let parent = self.stack.last().copied().unwrap_or(self.base);
+
             let xot = self.xot_mut();
-            let node = xot.new_element(elem_type);
+
+            let (cls, elem_name) = parse_container_type(container_type);
+            let elem_nid = xot.add_name(&elem_name);
+
+            let xot = self.xot_mut();
+            let node = xot.new_element(elem_nid);
             xot.append(parent, node);
+
+            let id = self.make_id();
+            self.set_attribute(node, "id", id);
 
             self.maybe_name(node);
 
-            self.set_attribute(node, "id", self.make_id());
+            self.set_attribute(node, "class", cls);
 
-            self.set_attribute(
-                node,
-                "class",
-                if type_util::type_is_struct(container_type) {
-                    "struct"
-                } else {
-                    "builtin"
-                },
-            );
+            // There's no way to determine which enum case we are in.
+            // if cls == "enum" {
+            //   self.set_attribute(node, "case", ???);
+            // }
 
             self.stack.push(node);
         }
 
+        self.depth += 1;
         self.pending_name = Some(name.to_string());
     }
 
@@ -218,11 +231,11 @@ impl<B: Backend> ModuleVisitor<B> for ModuleShadowTreeBuilder<B> {
         name: &str,
         container_type: &str,
     ) {
-        self.depth -= 1;
-        if self.stack.len() > self.depth + 1 {
+        if self.depth < self.stack.len() {
             self.pending_name = None;
             self.stack.pop();
         }
+        self.depth -= 1;
     }
 
     fn visit_bool<const D: usize>(

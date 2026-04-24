@@ -16,6 +16,7 @@ xee-xpath = { workspace = true }
 
 [dev-dependencies]
 burn = { workspace = true, features = ["wgpu"] }
+zsl-chat = { path = "../zsl-chat" }
 
 [lints]
 workspace = true

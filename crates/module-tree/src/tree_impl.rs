@@ -1,24 +1,33 @@
 #![allow(unused)]
 
-use std::fmt::{
-    Debug,
-    Display,
+use std::{
+    collections::HashSet,
+    fmt::{
+        Debug,
+        Display,
+    },
 };
 
 use burn::{
     module::{
         Module,
         ModuleVisitor,
+        ParamId,
     },
     prelude::Backend,
 };
-use xee_xpath::Documents;
+use xee_xpath::{
+    Documents,
+    Queries,
+    Query,
+    query::ManyQuery,
+};
 use xot::{
     Node,
     Xot,
 };
 
-use crate::shadow_tree::builder::ModuleShadowTreeBuilder;
+use crate::builder::ModuleShadowTreeBuilder;
 
 pub struct ModuleShadowTree {
     docs: Documents,
@@ -32,7 +41,7 @@ impl Default for ModuleShadowTree {
 }
 
 impl ModuleShadowTree {
-    pub fn build<B: Backend, M: Module<B>>(module: M) -> Self {
+    pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
         let mut builder = ModuleShadowTreeBuilder::default();
         module.visit(&mut builder);
         builder.build()
@@ -41,8 +50,8 @@ impl ModuleShadowTree {
     pub fn new() -> Self {
         let mut docs = Documents::new();
         let xot = docs.xot_mut();
-        let mtree_name = xot.add_name("mtree");
-        let root = xot.new_element(mtree_name);
+        let mtree_nid = xot.add_name("ModuleTree");
+        let root = xot.new_element(mtree_nid);
         let doc = xot.new_document_with_element(root).unwrap();
 
         Self { docs, root }
@@ -58,6 +67,60 @@ impl ModuleShadowTree {
 
     pub fn xot_mut(&mut self) -> &mut Xot {
         self.docs.xot_mut()
+    }
+
+    pub fn all_params(&mut self) -> HashSet<ParamId> {
+        self.select_paramids("//Param").unwrap()
+    }
+
+    pub fn select_paramids(
+        &mut self,
+        expr: &str,
+    ) -> Result<HashSet<ParamId>, Box<dyn std::error::Error>> {
+        let queries = Queries::default();
+        let root = self.root;
+        let xot = self.xot_mut();
+
+        let nodes_nid = xot.add_name("Nodes");
+        let nodes_node = xot
+            .children(root)
+            .find(|child| xot.element(*child).expect("Expected an element").name() == nodes_nid)
+            .expect("Expected a <Nodes/> node");
+
+        let param_nid = xot.add_name("Param");
+        let param_id_nid = xot.add_name("param_id");
+
+        let q = queries.many(expr, |_docs, item| Ok(item.to_node()?))?;
+
+        let nodes: Vec<Node> = q.execute(&mut self.docs, nodes_node)?;
+
+        let mut results: HashSet<ParamId> = HashSet::with_capacity(nodes.len());
+        let xot = self.docs.xot();
+        for node in nodes {
+            let element = xot.element(node).expect("Expected an element");
+            let name = element.name();
+            if name != param_nid {
+                return Err(format!(
+                    "Expected {}, found {}",
+                    xot.local_name_str(param_nid),
+                    xot.local_name_str(name)
+                )
+                .into());
+            }
+
+            let param_id: &str = match xot.get_attribute(node, param_id_nid) {
+                Some(val) => val,
+                None => {
+                    return Err("Malformed XML: Param missing param_id attribute".into());
+                }
+            };
+
+            // TODO: this panics on error; which is dumb.
+            let param_id = ParamId::deserialize(param_id);
+            results.insert(param_id);
+        }
+
+        Ok(results)
     }
 }
 
@@ -104,9 +167,13 @@ mod tests {
         Queries,
         Query,
     };
+    use zsl_chat::gpt::gpt_model::{
+        GPT,
+        GPTConfig,
+    };
 
     use super::*;
-    use crate::shadow_tree::{
+    use crate::{
         builder::ModuleShadowTreeBuilder,
         pretty_print_node,
     };
@@ -116,12 +183,9 @@ mod tests {
         selector: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let queries = Queries::default();
-        let q = queries.many(selector, |_docs, item| Ok(item.to_node()))?;
+        let q = queries.many(selector, |_docs, item| Ok(item.to_node()?))?;
 
-        let nodes: Vec<xot::Node> = q
-            .execute(&mut xtree.docs, xtree.root)?
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+        let nodes: Vec<xot::Node> = q.execute(&mut xtree.docs, xtree.root)?;
 
         println!("Query: {selector}");
         for (idx, node) in nodes.into_iter().enumerate() {
@@ -158,14 +222,16 @@ mod tests {
         let device = Default::default();
         let module = TestModule::<B>::init(&device);
 
-        let mut mtree = ModuleShadowTree::build(module);
+        let mut mtree = ModuleShadowTree::build(&module);
 
         println!("{:#?}", mtree);
 
-        print_node_query(&mut mtree, "//*[@id='1:3:1']")?;
+        assert_eq!(
+            mtree.select_paramids("//*[@name='seq']/Linear/Param[@name='weight']")?,
+            vec![module.seq[0].weight.id,].into_iter().collect(),
+        );
 
-        println!("Id translates to child index");
-        print_node_query(&mut mtree, "/mtree/*[1]/*[3]/*[1]")?;
+        print_node_query(&mut mtree, "//*[@id='n:2']")?;
 
         print_node_query(
             &mut mtree,
@@ -173,6 +239,26 @@ mod tests {
         )?;
 
         print_node_query(&mut mtree, "//TestModule/*[@name='tup']/*[2]")?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gpt() -> Result<(), Box<dyn std::error::Error>> {
+        type B = Wgpu;
+        let device = Default::default();
+
+        let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);
+
+        let mut mtree = ModuleShadowTree::build(&module);
+
+        println!("{:#?}", mtree);
+
+        let muon_params = mtree
+            .select_paramids("//GPT/Vec[@name='h']//Param[@rank=2]")
+            .unwrap();
+
+        println!("Muon params: {muon_params:?}");
 
         Ok(())
     }

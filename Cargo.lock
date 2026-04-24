@@ -5087,6 +5087,7 @@ dependencies = [
  "indextree",
  "xee-xpath",
  "xot",
+ "zsl-chat",
 ]
 
 [[package]]

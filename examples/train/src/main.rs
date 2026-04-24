@@ -68,13 +68,8 @@ use burn::{
 use clap::Parser;
 use hashbrown::HashSet;
 use module_tree::{
+    ModuleShadowTree,
     ParamKind,
-    param_map::{
-        ParamMap,
-        ParamPath,
-        ParamPathNode,
-        ParamTag,
-    },
 };
 use rand::{
     SeedableRng,
@@ -329,51 +324,30 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
-    let param_map = ParamMap::collect(&host);
-    println!("PARAMS: {:#?}", param_map);
+    let mut shadow_tree = ModuleShadowTree::build(&host);
+    println!("SHADOW_TREE:\n{:#?}", shadow_tree);
 
-    let all_params: HashSet<ParamId> = param_map
-        .iter()
-        .filter_map(|(_, desc)| {
-            if desc.kind() == ParamKind::Float {
-                Some(desc.id())
-            } else {
-                None
-            }
-        })
-        .collect::<HashSet<_>>();
-
-    let muon_regex = regex::Regex::new(r"gpt\.h\..*\.(mlp|attn)\.c_.*\.weight").unwrap();
-
-    let muon_params: HashSet<ParamId> = param_map
-        .iter()
-        .filter_map(|(path, desc)| {
-            let p = path.path_str();
-            if muon_regex.is_match(&p) && desc.kind() == ParamKind::Float {
-                Some(desc.id())
-            } else {
-                None
-            }
-        })
-        .collect();
+    let all_params = shadow_tree.all_params();
+    let muon_params = shadow_tree
+        .select_paramids("GptHost/GPT/Vec[@name='h']//Param[@rank=2]")
+        .unwrap();
 
     if muon_params.is_empty() {
         bail!("No Muon parameters found in the model");
     }
 
-    let mut adamw_params: HashSet<ParamId> = all_params.clone();
-    adamw_params.retain(|id| !muon_params.contains(id));
+    let mut adamw_params: HashSet<ParamId> = all_params.difference(&muon_params).cloned().collect();
 
     let optimizer = GroupOptimizerAdaptor2::new(
         vec![OptimizerGroup::from_adaptor(
-            adamw_params,
+            adamw_params.into_iter().collect(),
             &AdamWConfig::new()
                 .with_cautious_weight_decay(args.cautious_weight_decay)
                 .with_weight_decay(args.weight_decay)
                 .init::<B, GptHost<B>>(),
         )],
         vec![OptimizerGroup::from_adaptor(
-            muon_params,
+            muon_params.into_iter().collect(),
             &MuonConfig::new().init::<B, GptHost<B>>(),
         )],
     )
