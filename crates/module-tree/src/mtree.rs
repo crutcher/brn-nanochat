@@ -27,7 +27,7 @@ use xot::{
     Xot,
 };
 
-use crate::builder::ModuleTreeBuilder;
+use crate::visitor_builder::ModuleTreeBuilder;
 
 pub struct ModuleTree {
     docs: Documents,
@@ -174,8 +174,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        builder::ModuleTreeBuilder,
         pretty_print_node,
+        visitor_builder::ModuleTreeBuilder,
     };
 
     fn print_node_query(

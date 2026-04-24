@@ -23,7 +23,8 @@ use xot::{
 
 use crate::{
     ModuleTree,
-    ParamKind,
+    TensorKindDesc,
+    TensorParamDesc,
     type_util,
     type_util::parse_container_type,
 };
@@ -89,37 +90,36 @@ impl<B: Backend> ModuleTreeBuilder<B> {
             .collect()
     }
 
-    fn add_param(
+    fn add_param_desc(
         &mut self,
-        param_id: ParamId,
-        param_kind: ParamKind,
-        dtype: DType,
-        shape: Shape,
+        param_desc: TensorParamDesc,
     ) {
-        let node = self.new_child(*self.stack.last().unwrap(), "Param");
+        let elem_node = self.new_child(*self.stack.last().unwrap(), "Param");
+        self.set_idents(elem_node);
 
-        let id = self.make_id();
-        self.set_attribute(node, "id", id);
-
-        self.maybe_name(node);
-
-        self.set_attribute(node, "param_id", param_id.to_string());
+        self.set_attribute(elem_node, "param_id", param_desc.param_id().to_string());
 
         // Should kind be <Type kind="Float" dtype="F32" />?
-        self.set_attribute(node, "kind", format!("{:?}", param_kind));
-        self.set_attribute(node, "dtype", format!("{:?}", dtype));
+        self.set_attribute(elem_node, "kind", format!("{:?}", param_desc.kind()));
+        self.set_attribute(elem_node, "dtype", format!("{:?}", param_desc.dtype()));
 
         // Should shape be <Shape rank="1" dims="[10, 2]" />?
         self.set_attribute(
-            node,
+            elem_node,
             "shape",
-            shape
+            param_desc
+                .shape()
+                .clone()
                 .iter()
                 .map(|d| d.to_string())
                 .collect::<Vec<String>>()
                 .join(" "),
         );
-        self.set_attribute(node, "rank", shape.rank().to_string());
+        self.set_attribute(
+            elem_node,
+            "rank",
+            param_desc.shape().clone().rank().to_string(),
+        );
     }
 
     fn new_child<N: AsRef<str>>(
@@ -141,6 +141,21 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         xot.new_element(name_nid)
     }
 
+    fn set_idents(
+        &mut self,
+        node: Node,
+    ) {
+        self.next_id += 1;
+        let id = format!("n:{:X}", self.next_id);
+        self.set_attribute(node, "id", id);
+
+        if let Some(name) = self.pending_name.take()
+            && !self.parent_is_sequence()
+        {
+            self.set_attribute(node, "name", name);
+        }
+    }
+
     fn set_attribute<N: AsRef<str>, V: AsRef<str>>(
         &mut self,
         node: Node,
@@ -159,24 +174,6 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         let pname = pelem.name();
         let parent_type = xot.local_name_str(pname);
         type_util::type_is_sequence(parent_type)
-    }
-
-    fn maybe_name(
-        &mut self,
-        node: Node,
-    ) {
-        if let Some(name) = self.pending_name.take() {
-            if self.parent_is_sequence() {
-                return;
-            }
-
-            self.set_attribute(node, "name", name);
-        }
-    }
-
-    fn make_id(&mut self) -> String {
-        self.next_id += 1;
-        format!("n:{:X}", self.next_id)
     }
 }
 
@@ -204,22 +201,18 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
             let elem_nid = xot.add_name(&elem_name);
 
             let xot = self.xot_mut();
-            let node = xot.new_element(elem_nid);
-            xot.append(parent, node);
+            let elem_node = xot.new_element(elem_nid);
+            xot.append(parent, elem_node);
 
-            let id = self.make_id();
-            self.set_attribute(node, "id", id);
-
-            self.maybe_name(node);
-
-            self.set_attribute(node, "class", cls);
+            self.set_idents(elem_node);
+            self.set_attribute(elem_node, "class", cls);
 
             // There's no way to determine which enum case we are in.
             // if cls == "enum" {
             //   self.set_attribute(node, "case", ???);
             // }
 
-            self.stack.push(node);
+            self.stack.push(elem_node);
         }
 
         self.depth += 1;
@@ -242,20 +235,20 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
         &mut self,
         param: &Param<Tensor<B, D, Bool>>,
     ) {
-        self.add_param(param.id, ParamKind::Bool, param.dtype(), param.shape());
+        self.add_param_desc(TensorParamDesc::from(param));
     }
 
     fn visit_float<const D: usize>(
         &mut self,
         param: &Param<Tensor<B, D, Float>>,
     ) {
-        self.add_param(param.id, ParamKind::Float, param.dtype(), param.shape());
+        self.add_param_desc(TensorParamDesc::from(param));
     }
 
     fn visit_int<const D: usize>(
         &mut self,
         param: &Param<Tensor<B, D, Int>>,
     ) {
-        self.add_param(param.id, ParamKind::Int, param.dtype(), param.shape());
+        self.add_param_desc(TensorParamDesc::from(param));
     }
 }

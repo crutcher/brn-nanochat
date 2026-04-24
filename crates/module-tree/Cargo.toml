@@ -8,8 +8,7 @@ license.workspace = true
 
 [dependencies]
 burn = { workspace = true }
-debug-ignore = { workspace = true }
-indextree = { workspace = true }
+# debug-ignore = { workspace = true }
 
 xot = { workspace = true }
 xee-xpath = { workspace = true }

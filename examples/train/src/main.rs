@@ -69,7 +69,7 @@ use clap::Parser;
 use hashbrown::HashSet;
 use module_tree::{
     ModuleTree,
-    ParamKind,
+    TensorKindDesc,
 };
 use rand::{
     SeedableRng,
