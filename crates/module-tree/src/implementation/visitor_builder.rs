@@ -4,27 +4,25 @@ use burn::{
     module::{
         ModuleVisitor,
         Param,
-        ParamId,
     },
     prelude::{
         Backend,
         Bool,
         Float,
         Int,
-        Shape,
     },
-    tensor::DType,
 };
 use xot::{
-    NameId,
     Node,
     Xot,
 };
 
 use crate::{
     ModuleTree,
-    TensorKindDesc,
-    TensorParamDesc,
+    burn_ext::burn_desc::{
+        ParamDesc,
+        TensorDesc,
+    },
     type_util,
     type_util::parse_container_type,
 };
@@ -92,7 +90,7 @@ impl<B: Backend> ModuleTreeBuilder<B> {
 
     fn add_param_desc(
         &mut self,
-        param_desc: TensorParamDesc,
+        param_desc: ParamDesc<TensorDesc>,
     ) {
         let elem_node = self.new_child(*self.stack.last().unwrap(), "Param");
         self.set_idents(elem_node);
@@ -197,7 +195,7 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
 
             let xot = self.xot_mut();
 
-            let (cls, elem_name) = parse_container_type(container_type);
+            let (cls, elem_name) = type_util::parse_container_type(container_type);
             let elem_nid = xot.add_name(&elem_name);
 
             let xot = self.xot_mut();
@@ -235,20 +233,20 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
         &mut self,
         param: &Param<Tensor<B, D, Bool>>,
     ) {
-        self.add_param_desc(TensorParamDesc::from(param));
+        self.add_param_desc(param.into());
     }
 
     fn visit_float<const D: usize>(
         &mut self,
         param: &Param<Tensor<B, D, Float>>,
     ) {
-        self.add_param_desc(TensorParamDesc::from(param));
+        self.add_param_desc(param.into());
     }
 
     fn visit_int<const D: usize>(
         &mut self,
         param: &Param<Tensor<B, D, Int>>,
     ) {
-        self.add_param_desc(TensorParamDesc::from(param));
+        self.add_param_desc(param.into());
     }
 }

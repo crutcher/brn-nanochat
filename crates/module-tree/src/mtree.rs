@@ -20,14 +20,13 @@ use xee_xpath::{
     Documents,
     Queries,
     Query,
-    query::ManyQuery,
 };
 use xot::{
     Node,
     Xot,
 };
 
-use crate::visitor_builder::ModuleTreeBuilder;
+use crate::implementation::ModuleTreeBuilder;
 
 pub struct ModuleTree {
     docs: Documents,
@@ -173,11 +172,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{
-        pretty_print_node,
-        visitor_builder::ModuleTreeBuilder,
-    };
-
+    use crate::pretty_print_node;
     fn print_node_query(
         xtree: &mut ModuleTree,
         selector: &str,

@@ -1,17 +1,13 @@
 #![recursion_limit = "512"]
 
+pub mod burn_ext;
 mod mtree;
-mod tensor_kind_desc;
-mod tensor_param_desc;
 mod type_util;
-mod visitor_builder;
 mod xot_util;
+
+pub(crate) mod implementation;
 
 #[doc(inline)]
 pub use mtree::*;
-#[doc(inline)]
-pub use tensor_kind_desc::*;
-#[doc(inline)]
-pub use tensor_param_desc::*;
 #[doc(inline)]
 pub use xot_util::*;
