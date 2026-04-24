@@ -340,14 +340,14 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let optimizer = GroupOptimizerAdaptor2::new(
         vec![OptimizerGroup::from_adaptor(
-            adamw_params.into_iter().collect(),
+            adamw_params,
             &AdamWConfig::new()
                 .with_cautious_weight_decay(args.cautious_weight_decay)
                 .with_weight_decay(args.weight_decay)
                 .init::<B, GptHost<B>>(),
         )],
         vec![OptimizerGroup::from_adaptor(
-            muon_params.into_iter().collect(),
+            muon_params,
             &MuonConfig::new().init::<B, GptHost<B>>(),
         )],
     )

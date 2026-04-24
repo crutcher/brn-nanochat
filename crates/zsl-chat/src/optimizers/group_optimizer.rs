@@ -65,14 +65,18 @@ where
     }
 
     /// Build a [`OptimizerGroup`] from a [`OptimizerAdaptor`].
-    pub fn from_adaptor<M>(
-        params: HashSet<ParamId>,
+    pub fn from_adaptor<M, I>(
+        params: I,
         adaptor: &OptimizerAdaptor<O, M, B>,
     ) -> Self
     where
+        I: IntoIterator<Item = ParamId>,
         M: AutodiffModule<B>,
     {
-        Self::new(params, clone_simple_optimizer(adaptor))
+        Self::new(
+            params.into_iter().collect(),
+            clone_simple_optimizer(adaptor),
+        )
     }
 }
 
