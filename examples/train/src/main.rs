@@ -324,19 +324,24 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
-    let mut shadow_tree = ModuleTree::build(&host);
-    println!("SHADOW_TREE:\n{:#?}", shadow_tree);
+    let mut module_tree = ModuleTree::build(&host);
 
-    let all_params = shadow_tree.all_params();
-    let muon_params = shadow_tree
+    let all_params = module_tree.paramids();
+
+    let muon_params = module_tree
         .select_paramids("GptHost/GPT/Vec[@name='h']//Param[@rank=2]")
         .unwrap();
-
     if muon_params.is_empty() {
-        bail!("No Muon parameters found in the model");
+        bail!("Muon parameters not found");
     }
 
-    let mut adamw_params: HashSet<ParamId> = all_params.difference(&muon_params).cloned().collect();
+    let adamw_params = all_params
+        .difference(&muon_params)
+        .cloned()
+        .collect::<HashSet<_>>();
+    if adamw_params.is_empty() {
+        bail!("AdamW parameters not found");
+    }
 
     let optimizer = GroupOptimizerAdaptor2::new(
         vec![OptimizerGroup::from_adaptor(

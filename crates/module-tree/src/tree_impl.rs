@@ -69,7 +69,7 @@ impl ModuleTree {
         self.docs.xot_mut()
     }
 
-    pub fn all_params(&mut self) -> HashSet<ParamId> {
+    pub fn paramids(&mut self) -> HashSet<ParamId> {
         self.select_paramids("//Param").unwrap()
     }
 
