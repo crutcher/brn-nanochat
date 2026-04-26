@@ -52,8 +52,11 @@ parquet = "58.1.0"
 rand = "0.10"
 shellexpand = "3.1"
 tempdir = "0.3"
+strum = "0.28.0"
 serde = "1.0.228"
 serde_json = "1.0.149"
+thiserror = "2.0.18"
+spanned_error_message = "0.1.0"
 
 anyhow = { version = "1.0", default-features = false }
 log = { version = "0.4", default-features = false }

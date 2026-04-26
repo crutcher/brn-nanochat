@@ -330,11 +330,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let mut module_tree = ModuleTree::build(&host);
 
-    let all_params = module_tree.paramids();
+    let all_params = module_tree.param_ids()?;
 
     let muon_params = module_tree
-        .select_paramids("GptHost/GPT/Vec[@name='h']//Param[@rank=2]")
-        .unwrap();
+        .select("GptHost/GPT/Vec[@name='h']//Param[@rank=2]")
+        .param_ids()?;
     if muon_params.is_empty() {
         bail!("Muon parameters not found");
     }

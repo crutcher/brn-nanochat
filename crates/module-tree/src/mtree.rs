@@ -20,13 +20,23 @@ use xee_xpath::{
     Documents,
     Queries,
     Query,
+    error::Result as SpannedResult,
+    query::Convert,
 };
 use xot::{
     Node,
     Xot,
 };
 
-use crate::implementation::ModuleTreeBuilder;
+use crate::{
+    error::{
+        BunsenError,
+        BunsenResult,
+    },
+    implementation::ModuleTreeBuilder,
+    pretty_print_node,
+    xee_util,
+};
 
 pub struct ModuleTree {
     docs: Documents,
@@ -36,6 +46,79 @@ pub struct ModuleTree {
 impl Default for ModuleTree {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Selector builder for [`ModuleTree`].
+pub struct TreeSelector<'a> {
+    tree: &'a mut ModuleTree,
+    expr: String,
+}
+
+impl<'a> TreeSelector<'a> {
+    pub fn new(
+        tree: &'a mut ModuleTree,
+        expr: String,
+    ) -> Self {
+        Self { tree, expr }
+    }
+
+    /// The bound xpath expression.
+    pub fn expr(&self) -> &str {
+        &self.expr
+    }
+
+    pub fn select<S: AsRef<str>>(
+        self,
+        expr: S,
+    ) -> TreeSelector<'a> {
+        let expr = format!("{}/{}", self.expr, expr.as_ref());
+        TreeSelector::new(self.tree, expr)
+    }
+
+    pub fn where_expr<S: AsRef<str>>(
+        self,
+        expr: S,
+    ) -> TreeSelector<'a> {
+        let expr = format!("{}[{}]", self.expr, expr.as_ref());
+        TreeSelector::new(self.tree, expr)
+    }
+
+    pub fn params(self) -> TreeSelector<'a> {
+        self.select("descendant-or-self::Param")
+    }
+
+    fn param_nodes(&mut self) -> BunsenResult<Vec<Node>> {
+        let expr = format!("/ModuleTree/Nodes/{}/descendant-or-self::Param", self.expr);
+
+        self.tree
+            .query_many(self.tree.root, &expr, |_, item| Ok(item.to_node()?))
+            .map_err(|e| xee_util::adapt_xee_error(e, Some(&expr)))
+    }
+
+    pub fn param_ids(&mut self) -> BunsenResult<HashSet<ParamId>> {
+        let nodes = self.param_nodes()?;
+
+        let param_id_nid = self.tree.xot_mut().add_name("param_id");
+
+        let mut results: HashSet<ParamId> = HashSet::with_capacity(nodes.len());
+        let xot = self.tree.xot();
+        for node in nodes {
+            let param_id: &str = match xot.get_attribute(node, param_id_nid) {
+                Some(val) => val,
+                None => {
+                    return Err(BunsenError::Invalid(
+                        "Malformed XML: Param missing param_id attribute".into(),
+                    ));
+                }
+            };
+
+            // TODO: this panics on error; which is dumb.
+            let param_id = ParamId::deserialize(param_id);
+            results.insert(param_id);
+        }
+
+        Ok(results)
     }
 }
 
@@ -68,58 +151,48 @@ impl ModuleTree {
         self.docs.xot_mut()
     }
 
-    pub fn paramids(&mut self) -> HashSet<ParamId> {
-        self.select_paramids("//Param").unwrap()
+    pub fn select<'a>(
+        &'a mut self,
+        expr: &str,
+    ) -> TreeSelector<'a> {
+        TreeSelector::new(self, expr.to_string())
     }
 
-    pub fn select_paramids(
+    pub fn param_ids(&mut self) -> BunsenResult<HashSet<ParamId>> {
+        self.select(".").param_ids()
+    }
+
+    fn query_one<V, F>(
         &mut self,
+        root: Node,
         expr: &str,
-    ) -> Result<HashSet<ParamId>, Box<dyn std::error::Error>> {
-        let queries = Queries::default();
-        let root = self.root;
+        convert: F,
+    ) -> Result<V, Box<dyn std::error::Error>>
+    where
+        F: Convert<V>,
+    {
         let xot = self.xot_mut();
+        let queries = Queries::default();
 
-        let nodes_nid = xot.add_name("Nodes");
-        let nodes_node = xot
-            .children(root)
-            .find(|child| xot.element(*child).expect("Expected an element").name() == nodes_nid)
-            .expect("Expected a <Nodes/> node");
+        let q = queries.one(expr, convert)?;
 
-        let param_nid = xot.add_name("Param");
-        let param_id_nid = xot.add_name("param_id");
+        q.execute(&mut self.docs, root)
+            .map_err(|e| e.to_string().into())
+    }
 
-        let q = queries.many(expr, |_docs, item| Ok(item.to_node()?))?;
-
-        let nodes: Vec<Node> = q.execute(&mut self.docs, nodes_node)?;
-
-        let mut results: HashSet<ParamId> = HashSet::with_capacity(nodes.len());
-        let xot = self.docs.xot();
-        for node in nodes {
-            let element = xot.element(node).expect("Expected an element");
-            let name = element.name();
-            if name != param_nid {
-                return Err(format!(
-                    "Expected {}, found {}",
-                    xot.local_name_str(param_nid),
-                    xot.local_name_str(name)
-                )
-                .into());
-            }
-
-            let param_id: &str = match xot.get_attribute(node, param_id_nid) {
-                Some(val) => val,
-                None => {
-                    return Err("Malformed XML: Param missing param_id attribute".into());
-                }
-            };
-
-            // TODO: this panics on error; which is dumb.
-            let param_id = ParamId::deserialize(param_id);
-            results.insert(param_id);
-        }
-
-        Ok(results)
+    fn query_many<V, F>(
+        &mut self,
+        root: Node,
+        expr: &str,
+        convert: F,
+    ) -> SpannedResult<Vec<V>>
+    where
+        F: Convert<V>,
+    {
+        let xot = self.xot_mut();
+        let queries = Queries::default();
+        let q = queries.many(expr, convert)?;
+        q.execute(&mut self.docs, root)
     }
 }
 
@@ -222,7 +295,17 @@ mod tests {
         println!("{:#?}", mtree);
 
         assert_eq!(
-            mtree.select_paramids("//*[@name='seq']/Linear/Param[@name='weight']")?,
+            mtree
+                .select("TestModule/*[@name='seq']/Linear/Param[@name='weight']")
+                .param_ids()?,
+            vec![module.seq[0].weight.id,].into_iter().collect(),
+        );
+
+        assert_eq!(
+            mtree
+                .select("TestModule/*[@name='seq']/Linear/Param")
+                .where_expr("@name = 'weight'")
+                .param_ids()?,
             vec![module.seq[0].weight.id,].into_iter().collect(),
         );
 
@@ -250,8 +333,9 @@ mod tests {
         println!("{:#?}", mtree);
 
         let muon_params = mtree
-            .select_paramids("//GPT/Vec[@name='h']//Param[@rank=2]")
-            .unwrap();
+            .select("GPT/Vec[@name='h']//Param")
+            .where_expr("@rank = 2")
+            .param_ids()?;
 
         println!("Muon params: {muon_params:?}");
 

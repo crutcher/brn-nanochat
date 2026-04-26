@@ -5077,6 +5077,9 @@ name = "module-tree"
 version = "0.0.9"
 dependencies = [
  "burn",
+ "spanned_error_message",
+ "strum 0.28.0",
+ "thiserror 2.0.18",
  "xee-xpath",
  "xot",
  "zsl-chat",
@@ -7018,6 +7021,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spanned_error_message"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79b2cf95724fc09c75b58a9ffb9d23a1cb4ad4b6a564daffc102202797f36532"
+dependencies = [
+ "proc-macro2",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7115,6 +7127,12 @@ checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 dependencies = [
  "strum_macros 0.27.2",
 ]
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
 
 [[package]]
 name = "strum_macros"
