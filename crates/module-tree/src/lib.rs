@@ -11,6 +11,9 @@ pub mod error;
 pub(crate) mod implementation;
 pub mod xee_util;
 
+#[cfg(test)]
+pub mod api_examples;
+
 #[doc(inline)]
 pub use mtree::*;
 #[doc(inline)]

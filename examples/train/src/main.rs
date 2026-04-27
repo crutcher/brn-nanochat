@@ -328,23 +328,52 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
-    let mut module_tree = ModuleTree::build(&host);
+    let mut mtree = ModuleTree::build(&host);
 
-    let all_params: HashSet<ParamId> = module_tree.param_ids()?.collect();
+    let all_params: HashSet<ParamId> = mtree.param_ids()?.collect();
+    // ==>
+    //   let all_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .params()
+    //       .to_param_ids()?
+    //       .collect();
+    //
+    // ==>
+    //   let muon_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .select("descendant-or-self::Param")
+    //       .to_param_ids()?
+    //       .collect();
 
-    let muon_params: HashSet<ParamId> = module_tree
+    let muon_params: HashSet<ParamId> = mtree
         .select_params("GptHost/GPT/Vec[@name='h']")
         .filter("@rank=2")
         .to_param_ids()?
         .collect();
-    if muon_params.is_empty() {
-        bail!("Muon parameters not found");
-    }
+    // ==>
+    //   let muon_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .select("GptHost/GPT/Vec[@name='h']")
+    //       .params()
+    //       .filter("@rank=2")
+    //       .to_param_ids()?
+    //       .collect();
+    //
+    // ==>
+    //   let muon_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .select("GptHost/GPT/Vec[@name='h']/descendant-or-self::Param[@rank=2]"
+    // )       .to_param_ids()?
+    //       .collect();
 
-    let adamw_params = all_params
+    let adamw_params: HashSet<ParamId> = all_params
         .difference(&muon_params)
         .cloned()
         .collect::<HashSet<_>>();
+
+    if muon_params.is_empty() {
+        bail!("Muon parameters not found");
+    }
     if adamw_params.is_empty() {
         bail!("AdamW parameters not found");
     }
