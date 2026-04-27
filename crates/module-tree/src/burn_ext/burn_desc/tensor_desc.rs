@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use burn::{
     Tensor,
     prelude::{
@@ -11,8 +13,13 @@ use burn::{
     },
 };
 
+use crate::error::{
+    BunsenError,
+    BunsenResult,
+};
+
 /// Encodes a description af [`burn::tensor::TensorKind`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString)]
 #[non_exhaustive]
 pub enum TensorKindDesc {
     /// A Bool Tensor
@@ -74,6 +81,26 @@ where
     }
 }
 
+fn parse_dtype(dtype: &str) -> BunsenResult<DType> {
+    Ok(match dtype {
+        "F64" => DType::F64,
+        "F32" => DType::F32,
+        "Flex32" => DType::Flex32,
+        "F16" => DType::F16,
+        "BF16" => DType::BF16,
+        "I64" => DType::I64,
+        "I32" => DType::I32,
+        "I16" => DType::I16,
+        "I8" => DType::I8,
+        "U64" => DType::U64,
+        "U32" => DType::U32,
+        "U16" => DType::U16,
+        "U8" => DType::U8,
+        "Bool" => DType::Bool,
+        _ => return Err(BunsenError::External(format!("Invalid dtype: {}", dtype))),
+    })
+}
+
 impl TensorDesc {
     /// Create a new `TensorDesc`.
     pub fn new(
@@ -82,6 +109,26 @@ impl TensorDesc {
         shape: Shape,
     ) -> Self {
         Self { kind, dtype, shape }
+    }
+
+    pub fn from_strings(
+        kind: &str,
+        dtype: &str,
+        shape: &str,
+    ) -> BunsenResult<Self> {
+        let shape: Shape = shape
+            .split_whitespace()
+            .map(|s| s.parse::<usize>())
+            .collect::<Result<Vec<usize>, _>>()
+            .map_err(|e| BunsenError::External(format!("Invalid shape: {}", e)))?
+            .into();
+
+        let kind = TensorKindDesc::from_str(kind)
+            .map_err(|e| BunsenError::External(format!("Invalid kind: {}", e)))?;
+
+        let dtype = parse_dtype(dtype)?;
+
+        Ok(Self::new(kind, dtype, shape))
     }
 
     /// The [`TensorKindDesc`] kind wrapper.
