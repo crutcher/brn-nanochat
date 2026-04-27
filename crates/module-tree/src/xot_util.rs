@@ -111,8 +111,6 @@ impl<'a> XotHandle<'a> {
     }
 }
 
-impl<'a> XotHandle<'_> {}
-
 #[cfg(test)]
 mod tests {
     use crate::{

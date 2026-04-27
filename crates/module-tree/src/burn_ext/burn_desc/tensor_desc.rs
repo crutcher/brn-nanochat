@@ -13,9 +13,12 @@ use burn::{
     },
 };
 
-use crate::error::{
-    BunsenError,
-    BunsenResult,
+use crate::{
+    burn_enc::shape_from_xml_attr,
+    error::{
+        BunsenError,
+        BunsenResult,
+    },
 };
 
 /// Encodes a description af [`burn::tensor::TensorKind`].
@@ -116,12 +119,7 @@ impl TensorDesc {
         dtype: &str,
         shape: &str,
     ) -> BunsenResult<Self> {
-        let shape: Shape = shape
-            .split_whitespace()
-            .map(|s| s.parse::<usize>())
-            .collect::<Result<Vec<usize>, _>>()
-            .map_err(|e| BunsenError::External(format!("Invalid shape: {}", e)))?
-            .into();
+        let shape: Shape = shape_from_xml_attr(shape)?;
 
         let kind = TensorKindDesc::from_str(kind)
             .map_err(|e| BunsenError::External(format!("Invalid kind: {}", e)))?;

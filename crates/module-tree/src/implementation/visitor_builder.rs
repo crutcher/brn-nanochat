@@ -19,16 +19,29 @@ use xot::{
 
 use crate::{
     ModuleTree,
+    burn_enc::shape_to_xml_attr,
     burn_ext::burn_desc::{
         ParamDesc,
         TensorDesc,
+    },
+    constants::{
+        CLASS_ATTR,
+        DTYPE_ATTR,
+        ID_ATTR,
+        KIND_ATTR,
+        NAME_ATTR,
+        PARAM_ELEM,
+        PARAM_ID_ATTR,
+        RANK_ATTR,
+        SHAPE_ATTR,
+        STRUCTURE_ELEM,
     },
     type_util,
     type_util::parse_container_type,
 };
 
 pub struct ModuleTreeBuilder<B: Backend> {
-    xtree: ModuleTree,
+    mtree: ModuleTree,
 
     depth: usize,
     base: Node,
@@ -42,17 +55,17 @@ pub struct ModuleTreeBuilder<B: Backend> {
 
 impl<B: Backend> Default for ModuleTreeBuilder<B> {
     fn default() -> Self {
-        let mut xtree = ModuleTree::new();
-        let root = xtree.root();
+        let mut mtree = ModuleTree::new();
+        let root = mtree.root();
 
-        let xot = xtree.xot_mut();
-        let nodes_nid = xot.add_name("Nodes");
+        let nodes_nid = mtree.bind_local_name(STRUCTURE_ELEM);
+        let xot = mtree.xot_mut();
         let base = xot.new_element(nodes_nid);
 
         xot.append(root, base);
 
         Self {
-            xtree,
+            mtree,
             depth: 0,
             base,
             pending_name: None,
@@ -65,15 +78,15 @@ impl<B: Backend> Default for ModuleTreeBuilder<B> {
 
 impl<B: Backend> ModuleTreeBuilder<B> {
     pub fn build(self) -> ModuleTree {
-        self.xtree
+        self.mtree
     }
 
     fn xot(&self) -> &Xot {
-        self.xtree.xot()
+        self.mtree.xot()
     }
 
     fn xot_mut(&mut self) -> &mut Xot {
-        self.xtree.xot_mut()
+        self.mtree.xot_mut()
     }
 
     fn debug_stack(&self) -> Vec<String> {
@@ -92,30 +105,20 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         &mut self,
         param_desc: ParamDesc<TensorDesc>,
     ) {
-        let elem_node = self.new_child(*self.stack.last().unwrap(), "Param");
+        let elem_node = self.new_child(*self.stack.last().unwrap(), PARAM_ELEM);
         self.set_idents(elem_node);
 
-        self.set_attribute(elem_node, "param_id", param_desc.param_id().to_string());
+        self.set_attribute(elem_node, PARAM_ID_ATTR, param_desc.param_id().to_string());
 
         // Should kind be <Type kind="Float" dtype="F32" />?
-        self.set_attribute(elem_node, "kind", format!("{:?}", param_desc.kind()));
-        self.set_attribute(elem_node, "dtype", format!("{:?}", param_desc.dtype()));
+        self.set_attribute(elem_node, KIND_ATTR, format!("{:?}", param_desc.kind()));
+        self.set_attribute(elem_node, DTYPE_ATTR, format!("{:?}", param_desc.dtype()));
 
         // Should shape be <Shape rank="1" dims="[10, 2]" />?
+        self.set_attribute(elem_node, SHAPE_ATTR, shape_to_xml_attr(param_desc.shape()));
         self.set_attribute(
             elem_node,
-            "shape",
-            param_desc
-                .shape()
-                .clone()
-                .iter()
-                .map(|d| d.to_string())
-                .collect::<Vec<String>>()
-                .join(" "),
-        );
-        self.set_attribute(
-            elem_node,
-            "rank",
+            RANK_ATTR,
             param_desc.shape().clone().rank().to_string(),
         );
     }
@@ -134,9 +137,8 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         &mut self,
         name: N,
     ) -> Node {
-        let xot = self.xot_mut();
-        let name_nid = xot.add_name(name.as_ref());
-        xot.new_element(name_nid)
+        let name_nid = self.mtree.bind_local_name(name.as_ref());
+        self.xot_mut().new_element(name_nid)
     }
 
     fn set_idents(
@@ -145,12 +147,12 @@ impl<B: Backend> ModuleTreeBuilder<B> {
     ) {
         self.next_id += 1;
         let id = format!("n:{:X}", self.next_id);
-        self.set_attribute(node, "id", id);
+        self.set_attribute(node, ID_ATTR, id);
 
         if let Some(name) = self.pending_name.take()
             && !self.parent_is_sequence()
         {
-            self.set_attribute(node, "name", name);
+            self.set_attribute(node, NAME_ATTR, name);
         }
     }
 
@@ -160,9 +162,8 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         name: N,
         value: V,
     ) {
-        let xot = self.xot_mut();
-        let id = xot.add_name(name.as_ref());
-        xot.set_attribute(node, id, value.as_ref());
+        let attr_nid = self.mtree.bind_local_name(name.as_ref());
+        self.xot_mut().set_attribute(node, attr_nid, value.as_ref());
     }
 
     fn parent_is_sequence(&self) -> bool {
@@ -193,17 +194,13 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
             // and we need to attach it to the document.
             let parent = self.stack.last().copied().unwrap_or(self.base);
 
-            let xot = self.xot_mut();
-
             let (cls, elem_name) = type_util::parse_container_type(container_type);
-            let elem_nid = xot.add_name(&elem_name);
+            let elem_nid = self.mtree.bind_local_name(&elem_name);
 
-            let xot = self.xot_mut();
-            let elem_node = xot.new_element(elem_nid);
-            xot.append(parent, elem_node);
+            let elem_node = self.new_child(parent, elem_name);
 
             self.set_idents(elem_node);
-            self.set_attribute(elem_node, "class", cls);
+            self.set_attribute(elem_node, CLASS_ATTR, cls);
 
             // There's no way to determine which enum case we are in.
             // if cls == "enum" {
