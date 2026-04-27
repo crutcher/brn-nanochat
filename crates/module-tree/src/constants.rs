@@ -4,6 +4,7 @@ pub const MODULE_TREE_ELEM: &str = "ModuleTree";
 pub const PARAM_ELEM: &str = "Param";
 pub const STRUCTURE_ELEM: &str = "Structure";
 
+pub const VERSION_ATTR: &str = "version";
 pub const DTYPE_ATTR: &str = "dtype";
 pub const CLASS_ATTR: &str = "class";
 pub const ID_ATTR: &str = "id";

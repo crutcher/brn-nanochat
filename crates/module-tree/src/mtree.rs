@@ -74,7 +74,24 @@ impl ModuleTree {
         let root = xot.new_element(mtree_nid);
         let doc = xot.new_document_with_element(root).unwrap();
 
+        let version_nid = xot.add_name("version");
+        xot.set_attribute(root, version_nid, env!("CARGO_PKG_VERSION"));
+
         Self { docs, root }
+    }
+
+    /// Serialize the module tree to an XML string.
+    pub fn to_xml(&self) -> String {
+        self.docs
+            .xot()
+            .serialize_xml_string(
+                xot::output::xml::Parameters {
+                    indentation: Some(Default::default()),
+                    ..Default::default()
+                },
+                self.root,
+            )
+            .unwrap()
     }
 
     /// Bind (add/lookup) a local (no namespace) name in the [`xot`] arena.
@@ -276,26 +293,7 @@ impl Debug for ModuleTree {
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        // TODO: serialize_xml_write() directly?
-        // requires fmt::Write to io::Write adaptor
-
-        let contents = self
-            .docs
-            .xot()
-            .serialize_xml_string(
-                xot::output::xml::Parameters {
-                    indentation: if f.alternate() {
-                        Some(Default::default())
-                    } else {
-                        None
-                    },
-                    ..Default::default()
-                },
-                self.root,
-            )
-            .map_err(|e| std::fmt::Error)?;
-
-        f.write_str(&contents)
+        f.write_str(&self.to_xml())
     }
 }
 
