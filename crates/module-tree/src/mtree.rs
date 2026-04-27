@@ -154,8 +154,7 @@ impl ModuleTree {
         ModuleTreeQuery::new(self)
     }
 
-    /// Create a [`ModuleTreeQuery`] with an intial `XPath` selection
-    /// refinement.
+    /// Query a sub-tree.
     ///
     /// # Panics
     /// On invalid `XPath` expressions.
@@ -177,7 +176,29 @@ impl ModuleTree {
         ModuleTreeQuery::new(self).select(expr)
     }
 
-    /// Create a [`ModuleTreeQuery`], selecting all parameters of a subtree.
+    /// Query a sub-tree.
+    ///
+    /// # Returns
+    /// `Ok(query)` on success, `Err(e)` on `XPath` errors.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let q: QueryBuilder<_> = mtree
+    ///     .select("GPT/Linear");
+    ///
+    /// // Is equivalent to:
+    /// let q: QueryBuilder<_> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear");
+    /// ```
+    pub fn try_select<'a>(
+        &'a mut self,
+        expr: &str,
+    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+        ModuleTreeQuery::new(self).try_select(expr)
+    }
+
+    /// Query all parameters of a subtree.
     ///
     /// # Panics
     /// On invalid `XPath` expressions.
@@ -205,10 +226,39 @@ impl ModuleTree {
         self.select(expr).params()
     }
 
+    /// Query all parameters of a subtree.
+    ///
+    /// # Returns
+    /// `Ok(query)` on success, `Err(e)` on `XPath` errors.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let q: QueryBuilder<_> = mtree
+    ///     .select_params("GPT/Linear");
+    ///
+    /// // Is equivalent to:
+    /// let q: QueryBuilder<_> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear")
+    ///     .params();
+    ///
+    /// // Is equivalent to:
+    /// let q: QueryBuilder<_> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear/descedant-or-self::Param");
+    /// ```
+    pub fn try_select_params<'a>(
+        &'a mut self,
+        expr: &str,
+    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+        Ok(self.try_select(expr)?.params())
+    }
+
     /// Return an iterator over the parameter [`ParamId`]s of a subtree.
     ///
-    /// # Panics
-    /// On invalid `XPath` expressions.
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on `XPath`
+    /// errors.
     ///
     /// # Example
     /// ```rust,ignore
@@ -241,10 +291,13 @@ impl ModuleTree {
         &mut self,
         expr: &str,
     ) -> BunsenResult<impl Iterator<Item = ParamId>> {
-        self.select_params(expr).to_param_ids()
+        self.try_select_params(expr)?.to_param_ids()
     }
 
     /// Return an iterator over all [`ParamId`]s in the module.
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
     ///
     /// ## Example
     /// ```rust,ignore
@@ -271,6 +324,9 @@ impl ModuleTree {
     }
 
     /// Return an iterator over all [`ParamId`]s in the module.
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
     ///
     /// ## Example
     /// ```rust,ignore
@@ -333,20 +389,25 @@ impl<'a> ModuleTreeQuery<'a> {
         &self.expr
     }
 
+    fn try_append_expr(
+        mut self,
+        expr: &str,
+    ) -> BunsenResult<Self> {
+        let expr = format!("{}{}", self.expr, expr);
+
+        Queries::default()
+            .many(&expr, |_, _| Ok(()))
+            .map_err(|e| adapt_xee_error(e, Some(&expr)))?;
+
+        Ok(Self { expr, ..self })
+    }
+
     fn append_expr(
         mut self,
         expr: &str,
     ) -> Self {
-        let expr = format!("{}{}", self.expr, expr);
-
-        if let Err(e) = Queries::default()
-            .many(&expr, |_, _| Ok(()))
-            .map_err(|e| adapt_xee_error(e, Some(&expr)))
-        {
-            panic!("Invalid expression: {e}");
-        }
-
-        Self { expr, ..self }
+        self.try_append_expr(expr)
+            .unwrap_or_else(|e| panic!("{}", e))
     }
 
     /// Refine the current selection by appending an `XPath` path expression.
@@ -360,6 +421,19 @@ impl<'a> ModuleTreeQuery<'a> {
         expr: S,
     ) -> ModuleTreeQuery<'a> {
         self.append_expr(format!("/{}", expr.as_ref()).as_str())
+    }
+
+    /// Refine the current selection by appending an `XPath` path expression.
+    ///
+    /// If the expression was "E", the new expression will be "{E}/{expr}".
+    ///
+    /// # Returns
+    /// `Ok(query)` on success, `Err(e)` on `XPath` errors.
+    pub fn try_select<S: AsRef<str>>(
+        self,
+        expr: S,
+    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+        self.try_append_expr(format!("/{}", expr.as_ref()).as_str())
     }
 
     /// Refine the current selection by appending an `XPath` predicate
@@ -382,6 +456,28 @@ impl<'a> ModuleTreeQuery<'a> {
         pred: S,
     ) -> ModuleTreeQuery<'a> {
         self.append_expr(format!("[{}]", pred.as_ref()).as_str())
+    }
+
+    /// Refine the current selection by appending an `XPath` predicate
+    /// expression.
+    ///
+    /// Predicate expressions filter the current node-set, keeping only those
+    /// nodes for which each branch of the predicate expression evaluates to
+    /// true.
+    ///
+    /// If the expression was "E", the new expression will be "{E}[{expr}]".
+    ///
+    /// # Example
+    /// * `filter("@name='foo'")` - select only nodes with a "name" attribute
+    ///   equal to "foo".
+    ///
+    /// # Returns
+    /// `Ok(query)` on success, `Err(e)` on `XPath` errors.
+    pub fn try_filter<S: AsRef<str>>(
+        self,
+        pred: S,
+    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+        self.try_append_expr(format!("[{}]", pred.as_ref()).as_str())
     }
 
     /// Recursively select all parameter elements in the current context.
