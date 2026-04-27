@@ -144,7 +144,7 @@ impl ModuleTree {
     /// ```rust,ignore
     /// let q: QueryBuilder<_> = mtree.select("GPT/Linear");
     ///
-    /// # Is equivalent to:
+    /// // Is equivalent to:
     /// let q: QueryBuilder<_> = mtree.query().select(expr);
     /// ```
     pub fn select<'a>(
@@ -161,7 +161,7 @@ impl ModuleTree {
     /// ```rust,ignore
     /// let q: QueryBuilder<_> = mtree.select_params("GPT/Linear")?;
     ///
-    /// # Is equivalent to:
+    /// // Is equivalent to:
     /// let q: QueryBuilder<_> = mtree.query().select(expr).params();
     /// ```
     pub fn select_params<'a>(
@@ -194,7 +194,7 @@ impl ModuleTree {
     /// ```rust,ignore
     /// let parm_ids: HashSet<ParamId> = mtree.param_ids().collect();
     ///
-    /// # Is equivalent to:
+    /// // Is equivalent to:
     /// let parm_ids: HashSet<ParamId> = mtree.query().params().to_param_ids().collect();
     /// ```
     pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
@@ -207,7 +207,7 @@ impl ModuleTree {
     /// ```rust,ignore
     /// let descs: Vec<ParamDesc<TensorDesc>> = mtree.param_descs().collect();
     ///
-    /// # Is equivalent to:
+    /// // Is equivalent to:
     /// let descs: Vec<ParamDesc<TensorDesc>> = mtree.query().params().to_param_descs().collect();
     /// ```
     pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
