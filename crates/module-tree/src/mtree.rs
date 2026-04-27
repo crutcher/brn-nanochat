@@ -324,6 +324,14 @@ impl<'a> ModuleTreeQuery<'a> {
         &self.expr
     }
 
+    fn append_expr(
+        self,
+        expr: &str,
+    ) -> Self {
+        let expr = format!("{}{}", self.expr, expr);
+        Self { expr, ..self }
+    }
+
     /// Refine the current selection by appending an `XPath` path expression.
     ///
     /// If the expression was "E", the new expression will be "{E}/{expr}".
@@ -331,10 +339,7 @@ impl<'a> ModuleTreeQuery<'a> {
         self,
         expr: S,
     ) -> ModuleTreeQuery<'a> {
-        Self {
-            tree: self.tree,
-            expr: format!("{}/{}", self.expr, expr.as_ref()),
-        }
+        self.append_expr(format!("/{}", expr.as_ref()).as_str())
     }
 
     /// Refine the current selection by appending an `XPath` predicate
@@ -353,10 +358,7 @@ impl<'a> ModuleTreeQuery<'a> {
         self,
         pred: S,
     ) -> ModuleTreeQuery<'a> {
-        Self {
-            tree: self.tree,
-            expr: format!("{}[{}]", self.expr, pred.as_ref()),
-        }
+        self.append_expr(format!("[{}]", pred.as_ref()).as_str())
     }
 
     /// Recursively select all parameter elements in the current context.
