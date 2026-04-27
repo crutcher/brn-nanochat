@@ -105,19 +105,20 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         &mut self,
         param_desc: ParamDesc<TensorDesc>,
     ) {
-        let elem_node = self.new_child(*self.stack.last().unwrap(), PARAM_ELEM);
-        self.set_idents(elem_node);
+        let node = self.new_child(*self.stack.last().unwrap(), PARAM_ELEM);
+        self.set_idents(node);
 
-        self.set_attribute(elem_node, PARAM_ID_ATTR, param_desc.param_id().to_string());
+        self.set_attribute(node, PARAM_ID_ATTR, param_desc.param_id().to_string());
+        self.set_attribute(node, CLASS_ATTR, "tensor");
 
         // Should kind be <Type kind="Float" dtype="F32" />?
-        self.set_attribute(elem_node, KIND_ATTR, format!("{:?}", param_desc.kind()));
-        self.set_attribute(elem_node, DTYPE_ATTR, format!("{:?}", param_desc.dtype()));
+        self.set_attribute(node, KIND_ATTR, format!("{:?}", param_desc.kind()));
+        self.set_attribute(node, DTYPE_ATTR, format!("{:?}", param_desc.dtype()));
 
         // Should shape be <Shape rank="1" dims="[10, 2]" />?
-        self.set_attribute(elem_node, SHAPE_ATTR, shape_to_xml_attr(param_desc.shape()));
+        self.set_attribute(node, SHAPE_ATTR, shape_to_xml_attr(param_desc.shape()));
         self.set_attribute(
-            elem_node,
+            node,
             RANK_ATTR,
             param_desc.shape().clone().rank().to_string(),
         );
