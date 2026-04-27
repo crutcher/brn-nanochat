@@ -157,6 +157,9 @@ impl ModuleTree {
     /// Create a [`ModuleTreeQuery`] with an intial `XPath` selection
     /// refinement.
     ///
+    /// # Panics
+    /// On invalid `XPath` expressions.
+    ///
     /// # Example
     /// ```rust,ignore
     /// let q: QueryBuilder<_> = mtree
@@ -175,6 +178,9 @@ impl ModuleTree {
     }
 
     /// Create a [`ModuleTreeQuery`], selecting all parameters of a subtree.
+    ///
+    /// # Panics
+    /// On invalid `XPath` expressions.
     ///
     /// # Example
     /// ```rust,ignore
@@ -200,6 +206,9 @@ impl ModuleTree {
     }
 
     /// Return an iterator over the parameter [`ParamId`]s of a subtree.
+    ///
+    /// # Panics
+    /// On invalid `XPath` expressions.
     ///
     /// # Example
     /// ```rust,ignore
@@ -325,16 +334,27 @@ impl<'a> ModuleTreeQuery<'a> {
     }
 
     fn append_expr(
-        self,
+        mut self,
         expr: &str,
     ) -> Self {
         let expr = format!("{}{}", self.expr, expr);
+
+        if let Err(e) = Queries::default()
+            .many(&expr, |_, _| Ok(()))
+            .map_err(|e| adapt_xee_error(e, Some(&expr)))
+        {
+            panic!("Invalid expression: {e}");
+        }
+
         Self { expr, ..self }
     }
 
     /// Refine the current selection by appending an `XPath` path expression.
     ///
     /// If the expression was "E", the new expression will be "{E}/{expr}".
+    ///
+    /// # Panics
+    /// On invalid `XPath` expressions.
     pub fn select<S: AsRef<str>>(
         self,
         expr: S,
@@ -354,6 +374,9 @@ impl<'a> ModuleTreeQuery<'a> {
     /// # Example
     /// * `filter("@name='foo'")` - select only nodes with a "name" attribute
     ///   equal to "foo".
+    ///
+    /// # Panics
+    /// On invalid `XPath` expressions.
     pub fn filter<S: AsRef<str>>(
         self,
         pred: S,
