@@ -62,20 +62,6 @@ impl Default for ModuleTree {
     }
 }
 
-pub struct NodeSet<'a> {
-    tree: &'a mut ModuleTree,
-    nodes: Vec<Node>,
-}
-
-impl<'a> NodeSet<'a> {
-    pub fn new(
-        tree: &'a mut ModuleTree,
-        nodes: Vec<Node>,
-    ) -> Self {
-        Self { tree, nodes }
-    }
-}
-
 pub struct QueryBuilder<'a> {
     tree: &'a mut ModuleTree,
     expr: String,
@@ -123,15 +109,6 @@ impl<'a> QueryBuilder<'a> {
         self.select("descendant-or-self::Param")
     }
 
-    pub fn nodes(self) -> BunsenResult<NodeSet<'a>> {
-        let nodes = self
-            .tree
-            .query_many(self.tree.root, &self.expr, |_, item| Ok(item.to_node()?))
-            .map_err(|e| xee_util::adapt_xee_error(e, Some(&self.expr)))?;
-
-        Ok(NodeSet::new(self.tree, nodes))
-    }
-
     pub fn many<V, F>(
         &mut self,
         f: F,
@@ -153,7 +130,7 @@ impl<'a> QueryBuilder<'a> {
         self.many(|docs, item| Ok(item.string_value(docs.xot())?))
     }
 
-    pub fn tensor_params(mut self) -> BunsenResult<Vec<ParamDesc<TensorDesc>>> {
+    pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
         let param_id_nid = self.tree.add_name(PARAM_ID_ATTR);
         let dtype_nid = self.tree.add_name(DTYPE_ATTR);
         let rank_nid = self.tree.add_name(RANK_ATTR);
@@ -163,7 +140,8 @@ impl<'a> QueryBuilder<'a> {
         let nodes: Vec<Node> = self.many(|docs, item| Ok(item.to_node()?))?;
 
         let xot = self.tree.xot();
-        nodes
+
+        Ok(nodes
             .into_iter()
             .map(|node| {
                 let attrs = xot.attributes(node);
@@ -179,7 +157,12 @@ impl<'a> QueryBuilder<'a> {
 
                 Ok(ParamDesc::new(param_id, tensor_desc))
             })
-            .collect()
+            .collect::<BunsenResult<Vec<ParamDesc<TensorDesc>>>>()?
+            .into_iter())
+    }
+
+    pub fn to_param_ids(mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
+        Ok(self.to_param_descs()?.map(|d| d.param_id()))
     }
 
     pub fn map_strings<V, F>(
@@ -194,79 +177,6 @@ impl<'a> QueryBuilder<'a> {
             .into_iter()
             .map(|s| f(&s))
             .collect::<BunsenResult<Vec<V>>>()
-    }
-}
-
-/// Selector builder for [`ModuleTree`].
-pub struct TreeSelector<'a> {
-    tree: &'a mut ModuleTree,
-    expr: String,
-}
-
-impl<'a> TreeSelector<'a> {
-    pub fn new(
-        tree: &'a mut ModuleTree,
-        expr: String,
-    ) -> Self {
-        Self { tree, expr }
-    }
-
-    /// The bound xpath expression.
-    pub fn expr(&self) -> &str {
-        &self.expr
-    }
-
-    pub fn select<S: AsRef<str>>(
-        self,
-        expr: S,
-    ) -> TreeSelector<'a> {
-        let expr = format!("{}/{}", self.expr, expr.as_ref());
-        TreeSelector::new(self.tree, expr)
-    }
-
-    pub fn where_expr<S: AsRef<str>>(
-        self,
-        expr: S,
-    ) -> TreeSelector<'a> {
-        let expr = format!("{}[{}]", self.expr, expr.as_ref());
-        TreeSelector::new(self.tree, expr)
-    }
-
-    pub fn params(self) -> TreeSelector<'a> {
-        self.select("descendant-or-self::Param")
-    }
-
-    fn param_nodes(&mut self) -> BunsenResult<Vec<Node>> {
-        let expr = format!("/ModuleTree/Nodes/{}/descendant-or-self::Param", self.expr);
-
-        self.tree
-            .query_many(self.tree.root, &expr, |_, item| Ok(item.to_node()?))
-            .map_err(|e| xee_util::adapt_xee_error(e, Some(&expr)))
-    }
-
-    pub fn param_ids(&mut self) -> BunsenResult<HashSet<ParamId>> {
-        let nodes = self.param_nodes()?;
-
-        let param_id_nid = self.tree.xot_mut().add_name("param_id");
-
-        let mut results: HashSet<ParamId> = HashSet::with_capacity(nodes.len());
-        let xot = self.tree.xot();
-        for node in nodes {
-            let param_id: &str = match xot.get_attribute(node, param_id_nid) {
-                Some(val) => val,
-                None => {
-                    return Err(BunsenError::Invalid(
-                        "Malformed XML: Param missing param_id attribute".into(),
-                    ));
-                }
-            };
-
-            // TODO: this panics on error; which is dumb.
-            let param_id = ParamId::deserialize(param_id);
-            results.insert(param_id);
-        }
-
-        Ok(results)
     }
 }
 
@@ -322,29 +232,15 @@ impl ModuleTree {
     pub fn select<'a>(
         &'a mut self,
         expr: &str,
-    ) -> TreeSelector<'a> {
-        TreeSelector::new(self, expr.to_string())
+    ) -> QueryBuilder<'a> {
+        QueryBuilder::new(self).select(expr)
     }
 
-    pub fn param_ids(&mut self) -> BunsenResult<HashSet<ParamId>> {
-        self.select(".").param_ids()
-    }
-
-    fn query_one<V, F>(
-        &mut self,
-        root: Node,
+    pub fn select_params<'a>(
+        &'a mut self,
         expr: &str,
-        convert: F,
-    ) -> Result<V, Box<dyn std::error::Error>>
-    where
-        F: Convert<V>,
-    {
-        let xot = self.xot_mut();
-
-        let q = Queries::default().one(expr, convert)?;
-
-        q.execute(&mut self.docs, root)
-            .map_err(|e| e.to_string().into())
+    ) -> QueryBuilder<'a> {
+        self.select(expr).params()
     }
 
     fn query_many<V, F>(
@@ -359,6 +255,10 @@ impl ModuleTree {
         let xot = self.xot_mut();
         let q = Queries::default().many(expr, convert)?;
         q.execute(&mut self.docs, root)
+    }
+
+    pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
+        self.query().params().to_param_ids()
     }
 }
 
@@ -463,43 +363,6 @@ mod tests {
     }
 
     #[test]
-    fn test_builder() -> Result<(), Box<dyn std::error::Error>> {
-        type B = Wgpu;
-        let device = Default::default();
-        let module = TestModule::<B>::init(&device);
-
-        let mut mtree = ModuleTree::build(&module);
-
-        println!("{:#?}", mtree);
-
-        assert_eq!(
-            mtree
-                .select("TestModule/*[@name='seq']/Linear/Param[@name='weight']")
-                .param_ids()?,
-            vec![module.seq[0].weight.id,].into_iter().collect(),
-        );
-
-        assert_eq!(
-            mtree
-                .select("TestModule/*[@name='seq']/Linear/Param")
-                .where_expr("@name = 'weight'")
-                .param_ids()?,
-            vec![module.seq[0].weight.id,].into_iter().collect(),
-        );
-
-        print_node_query(&mut mtree, "//*[@id='n:2']")?;
-
-        print_node_query(
-            &mut mtree,
-            "//TestModule/*[@name='tup']/Linear/Param[@rank=2]",
-        )?;
-
-        print_node_query(&mut mtree, "//TestModule/*[@name='tup']/*[2]")?;
-
-        Ok(())
-    }
-
-    #[test]
     fn test_gpt() -> BunsenResult<()> {
         type B = Wgpu;
         let device = Default::default();
@@ -522,27 +385,18 @@ mod tests {
         use xee_xpath::Item;
 
         let ids: Vec<ParamId> = mtree
-            .query()
-            .select("GPT/*[@name='h']")
-            .params()
+            .select_params("GPT/*[@name='h']")
             .filter("@rank=2")
-            .map_strings("@param_id", |s| {
-                // TODO:
-                // ParamId::deserialize() panics on error.
-                // ParamId::try_deserialize() should exist, PR open:
-                // https://github.com/tracel-ai/burn/pull/4881
-                let param_id = ParamId::deserialize(&s);
-                Ok(param_id)
-            })?;
+            .to_param_ids()?
+            .collect();
 
         println!("IDs: {ids:?}");
 
         let descs: Vec<ParamDesc<TensorDesc>> = mtree
-            .query()
-            .select("GPT/*[@name='h']")
-            .params()
+            .select_params("GPT/*[@name='h']")
             .filter("@rank=2")
-            .tensor_params()?;
+            .to_param_descs()?
+            .collect();
 
         println!("Descs: {descs:#?}");
 
