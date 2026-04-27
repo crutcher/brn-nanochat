@@ -142,27 +142,38 @@ impl ModuleTree {
     ///
     /// # Example
     /// ```rust,ignore
-    /// let q: QueryBuilder<_> = mtree.select("GPT/Linear");
+    /// let q: QueryBuilder<_> = mtree
+    ///     .select("GPT/Linear");
     ///
     /// // Is equivalent to:
-    /// let q: QueryBuilder<_> = mtree.query().select(expr);
+    /// let q: QueryBuilder<_> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear");
     /// ```
     pub fn select<'a>(
         &'a mut self,
-        xpath: &str,
+        expr: &str,
     ) -> ModuleTreeQuery<'a> {
-        ModuleTreeQuery::new(self).select(xpath)
+        ModuleTreeQuery::new(self).select(expr)
     }
 
-    /// Create a [`ModuleTreeQuery`], selecting all parameters covered by a
-    /// subtree.
+    /// Create a [`ModuleTreeQuery`], selecting all parameters of a subtree.
     ///
     /// # Example
     /// ```rust,ignore
-    /// let q: QueryBuilder<_> = mtree.select_params("GPT/Linear")?;
+    /// let q: QueryBuilder<_> = mtree
+    ///     .select_params("GPT/Linear");
     ///
     /// // Is equivalent to:
-    /// let q: QueryBuilder<_> = mtree.query().select(expr).params();
+    /// let q: QueryBuilder<_> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear")
+    ///     .params();
+    ///
+    /// // Is equivalent to:
+    /// let q: QueryBuilder<_> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear/descedant-or-self::Param");
     /// ```
     pub fn select_params<'a>(
         &'a mut self,
@@ -171,15 +182,34 @@ impl ModuleTree {
         self.select(expr).params()
     }
 
-    /// Return an iterable over the [`ParamId`] of all parameters under a
-    /// subtree.
+    /// Return an iterator over the parameter [`ParamId`]s of a subtree.
     ///
     /// # Example
     /// ```rust,ignore
-    /// let param_ids : HashSet<ParamId> = mtree.select_param_ids("GPT/Linear")?.collect();
+    /// let param_ids : HashSet<ParamId> = mtree
+    ///     .select_param_ids("GPT/Linear")?
+    ///     .collect();
     ///
-    /// # is equivalent to:
-    /// let param_ids : HashSet<ParamId> = mtree.select_params("GPT/Linear").to_param_ids()?.collect();
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = mtree
+    ///     .select_params("GPT/Linear")
+    ///     .to_param_ids()?
+    ///     .collect();
+    ///
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear")
+    ///     .params()
+    ///     .to_param_ids()?
+    ///     .collect();
+    ///
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear/descendant-or-self::Param")
+    ///     .to_param_ids()?
+    ///     .collect();
     /// ```
     pub fn select_param_ids(
         &mut self,
@@ -188,27 +218,53 @@ impl ModuleTree {
         self.select_params(expr).to_param_ids()
     }
 
-    /// Return an iterable of all [`ParamId`]s in the module.
+    /// Return an iterator over all [`ParamId`]s in the module.
     ///
     /// ## Example
     /// ```rust,ignore
-    /// let parm_ids: HashSet<ParamId> = mtree.param_ids().collect();
+    /// let parm_ids: HashSet<ParamId> = mtree
+    ///     .param_ids()?
+    ///     .collect();
     ///
     /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree.query().params().to_param_ids().collect();
+    /// let parm_ids: HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .params()
+    ///     .to_param_ids()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let parm_ids: HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .select("descendant-or-self::Param")
+    ///     .to_param_ids()?
+    ///     .collect();
     /// ```
     pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
         self.query().params().to_param_ids()
     }
 
-    /// Return an iterable of all [`ParamId`]s in the module.
+    /// Return an iterator over all [`ParamId`]s in the module.
     ///
     /// ## Example
     /// ```rust,ignore
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree.param_descs().collect();
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .param_descs()?
+    ///     .collect();
     ///
     /// // Is equivalent to:
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree.query().params().to_param_descs().collect();
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .query()
+    ///     .params()
+    ///     .to_param_descs()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .query()
+    ///     .select("descendant-or-self::Param")
+    ///     .to_param_descs()?
+    ///     .collect();
     /// ```
     pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
         self.query().params().to_param_descs()
