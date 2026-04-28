@@ -1,6 +1,7 @@
+#![allow(unused)]
+
 use std::{
     cmp::max,
-    collections::HashSet,
     path::PathBuf,
     sync::{
         Arc,
@@ -8,9 +9,13 @@ use std::{
     },
 };
 
+use anyhow::{
+    Result,
+    bail,
+};
 use burn::{
     data::dataloader::DataLoader,
-    grad_clipping::GradientClippingConfig,
+    grad_clipping::GradientClipping,
     lr_scheduler::{
         composed::{
             ComposedLrSchedulerConfig,
@@ -19,10 +24,25 @@ use burn::{
         cosine::CosineAnnealingLrSchedulerConfig,
         linear::LinearLrSchedulerConfig,
     },
-    module::Module,
+    module::{
+        Module,
+        ModuleVisitor,
+        Param,
+        ParamId,
+    },
     nn::loss::CrossEntropyLossConfig,
-    optim::AdamWConfig,
-    prelude::Backend,
+    optim::{
+        AdamWConfig,
+        MuonConfig,
+        Optimizer,
+        decay::WeightDecayConfig,
+    },
+    prelude::{
+        Backend,
+        Bool,
+        Float,
+        Int,
+    },
     record::CompactRecorder,
     tensor::{
         AsIndex,
@@ -46,6 +66,15 @@ use burn::{
     },
 };
 use clap::Parser;
+use hashbrown::HashSet;
+use module_tree::{
+    ModuleTree,
+    burn_ext::burn_desc::{
+        ParamDesc,
+        TensorDesc,
+        TensorKindDesc,
+    },
+};
 use rand::{
     SeedableRng,
     rngs::StdRng,
@@ -56,9 +85,15 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
-use zsl_chat::gpt::gpt_model::{
-    GPT,
-    GPTConfig,
+use zsl_chat::{
+    gpt::gpt_model::{
+        GPT,
+        GPTConfig,
+    },
+    optimizers::{
+        GroupOptimizerAdaptor2,
+        OptimizerGroup,
+    },
 };
 use zsl_chat_data::{
     dataloader::ChatDataLoader,
@@ -293,11 +328,71 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
-    let optimizer = AdamWConfig::new()
-        .with_cautious_weight_decay(args.cautious_weight_decay)
-        .with_weight_decay(args.weight_decay)
-        .with_grad_clipping(Some(GradientClippingConfig::Value(2.0)))
-        .init();
+    let mut mtree = ModuleTree::build(&host);
+
+    let all_params: HashSet<ParamId> = mtree.param_ids()?.collect();
+    // ==>
+    //   let all_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .params()
+    //       .to_param_ids()?
+    //       .collect();
+    //
+    // ==>
+    //   let muon_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .select("descendant-or-self::Param")
+    //       .to_param_ids()?
+    //       .collect();
+
+    let muon_params: HashSet<ParamId> = mtree
+        .select_params("GptHost/GPT/Vec[@name='h']")
+        .filter("@rank=2")
+        .to_param_ids()?
+        .collect();
+    // ==>
+    //   let muon_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .select("GptHost/GPT/Vec[@name='h']")
+    //       .params()
+    //       .filter("@rank=2")
+    //       .to_param_ids()?
+    //       .collect();
+    //
+    // ==>
+    //   let muon_params: HashSet<ParamId> = mtree
+    //       .query()
+    //       .select("GptHost/GPT/Vec[@name='h']/descendant-or-self::Param[@rank=2]"
+    // )       .to_param_ids()?
+    //       .collect();
+
+    let adamw_params: HashSet<ParamId> = all_params
+        .difference(&muon_params)
+        .cloned()
+        .collect::<HashSet<_>>();
+
+    if muon_params.is_empty() {
+        bail!("Muon parameters not found");
+    }
+    if adamw_params.is_empty() {
+        bail!("AdamW parameters not found");
+    }
+
+    let optimizer = GroupOptimizerAdaptor2::new(
+        vec![OptimizerGroup::from_adaptor(
+            adamw_params,
+            &AdamWConfig::new()
+                .with_cautious_weight_decay(args.cautious_weight_decay)
+                .with_weight_decay(args.weight_decay)
+                .init::<B, GptHost<B>>(),
+        )],
+        vec![OptimizerGroup::from_adaptor(
+            muon_params,
+            &MuonConfig::new().init::<B, GptHost<B>>(),
+        )],
+    )
+    .unwrap()
+    .with_grad_clipping(GradientClipping::Value(2.0));
 
     let result = training.launch(Learner::new(host, optimizer, lr_scheduler));
 
@@ -314,60 +409,20 @@ pub struct GptHost<B: Backend> {
     pub gpt: GPT<B>,
 }
 
-impl<B: AutodiffBackend> TrainStep for GptHost<B> {
-    type Input = Tensor<B, 2, burn::prelude::Int>;
-    type Output = ClassificationOutput<B>;
-
-    fn step(
+impl<B: Backend> GptHost<B> {
+    fn loss_step(
         &self,
-        input: Self::Input,
-    ) -> TrainOutput<Self::Output> {
-        let x: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
+        input: Tensor<B, 2, burn::prelude::Int>,
+    ) -> ClassificationOutput<B> {
+        let inputs: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
         let targets: Tensor<B, 2, burn::prelude::Int> = input.slice(s![.., 1..]);
 
         let mut kv_cache = None;
 
         // Logits.
-        let output: Tensor<B, 3> = self.gpt.forward(x, &mut kv_cache);
+        let outputs: Tensor<B, 3> = self.gpt.forward(inputs, &mut kv_cache);
 
-        let output_flatten: Tensor<B, 2> = output.flatten(0, 1);
-        let targets_flatten: Tensor<B, 1, burn::prelude::Int> = targets.flatten(0, 1);
-
-        let loss = CrossEntropyLossConfig::new()
-            .init(&output_flatten.device())
-            .forward(output_flatten.clone(), targets_flatten.clone());
-
-        let grads = loss.backward();
-
-        TrainOutput::new(
-            self,
-            grads,
-            ClassificationOutput {
-                loss,
-                output: output_flatten,
-                targets: targets_flatten,
-            },
-        )
-    }
-}
-
-impl<B: Backend> InferenceStep for GptHost<B> {
-    type Input = Tensor<B, 2, burn::prelude::Int>;
-    type Output = ClassificationOutput<B>;
-
-    fn step(
-        &self,
-        input: Self::Input,
-    ) -> Self::Output {
-        let x: Tensor<B, 2, burn::prelude::Int> = input.clone().slice(s![.., ..-1]);
-        let targets: Tensor<B, 2, burn::prelude::Int> = input.slice(s![.., 1..]);
-
-        let mut kv_cache = None;
-
-        // Logits.
-        let output: Tensor<B, 3> = self.gpt.forward(x, &mut kv_cache);
-
-        let output_flatten: Tensor<B, 2> = output.flatten(0, 1);
+        let output_flatten: Tensor<B, 2> = outputs.flatten(0, 1);
         let targets_flatten: Tensor<B, 1, burn::prelude::Int> = targets.flatten(0, 1);
 
         let loss = CrossEntropyLossConfig::new()
@@ -379,5 +434,32 @@ impl<B: Backend> InferenceStep for GptHost<B> {
             output: output_flatten,
             targets: targets_flatten,
         }
+    }
+}
+
+impl<B: AutodiffBackend> TrainStep for GptHost<B> {
+    type Input = Tensor<B, 2, burn::prelude::Int>;
+    type Output = ClassificationOutput<B>;
+
+    fn step(
+        &self,
+        input: Self::Input,
+    ) -> TrainOutput<Self::Output> {
+        let classification_output = self.loss_step(input);
+        let grads = classification_output.loss.backward();
+
+        TrainOutput::new(self, grads, classification_output)
+    }
+}
+
+impl<B: Backend> InferenceStep for GptHost<B> {
+    type Input = Tensor<B, 2, burn::prelude::Int>;
+    type Output = ClassificationOutput<B>;
+
+    fn step(
+        &self,
+        input: Self::Input,
+    ) -> Self::Output {
+        self.loss_step(input)
     }
 }

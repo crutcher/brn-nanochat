@@ -395,12 +395,10 @@ impl<B: Backend> GPT<B> {
 }
 
 #[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
     use bimm_contracts::assert_shape_contract;
-    use burn::{
-        backend::Wgpu,
-        tensor::Distribution,
-    };
+    use burn::tensor::Distribution;
 
     use super::*;
 
@@ -419,8 +417,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_gpt_forward() {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let batch_size = 1;

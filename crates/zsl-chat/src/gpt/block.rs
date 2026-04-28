@@ -117,8 +117,8 @@ impl<B: Backend> GPTBlock<B> {
 }
 
 #[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
-    use bimm_contracts::assert_shape_contract;
     use bunsen::nn::{
         attention::{
             csa::{
@@ -129,16 +129,14 @@ mod tests {
         },
         embedding::rotary::RotaryEmbeddingConfig,
     };
-    use burn::{
-        backend::Wgpu,
-        tensor::Distribution,
-    };
+    use burn::tensor::Distribution;
 
     use super::*;
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_gpt_block_config() {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let n_embed = 1024;
@@ -163,8 +161,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_gpt_block_forward() {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let batch = 2;
@@ -188,7 +187,7 @@ mod tests {
         let mut kv_cache: Option<&mut KVCache<B>> = None;
 
         let output = block.forward(input.clone(), &r_emb, &mut kv_cache);
-        assert_shape_contract!(
+        bimm_contracts::assert_shape_contract!(
             ["B", "T", "D"],
             &output.dims(),
             &[("B", batch), ("T", seq_len), ("D", n_embed)]

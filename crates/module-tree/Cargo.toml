@@ -1,0 +1,27 @@
+[package]
+name = "module-tree"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+cuda = ["burn/cuda"]
+
+[dependencies]
+burn = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+# debug-ignore = { workspace = true }
+spanned_error_message = { workspace = true }
+
+xot = { workspace = true }
+xee-xpath = { workspace = true }
+
+[dev-dependencies]
+zsl-chat = { path = "../zsl-chat" }
+
+[lints]
+workspace = true

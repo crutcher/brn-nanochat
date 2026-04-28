@@ -1,18 +1,23 @@
 [package]
 name = "zsl-chat"
+version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish = false
+
+[features]
+default = []
+cuda = ["burn/cuda"]
 
 [dependencies]
 burn = { workspace = true }
 bunsen = { workspace = true }
 bimm-contracts = { workspace = true, features = ["burn"] }
+paste = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
+hashbrown = { workspace = true }
 anyhow = { workspace = true, features = ["std"] }
-
-[dev-dependencies]
-burn = { workspace = true, features = ["wgpu"] }
 
 [lints]
 workspace = true

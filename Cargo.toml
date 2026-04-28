@@ -8,6 +8,7 @@ members = [
     "crates/*/examples/*",
 ]
 
+
 [workspace.package]
 version = "0.0.9"
 repository = "https://github.com/crutcher/brn-nanochat"
@@ -26,14 +27,25 @@ doc_markdown = "deny"
 
 [workspace.dependencies]
 burn = "0.20.1"
-bunsen = "0.0.2"
+bunsen = "0.0.4"
 wordchipper = { version = "0.9.1" }
 wordchipper-cli-util = { version = "0.9.1" }
+bimm-contracts = "0.20.1"
+regex = "1.12.3"
 
+xot = "0.31.2"
+xee-xpath = "0.1.5"
+
+indextree = "4.8.1"
+debug-ignore = "1.0.5"
+
+# must match the version used by burn
+hashbrown = { version = "0.16.1" }
+
+paste = "1.0.9"
 derive-new = "0.7.0"
 humansize = "2.1.3"
 arrow = "58.1.0"
-bimm-contracts = "0.19.2"
 clap = "4.5"
 dary_heap = "0.3"
 downloader = "0.2"
@@ -41,8 +53,11 @@ parquet = "58.1.0"
 rand = "0.10"
 shellexpand = "3.1"
 tempdir = "0.3"
+strum = "0.28.0"
 serde = "1.0.228"
 serde_json = "1.0.149"
+thiserror = "2.0.18"
+spanned_error_message = "0.1.0"
 
 anyhow = { version = "1.0", default-features = false }
 log = { version = "0.4", default-features = false }
