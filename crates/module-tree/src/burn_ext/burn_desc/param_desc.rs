@@ -3,24 +3,17 @@ use std::{
     ops::Deref,
 };
 
-use burn::{
-    module::{
-        Param,
-        ParamId,
-        Parameter,
-    },
-    prelude::Backend,
-    tensor::{
-        BasicOps,
-        Tensor,
-    },
+use burn::module::{
+    Param,
+    ParamId,
+    Parameter,
 };
 
-use crate::burn_ext::burn_desc::{
-    ParamKindBinding,
-    TensorDesc,
-};
-
+/// This is meta-description type of a burn [`burn::module::Param`].
+///
+/// This type acts as [`AsRef<T>`], [`Deref<T>`].
+///
+/// Currently, this will always be `Param<Tensor<_, _, _>>`.
 #[derive(Debug, Clone)]
 pub struct ParamDesc<T>
 where
@@ -64,21 +57,19 @@ where
         }
     }
 
-    /// The burn `ParamId`.
+    /// Get the [`ParamId`].
     pub fn param_id(&self) -> ParamId {
         self.param_id
     }
 }
 
-impl<B, const R: usize, K> From<&Param<Tensor<B, R, K>>> for ParamDesc<TensorDesc>
+impl<T, D> From<&Param<T>> for ParamDesc<D>
 where
-    B: Backend,
-    K: BasicOps<B>,
-    burn::Tensor<B, R, K>: Parameter,
-    K: ParamKindBinding,
+    T: Parameter,
+    D: for<'a> From<&'a T> + Debug + Clone + Send + 'static,
 {
-    fn from(param: &Param<Tensor<B, R, K>>) -> Self {
-        Self::new(param.id, TensorDesc::from(&param.val()))
+    fn from(param: &Param<T>) -> Self {
+        Self::new(param.id, D::from(&param.val()))
     }
 }
 
@@ -92,7 +83,10 @@ mod tests {
     };
 
     use super::*;
-    use crate::burn_ext::burn_desc::TensorKindDesc;
+    use crate::burn_ext::burn_desc::{
+        TensorDesc,
+        TensorKindDesc,
+    };
 
     #[test]
     #[cfg(feature = "cuda")]

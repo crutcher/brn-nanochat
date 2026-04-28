@@ -38,6 +38,7 @@ xee-xpath = "0.1.5"
 
 indextree = "4.8.1"
 debug-ignore = "1.0.5"
+indoc = "2.0.7"
 
 # must match the version used by burn
 hashbrown = { version = "0.16.1" }

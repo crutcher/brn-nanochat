@@ -23,6 +23,7 @@ use crate::{
     burn_ext::burn_desc::{
         ParamDesc,
         TensorDesc,
+        TensorParamDesc,
     },
     constants::{
         CLASS_ATTR,
@@ -89,21 +90,9 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         self.mtree.xot_mut()
     }
 
-    fn debug_stack(&self) -> Vec<String> {
-        let xot = self.xot();
-        self.stack
-            .iter()
-            .map(|n| {
-                let elem = xot.element(*n).unwrap();
-                let name = elem.name();
-                xot.local_name_str(name).to_string()
-            })
-            .collect()
-    }
-
     fn add_param_desc(
         &mut self,
-        param_desc: ParamDesc<TensorDesc>,
+        param_desc: TensorParamDesc,
     ) {
         let node = self.new_child(*self.stack.last().unwrap(), PARAM_ELEM);
         self.set_idents(node);

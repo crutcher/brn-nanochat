@@ -1,7 +1,7 @@
 #![recursion_limit = "512"]
 
 pub mod burn_ext;
-mod mtree;
+mod module_tree;
 mod type_util;
 mod xot_util;
 
@@ -15,6 +15,6 @@ pub mod xee_util;
 pub mod api_examples;
 
 #[doc(inline)]
-pub use mtree::*;
+pub use module_tree::*;
 #[doc(inline)]
 pub use xot_util::*;

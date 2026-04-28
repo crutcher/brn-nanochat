@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    fmt::Debug,
+    str::FromStr,
+};
 
 use burn::{
     Tensor,
@@ -15,6 +18,7 @@ use burn::{
 
 use crate::{
     burn_enc::shape_from_xml_attr,
+    burn_ext::burn_desc::ParamDesc,
     error::{
         BunsenError,
         BunsenResult,
@@ -154,6 +158,9 @@ impl TensorDesc {
         self.dtype.size() * self.shape.num_elements()
     }
 }
+
+/// A type alias for a [`ParamDesc`] of a [`TensorDesc`].
+pub type TensorParamDesc = ParamDesc<TensorDesc>;
 
 #[cfg(test)]
 mod tests {

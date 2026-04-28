@@ -146,6 +146,64 @@ impl ModuleTree {
         self.docs.xot_mut()
     }
 
+    /// Return an iterator over all [`ParamId`]s in the module.
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    ///
+    /// ## Example
+    /// ```rust,ignore
+    /// let parm_ids: HashSet<ParamId> = mtree
+    ///     .param_ids()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let parm_ids: HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .params()
+    ///     .to_param_ids()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let parm_ids: HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .select("descendant-or-self::Param")
+    ///     .to_param_ids()?
+    ///     .collect();
+    /// ```
+    pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
+        self.query().params().to_param_ids()
+    }
+
+    /// Return an iterator over all [`ParamId`]s in the module.
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    ///
+    /// ## Example
+    /// ```rust,ignore
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .param_descs()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .query()
+    ///     .params()
+    ///     .to_param_descs()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .query()
+    ///     .select("descendant-or-self::Param")
+    ///     .to_param_descs()?
+    ///     .collect();
+    /// ```
+    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
+        self.query().params().to_param_descs()
+    }
+
     /// Create a new default [`ModuleTreeQuery`] for this module tree.
     ///
     /// The query builder has a fluent api to incrementally refine a query.
@@ -292,64 +350,6 @@ impl ModuleTree {
         expr: &str,
     ) -> BunsenResult<impl Iterator<Item = ParamId>> {
         self.try_select_params(expr)?.to_param_ids()
-    }
-
-    /// Return an iterator over all [`ParamId`]s in the module.
-    ///
-    /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
-    ///
-    /// ## Example
-    /// ```rust,ignore
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .param_ids()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .query()
-    ///     .params()
-    ///     .to_param_ids()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .query()
-    ///     .select("descendant-or-self::Param")
-    ///     .to_param_ids()?
-    ///     .collect();
-    /// ```
-    pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
-        self.query().params().to_param_ids()
-    }
-
-    /// Return an iterator over all [`ParamId`]s in the module.
-    ///
-    /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
-    ///
-    /// ## Example
-    /// ```rust,ignore
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .param_descs()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .query()
-    ///     .params()
-    ///     .to_param_descs()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .query()
-    ///     .select("descendant-or-self::Param")
-    ///     .to_param_descs()?
-    ///     .collect();
-    /// ```
-    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
-        self.query().params().to_param_descs()
     }
 }
 
