@@ -153,9 +153,15 @@ impl TensorDesc {
         self.shape.rank()
     }
 
+    /// The number of elements in the shape.
+    pub fn num_elements(&self) -> usize {
+        self.shape.num_elements()
+    }
+
     /// The estimated size of the tensor.
+    /// This ignores alignment, padding, and metadata.
     pub fn size_estimate(&self) -> usize {
-        self.dtype.size() * self.shape.num_elements()
+        self.dtype.size() * self.num_elements()
     }
 }
 

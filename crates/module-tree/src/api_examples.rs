@@ -36,12 +36,11 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cuda")]
-    fn cuda_tensor_param_desc_example() -> BunsenResult<()> {
-        tensor_param_desc_example::<burn::backend::Cuda>(&Default::default())
+    fn cuda_basic_module_tree_api_example() -> BunsenResult<()> {
+        basic_module_tree_api_example::<burn::backend::Cuda>(&Default::default())
     }
 
-    /// This is an example of the [`TensorParamDesc`] API.
-    fn tensor_param_desc_example<B: Backend>(device: &B::Device) -> BunsenResult<()> {
+    fn basic_module_tree_api_example<B: Backend>(device: &B::Device) -> BunsenResult<()> {
         // Create a Linear module, with a bias:
         // * `weight` - `Param<Tensor<B, 2>>` [d_input, d_output].
         // * `bias` - `Option<Param<Tensor<B, 1>>>` [d_output].
@@ -66,30 +65,17 @@ mod tests {
 
         // [`TensorParamDesc`] also provides some convience methods:
         assert_eq!(weight_desc.rank(), 2);
+        assert_eq!(weight_desc.num_elements(), 2 * 3);
+        assert_eq!(
+            weight_desc.num_elements(),
+            weight_desc.shape().num_elements()
+        );
+
+        // This is a rough size-estimate of the buffer size used by the parameter.
         assert_eq!(
             weight_desc.size_estimate(),
             module.weight.dtype().size() * 2 * 3
         );
-
-        Ok(())
-    }
-
-    #[test]
-    #[cfg(feature = "cuda")]
-    fn cuda_linear_module_tree_example() -> BunsenResult<()> {
-        linear_module_tree_example::<burn::backend::Cuda>(&Default::default())
-    }
-
-    fn linear_module_tree_example<B: Backend>(device: &B::Device) -> BunsenResult<()> {
-        // Create a Linear module, with a bias:
-        // * `weight` - `Param<Tensor<B, 2>>` [d_input, d_output].
-        // * `bias` - `Option<Param<Tensor<B, 1>>>` [d_output].
-        let d_input = 2;
-        let d_output = 3;
-        let module: Linear<B> = LinearConfig::new(d_input, d_output).init(device);
-
-        let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
-        let bias_desc: TensorParamDesc = TensorParamDesc::from(module.bias.as_ref().unwrap());
 
         // Build a ModuleTree from the module.
         // As the ModuleTree holds non-Send active active query environment,
