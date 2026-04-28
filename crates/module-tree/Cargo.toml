@@ -6,6 +6,10 @@ rust-version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = []
+cuda = ["burn/cuda"]
+
 [dependencies]
 burn = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
@@ -17,7 +21,6 @@ xot = { workspace = true }
 xee-xpath = { workspace = true }
 
 [dev-dependencies]
-burn = { workspace = true, features = ["wgpu"] }
 zsl-chat = { path = "../zsl-chat" }
 
 [lints]

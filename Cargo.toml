@@ -8,6 +8,7 @@ members = [
     "crates/*/examples/*",
 ]
 
+
 [workspace.package]
 version = "0.0.9"
 repository = "https://github.com/crutcher/brn-nanochat"

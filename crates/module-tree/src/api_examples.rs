@@ -2,7 +2,6 @@
 #[allow(unused)]
 mod tests {
     use burn::{
-        backend::Wgpu,
         module::{
             Module,
             ParamId,
@@ -48,8 +47,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_gpt() -> BunsenResult<()> {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);

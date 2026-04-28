@@ -83,9 +83,9 @@ where
 }
 
 #[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
     use burn::{
-        backend::Wgpu,
         nn::LinearConfig,
         prelude::Shape,
         tensor::DType,
@@ -95,8 +95,9 @@ mod tests {
     use crate::burn_ext::burn_desc::TensorKindDesc;
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_from_param() {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let linear = LinearConfig::new(2, 3).init::<B>(&device);

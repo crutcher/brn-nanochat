@@ -157,10 +157,7 @@ impl TensorDesc {
 
 #[cfg(test)]
 mod tests {
-    use burn::{
-        backend::Wgpu,
-        tensor,
-    };
+    use burn::tensor;
 
     use super::*;
 
@@ -181,8 +178,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_tensor_desc() {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         {

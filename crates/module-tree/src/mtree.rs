@@ -544,12 +544,9 @@ impl<'a> ModuleTreeQuery<'a> {
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
-    use burn::{
-        backend::Wgpu,
-        nn::{
-            Linear,
-            LinearConfig,
-        },
+    use burn::nn::{
+        Linear,
+        LinearConfig,
     };
     use zsl_chat::gpt::gpt_model::{
         GPT,
@@ -597,8 +594,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cuda")]
     fn test_gpt() -> BunsenResult<()> {
-        type B = Wgpu;
+        type B = burn::backend::Cuda;
         let device = Default::default();
 
         let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);
