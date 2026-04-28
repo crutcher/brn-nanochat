@@ -9,6 +9,7 @@ license.workspace = true
 [features]
 default = []
 cuda = ["burn/cuda"]
+wgpu = ["burn/wgpu"]
 
 [dependencies]
 burn = { workspace = true }

@@ -18,6 +18,11 @@ use xee_xpath::{
     Itemable,
     Queries,
     Query,
+    error::{
+        Error as SpannedError,
+        ErrorValue,
+        Result as SpannedResult,
+    },
     query::Convert,
 };
 use xot::{
@@ -581,6 +586,42 @@ impl<'a> ModuleTreeQuery<'a> {
     pub fn to_param_ids(mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
         Ok(self.to_param_descs()?.map(|d| d.param_id()))
     }
+
+    /// Iterate over string fragments for the current expression matches.
+    ///
+    /// # Arguments
+    /// * `pretty` - pretty-print/indent the xml fragments.
+    pub fn to_fragments(
+        &mut self,
+        pretty: bool,
+    ) -> BunsenResult<impl Iterator<Item = String>> {
+        use xee_xpath::Item;
+
+        let output_params = xot::output::xml::Parameters {
+            indentation: if pretty {
+                Some(Default::default())
+            } else {
+                None
+            },
+            ..Default::default()
+        };
+
+        let res = self.execute_many(
+            |docs: &mut Documents, item: &Item| -> SpannedResult<String> {
+                let xot: &xot::Xot = docs.xot();
+
+                match item {
+                    Item::Node(node) => xot
+                        .serialize_xml_string(output_params.clone(), *node)
+                        .map(|s| s.trim().to_string())
+                        .map_err(|e| ErrorValue::from(e).into()),
+                    _ => Ok(item.string_value(xot)?),
+                }
+            },
+        )?;
+
+        Ok(res.into_iter())
+    }
 }
 
 #[cfg(test)]
@@ -617,8 +658,17 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cuda")]
-    fn test_debug() {
-        type B = burn::backend::Cuda;
+    fn test_debug_cuda() {
+        test_debug::<burn::backend::Cuda>();
+    }
+
+    #[test]
+    #[cfg(feature = "wgpu")]
+    fn test_debug_wgpu() {
+        test_debug::<burn::backend::Wgpu>();
+    }
+
+    fn test_debug<B: Backend>() {
         let device = Default::default();
         let module: Linear<B> = LinearConfig::new(2, 3).init(&device);
 
@@ -661,8 +711,17 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cuda")]
-    fn test_to_xml() {
-        type B = burn::backend::Cuda;
+    fn test_to_xml_cuda() {
+        test_to_xml::<burn::backend::Cuda>();
+    }
+
+    #[test]
+    #[cfg(feature = "wgpu")]
+    fn test_to_xml_wgpu() {
+        test_to_xml::<burn::backend::Wgpu>();
+    }
+
+    fn test_to_xml<B: Backend>() {
         let device = Default::default();
         let module: Linear<B> = LinearConfig::new(2, 3).init(&device);
 

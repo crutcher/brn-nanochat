@@ -24,17 +24,25 @@ mod tests {
 
     #[test]
     #[cfg(feature = "cuda")]
-    fn cuda_basic_module_tree_api_example() -> BunsenResult<()> {
-        basic_module_tree_api_example::<burn::backend::Cuda>(&Default::default())
+    fn basic_module_tree_api_example_cuda() -> BunsenResult<()> {
+        basic_module_tree_api_example::<burn::backend::Cuda>()
     }
 
-    fn basic_module_tree_api_example<B: Backend>(device: &B::Device) -> BunsenResult<()> {
+    #[test]
+    #[cfg(feature = "wgpu")]
+    fn basic_module_tree_api_example_wgpu() -> BunsenResult<()> {
+        basic_module_tree_api_example::<burn::backend::Wgpu>()
+    }
+
+    fn basic_module_tree_api_example<B: Backend>() -> BunsenResult<()> {
+        let device = Default::default();
+
         // Create a Linear module, with a bias:
         // * `weight` - `Param<Tensor<B, 2>>` [d_input, d_output].
         // * `bias` - `Option<Param<Tensor<B, 1>>>` [d_output].
         let d_input = 2;
         let d_output = 3;
-        let module: Linear<B> = LinearConfig::new(d_input, d_output).init(device);
+        let module: Linear<B> = LinearConfig::new(d_input, d_output).init(&device);
 
         // [`TensorParamDesc`] can describe a `Param<Tensor<B, R, K>>`:
         let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
@@ -213,6 +221,25 @@ mod tests {
                 bias_id = bias_desc.param_id(),
                 bias_dtype = format!("{:?}", bias_desc.dtype()),
             }
+        );
+
+        // We can collect the current query results as XML fragments.
+        // This is primarily useful for debugging.
+        let fragments: Vec<String> = query.params().to_fragments(false)?.collect();
+        assert_eq!(
+            &fragments,
+            &[
+                format!(
+                    r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
+                    weight_id = weight_desc.param_id(),
+                    weight_dtype = format!("{:?}", weight_desc.dtype()),
+                ),
+                format!(
+                    r#"<Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>"#,
+                    bias_id = bias_desc.param_id(),
+                    bias_dtype = format!("{:?}", bias_desc.dtype()),
+                )
+            ],
         );
 
         Ok(())
