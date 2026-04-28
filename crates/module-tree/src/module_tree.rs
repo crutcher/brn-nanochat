@@ -59,6 +59,8 @@ impl Default for ModuleTree {
     }
 }
 
+pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 impl ModuleTree {
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
         let mut builder = ModuleTreeBuilder::default();
@@ -75,7 +77,7 @@ impl ModuleTree {
         let doc = xot.new_document_with_element(root).unwrap();
 
         let version_nid = xot.add_name("version");
-        xot.set_attribute(root, version_nid, env!("CARGO_PKG_VERSION"));
+        xot.set_attribute(root, version_nid, MODULE_TREE_VERSION);
 
         Self { docs, root }
     }

@@ -22,6 +22,7 @@ mod tests {
     };
 
     use crate::{
+        MODULE_TREE_VERSION,
         ModuleTree,
         ModuleTreeQuery,
         burn_ext::burn_desc::{
@@ -95,12 +96,51 @@ mod tests {
         // it must be `mut` to be useful.
         let mut mtree = ModuleTree::build(&module);
 
+        // [`ModuleTree`] builds an XML meta-description of the module structure.
+        //
+        // This can be dumped directly to a `String` to examine the module structure.
+        //
+        // The XPath expressions used by query api all all written in terms of this
+        // structure; though they start with `/Module/Structure` as their implied
+        // context.
+        //
+        // The module structure is embedded in the wrapping elements to provide
+        // a pathway to future metadata extension.
+        //
+        // # @id - Document-Unique Id
+        // Every structural element has a document-unique id attribute, which can be
+        // used to reference the element in the XML.
+        //
+        // # <{NAME} class="{CLASS}"/> - Structural Element
+        // Structural elements are given a {NAME} and {CLASS} in the local namespace,
+        // derived from the [`burn::module::ModuleVisitor::enter_module`]
+        // `container_type`.
+        // * `{TYPE}` => NAME=TYPE, CLASS='builtin'
+        // * `{C}:{TYPE}` => NAME=TYPE, CLASS=lowercase(C)
+        //
+        // # @class - Element Class
+        // Structural elements derive their class from their `container_type`;
+        // while `Param` elements are (currently) always "tensor".
+        //
+        // # @name - The structural field name.
+        // If an element is a named field of a "struct"-class parent,
+        // then it will have a `@name` attribute.
         assert_eq!(
-            &mtree.to_xml(),
+            mtree.to_xml(),
             indoc::formatdoc! {r#"
-              <ModuleTree version="{}">
-            "#,
-
+                <ModuleTree version="{MODULE_TREE_VERSION}">
+                  <Structure>
+                    <Linear id="n:1" class="struct">
+                      <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                      <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                    </Linear>
+                  </Structure>
+                </ModuleTree>
+                "#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
             }
         );
 
@@ -174,6 +214,16 @@ mod tests {
         //     // Collect the results into a `Vec`.
         //     .collect::<Vec<_>>();
         let descs: Vec<TensorParamDesc> = mtree.param_descs()?.collect();
+
+        // The query api is designed to be fluent and chainable.
+        //
+        // The [`ModuleTreeQuery<'a>`] captures a borrow of the module tree,
+        // so you'll need to resolve the borrow before running another query.
+        let q: ModuleTreeQuery<'_> = mtree.query();
+
+        // We can introspect on the current XPath expression being accumulated
+        // by a query by calling `expr()`.
+        assert_eq!(q.expr(), "/ModuleTree/Structure");
 
         Ok(())
     }
