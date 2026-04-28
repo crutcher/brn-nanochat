@@ -3,28 +3,21 @@ use std::{
     ops::Deref,
 };
 
-use burn::{
-    module::{
-        Param,
-        ParamId,
-        Parameter,
-    },
-    prelude::Backend,
-    tensor::{
-        BasicOps,
-        Tensor,
-    },
+use burn::module::{
+    Param,
+    ParamId,
+    Parameter,
 };
 
-use crate::burn_ext::burn_desc::{
-    ParamKindBinding,
-    TensorDesc,
-};
-
-#[derive(Debug, Clone)]
+/// This is meta-description type of a burn [`burn::module::Param`].
+///
+/// This type acts as [`AsRef<T>`], [`Deref<T>`].
+///
+/// Currently, this will always be `Param<Tensor<_, _, _>>`.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     param_id: ParamId,
     data: T,
@@ -32,7 +25,7 @@ where
 
 impl<T> Deref for ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     type Target = T;
 
@@ -43,7 +36,7 @@ where
 
 impl<T> AsRef<T> for ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     fn as_ref(&self) -> &T {
         &self.data
@@ -52,7 +45,7 @@ where
 
 impl<T> ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     pub fn new(
         param_id: ParamId,
@@ -64,21 +57,19 @@ where
         }
     }
 
-    /// The burn `ParamId`.
+    /// Get the [`ParamId`].
     pub fn param_id(&self) -> ParamId {
         self.param_id
     }
 }
 
-impl<B, const R: usize, K> From<&Param<Tensor<B, R, K>>> for ParamDesc<TensorDesc>
+impl<T, D> From<&Param<T>> for ParamDesc<D>
 where
-    B: Backend,
-    K: BasicOps<B>,
-    burn::Tensor<B, R, K>: Parameter,
-    K: ParamKindBinding,
+    T: Parameter,
+    D: for<'a> From<&'a T> + Debug + Clone + Send + PartialEq + 'static,
 {
-    fn from(param: &Param<Tensor<B, R, K>>) -> Self {
-        Self::new(param.id, TensorDesc::from(&param.val()))
+    fn from(param: &Param<T>) -> Self {
+        Self::new(param.id, D::from(&param.val()))
     }
 }
 
@@ -92,7 +83,10 @@ mod tests {
     };
 
     use super::*;
-    use crate::burn_ext::burn_desc::TensorKindDesc;
+    use crate::burn_ext::burn_desc::{
+        TensorDesc,
+        TensorKindDesc,
+    };
 
     #[test]
     #[cfg(feature = "cuda")]

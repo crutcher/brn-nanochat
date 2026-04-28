@@ -2,90 +2,293 @@
 #[allow(unused)]
 mod tests {
     use burn::{
-        module::{
-            Module,
-            ParamId,
-        },
+        module::ParamId,
         nn::{
             Linear,
             LinearConfig,
         },
         prelude::Backend,
-    };
-    use zsl_chat::gpt::gpt_model::{
-        GPT,
-        GPTConfig,
+        tensor::Shape,
     };
 
     use crate::{
+        MODULE_TREE_VERSION,
         ModuleTree,
+        ModuleTreeQuery,
         burn_ext::burn_desc::{
-            ParamDesc,
-            TensorDesc,
+            TensorKindDesc,
+            TensorParamDesc,
         },
         error::BunsenResult,
     };
 
-    #[derive(Module, Debug)]
-    struct TestModule<B: Backend> {
-        seq: Vec<Linear<B>>,
-        tup: (Linear<B>, Linear<B>),
-        arr: [Linear<B>; 1],
-    }
-
-    impl<B: Backend> TestModule<B> {
-        fn init(device: &B::Device) -> Self {
-            Self {
-                seq: vec![LinearConfig::new(10, 10).init(device)],
-                tup: (
-                    LinearConfig::new(10, 10).init(device),
-                    LinearConfig::new(10, 23).init(device),
-                ),
-                arr: [LinearConfig::new(10, 10).init(device)],
-            }
-        }
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn basic_module_tree_api_example_cuda() -> BunsenResult<()> {
+        basic_module_tree_api_example::<burn::backend::Cuda>()
     }
 
     #[test]
-    #[cfg(feature = "cuda")]
-    fn test_gpt() -> BunsenResult<()> {
-        type B = burn::backend::Cuda;
+    #[cfg(feature = "wgpu")]
+    fn basic_module_tree_api_example_wgpu() -> BunsenResult<()> {
+        basic_module_tree_api_example::<burn::backend::Wgpu>()
+    }
+
+    fn basic_module_tree_api_example<B: Backend>() -> BunsenResult<()> {
         let device = Default::default();
 
-        let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);
+        // Create a Linear module, with a bias:
+        // * `weight` - `Param<Tensor<B, 2>>` [d_input, d_output].
+        // * `bias` - `Option<Param<Tensor<B, 1>>>` [d_output].
+        let d_input = 2;
+        let d_output = 3;
+        let module: Linear<B> = LinearConfig::new(d_input, d_output).init(&device);
 
+        // [`TensorParamDesc`] can describe a `Param<Tensor<B, R, K>>`:
+        let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
+        let bias_ref = module.bias.as_ref().unwrap();
+        let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
+
+        // [`TensorParamDesc`] exposes the basic `Param` and `Tensor` metadata:
+        assert_eq!(weight_desc.param_id(), module.weight.id);
+
+        // [`TensorKindDesc`] is an enum which describes the current kind variants:
+        assert_eq!(weight_desc.kind(), TensorKindDesc::Float);
+        assert_eq!(weight_desc.dtype(), module.weight.dtype());
+
+        assert_eq!(weight_desc.shape(), &module.weight.shape());
+        assert_eq!(weight_desc.shape(), &Shape::new([d_input, d_output]));
+
+        // [`TensorParamDesc`] also provides some convience methods:
+        assert_eq!(weight_desc.rank(), 2);
+        assert_eq!(weight_desc.num_elements(), 2 * 3);
+        assert_eq!(
+            weight_desc.num_elements(),
+            weight_desc.shape().num_elements()
+        );
+
+        // This is a rough size-estimate of the buffer size used by the parameter.
+        assert_eq!(
+            weight_desc.size_estimate(),
+            module.weight.dtype().size() * 2 * 3
+        );
+
+        // Build a ModuleTree from the module.
+        // As the ModuleTree holds non-Send active active query environment,
+        // it must be `mut` to be useful.
         let mut mtree = ModuleTree::build(&module);
 
-        println!("{:#?}", mtree);
+        // [`ModuleTree`] builds an XML meta-description of the module structure.
+        //
+        // This can be dumped directly to a `String` to examine the module structure.
+        //
+        // The XPath expressions used by query api all all written in terms of this
+        // structure; though they start with `/Module/Structure` as their implied
+        // context.
+        //
+        // The module structure is embedded in the wrapping elements to provide
+        // a pathway to future metadata extension.
+        //
+        // # @id - Document-Unique Id
+        // Every structural element has a document-unique id attribute, which can be
+        // used to reference the element in the XML.
+        //
+        // # <{NAME} class="{CLASS}"/> - Structural Element
+        // Structural elements are given a {NAME} and {CLASS} in the local namespace,
+        // derived from the [`burn::module::ModuleVisitor::enter_module`]
+        // `container_type`.
+        // * `{TYPE}` => NAME=TYPE, CLASS='builtin'
+        // * `{C}:{TYPE}` => NAME=TYPE, CLASS=lowercase(C)
+        //
+        // # @class - Element Class
+        // Structural elements derive their class from their `container_type`;
+        // while `Param` elements are (currently) always "tensor".
+        //
+        // # @name - The structural field name.
+        // If an element is a named field of a "struct"-class parent,
+        // then it will have a `@name` attribute.
+        assert_eq!(
+            mtree.to_xml(true),
+            indoc::formatdoc! {r#"
+                <ModuleTree version="{MODULE_TREE_VERSION}">
+                  <Structure>
+                    <Linear id="n:1" class="struct">
+                      <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                      <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                    </Linear>
+                  </Structure>
+                </ModuleTree>
+                "#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
 
-        /*
-        let ps = mtree
-            .select("GPT/Vec[@name='h']//Param")
-            .where_expr("@rank = 2")
-            .param_ids()?;
+        // [`ModuleTree`] has a Debug impl:
+        assert_eq!(
+            format!("{:#?}", mtree),
+            indoc::formatdoc! {r#"
+                ModuleTree {{
+                  <ModuleTree version="{MODULE_TREE_VERSION}">
+                    <Structure>
+                      <Linear id="n:1" class="struct">
+                        <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                        <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                      </Linear>
+                    </Structure>
+                  </ModuleTree>
+                }}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
 
-        println!("Params: {ps:?}");
-         */
+        // [`ModuleTree::param_ids`] iterates over all [`ParamId`]s.
+        //
+        // This is a useful way to get all the parameter ids in a module;
+        // but it is actually a wrapper over a series of more complex steps.
+        //
+        //   let ids: Vec<ParamId> = mtree
+        //       .query()
+        //       // .params() is implicit to [`ModuleTreeQuery::to_param_ids`],
+        //       // equivalent to: .select("descendant-or-self::Param")
+        //       .to_param_ids()?
+        //       .collect();
+        let module_param_ids: Vec<ParamId> = mtree.param_ids()?.collect();
 
-        let ids: Vec<ParamId> = mtree
-            .select_params("GPT/*[@name='h']")
-            .filter("@rank=2")
-            .to_param_ids()?
-            .collect();
+        // IMPORTANT: Module Tree Ordering
+        //
+        // `burn` Modules order their children in a stable and specific order,
+        // determined by the order of their declaration in the source code,
+        // and the current semantics of the `Module` derive macro.
+        //
+        // Where possible, you should not rely upon this; and should prefer
+        // to use `HashSet<ParamId>` or similar to shield yourself from
+        // ordering variation; particularly as you'll generally be using
+        // this machinery when doing subset calculations.
+        assert_eq!(
+            module_param_ids,
+            [module.weight.id, module.bias.as_ref().unwrap().id]
+        );
 
-        println!("IDs: {ids:?}");
+        // [`ModuleTreeQuery::to_param_ids`] iterates over [`ParamId`]s for
+        // each parameter in the subtree.
+        assert_eq!(
+            &mtree.query().to_param_ids()?.collect::<Vec<ParamId>>(),
+            &module_param_ids,
+        );
 
-        let descs: Vec<ParamDesc<TensorDesc>> = mtree
-            .select_params("GPT/*[@name='h']")
-            .filter("@rank=2")
-            .to_param_descs()?
-            .collect();
+        // [`ModuleTree::param_descs`] iterates over descriptions of every parameter.
+        //
+        // This leverages the [`TensorParamDesc`] API to strip generics from
+        // the introspection api.
+        //
+        // Similar to [`ModuleTree::param_ids`], this is a wrapper over a series of more
+        // complex steps.
+        //
+        //   let descs: Vec<ParamDesc<TensorDesc>> = mtree
+        //       .query()
+        //       // .params() is implicit to [`ModuleTreeQuery::to_param_descs`],
+        //       // equivalent to: .select("descendant-or-self::Param")
+        //       .to_param_descs()?
+        //       .collect();
+        let module_param_descs: Vec<TensorParamDesc> = mtree.param_descs()?.collect();
+        assert_eq!(
+            &module_param_descs,
+            &vec![weight_desc.clone(), bias_desc.clone()]
+        );
 
-        println!("Descs: {descs:#?}");
+        // [`ModuleTreeQuery::to_param_descs`] iterates over
+        // [`TensorParamDesc`]s for each parameter in the subtree.
+        assert_eq!(
+            &mtree
+                .query()
+                .to_param_descs()?
+                .collect::<Vec<TensorParamDesc>>(),
+            &module_param_descs,
+        );
 
-        let ids = descs.iter().map(|d| d.param_id()).collect::<Vec<_>>();
+        // The query api is designed to be fluent and chainable.
+        //
+        // The [`ModuleTreeQuery<'a>`] captures a borrow of the module tree,
+        // so you'll need to resolve the borrow before running another query.
+        let mut query: ModuleTreeQuery<'_> = mtree.query();
 
-        println!("IDs: {ids:?}");
+        // We can introspect on the current XPath expression being accumulated
+        // by a query by calling `expr()`.
+        assert_eq!(query.expr(), "/ModuleTree/Structure");
+
+        // [`ModuleTreeQuery`] has a Debug impl:
+        assert_eq!(
+            format!("{:#?}", query),
+            indoc::formatdoc! {r#"
+                ModuleTreeQuery {{
+                    tree: ModuleTree {{
+                      <ModuleTree version="{MODULE_TREE_VERSION}">
+                        <Structure>
+                          <Linear id="n:1" class="struct">
+                            <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                            <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                          </Linear>
+                        </Structure>
+                      </ModuleTree>
+                    }},
+                    expr: "/ModuleTree/Structure",
+                }}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+
+        // We can collect the current query results as XML fragments.
+        // This is primarily useful for debugging.
+        //
+        // Initially, this will be the root Module node.
+        let fragments: Vec<String> = query.to_fragments(true)?.collect();
+        assert_eq!(
+            &fragments,
+            &[indoc::formatdoc! {r#"
+                <Structure>
+                  <Linear id="n:1" class="struct">
+                    <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                    <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                  </Linear>
+                </Structure>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            },],
+        );
+
+        // The [`ModuleTreeQuery::params`] method selects all the `Param` elements
+        // in the current subtree.
+        let mut query = query.params();
+        assert_eq!(
+            query.expr(),
+            "/ModuleTree/Structure/descendant-or-self::Param"
+        );
+        assert_eq!(
+            &query.to_fragments(false)?.collect::<Vec<_>>(),
+            &[
+                format!(
+                    r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
+                    weight_id = weight_desc.param_id(),
+                    weight_dtype = format!("{:?}", weight_desc.dtype()),
+                ),
+                format!(
+                    r#"<Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>"#,
+                    bias_id = bias_desc.param_id(),
+                    bias_dtype = format!("{:?}", bias_desc.dtype()),
+                )
+            ],
+        );
 
         Ok(())
     }

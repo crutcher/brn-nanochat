@@ -18,6 +18,11 @@ use xee_xpath::{
     Itemable,
     Queries,
     Query,
+    error::{
+        Error as SpannedError,
+        ErrorValue,
+        Result as SpannedResult,
+    },
     query::Convert,
 };
 use xot::{
@@ -30,6 +35,7 @@ use crate::{
     burn_ext::burn_desc::{
         ParamDesc,
         TensorDesc,
+        TensorParamDesc,
     },
     constants::{
         DTYPE_ATTR,
@@ -48,14 +54,28 @@ use crate::{
     xee_util::adapt_xee_error,
 };
 
+pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub struct ModuleTree {
     docs: Documents,
     root: Node,
 }
 
-impl Default for ModuleTree {
-    fn default() -> Self {
-        Self::new()
+impl Debug for ModuleTree {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        f.write_str("ModuleTree {")?;
+        if f.alternate() {
+            f.write_str("\n")?;
+            for line in self.to_xml(true).lines() {
+                writeln!(f, "  {line}")?;
+            }
+        } else {
+            f.write_str(self.to_xml(false).as_str())?;
+        }
+        f.write_str("}")
     }
 }
 
@@ -75,18 +95,25 @@ impl ModuleTree {
         let doc = xot.new_document_with_element(root).unwrap();
 
         let version_nid = xot.add_name("version");
-        xot.set_attribute(root, version_nid, env!("CARGO_PKG_VERSION"));
+        xot.set_attribute(root, version_nid, MODULE_TREE_VERSION);
 
         Self { docs, root }
     }
 
     /// Serialize the module tree to an XML string.
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(
+        &self,
+        pretty: bool,
+    ) -> String {
         self.docs
             .xot()
             .serialize_xml_string(
                 xot::output::xml::Parameters {
-                    indentation: Some(Default::default()),
+                    indentation: if pretty {
+                        Some(Default::default())
+                    } else {
+                        None
+                    },
                     ..Default::default()
                 },
                 self.root,
@@ -144,6 +171,57 @@ impl ModuleTree {
     /// Internal. Shorthand access to the mutable [`xot`] arena.
     pub(crate) fn xot_mut(&mut self) -> &mut Xot {
         self.docs.xot_mut()
+    }
+
+    /// Iterate over [`ParamId`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`ModuleTreeQuery::params`].
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    ///
+    /// ## Example
+    /// ```rust,ignore
+    /// let param_ids: HashSet<ParamId> = mtree
+    ///     .param_ids()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let param_ids: HashSet<ParamId> = mtree
+    ///     .query()
+    ///     // .params() is implicit to [`ModuleTreeQuery::to_param_ids`],
+    ///     // equivalent to: .select("descendant-or-self::Param")
+    ///     .to_param_ids()?
+    ///     .collect();
+    /// ```
+    pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
+        self.query().to_param_ids()
+    }
+
+    /// Iterate over [`TensorParamDesc`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`ModuleTreeQuery::params`].
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
+    /// errors.
+    ///
+    /// ## Example
+    /// ```rust,ignore
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .param_descs()?
+    ///     .collect();
+    ///
+    /// // Is equivalent to:
+    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
+    ///     .query()
+    ///     // .params() is implicit to [`ModuleTreeQuery::to_param_descs`],
+    ///     // equivalent to: .select("descendant-or-self::Param")
+    ///     .to_param_descs()?
+    ///     .collect();
+    /// ```
+    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
+        self.query().to_param_descs()
     }
 
     /// Create a new default [`ModuleTreeQuery`] for this module tree.
@@ -286,79 +364,20 @@ impl ModuleTree {
     ///     .select("GPT/Linear/descendant-or-self::Param")
     ///     .to_param_ids()?
     ///     .collect();
+    ///
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear/descendant-or-self::Param")
+    ///     .to_param_descs()?
+    ///     .map(|d| d.param_id())
+    ///     .collect();
     /// ```
     pub fn select_param_ids(
         &mut self,
         expr: &str,
     ) -> BunsenResult<impl Iterator<Item = ParamId>> {
         self.try_select_params(expr)?.to_param_ids()
-    }
-
-    /// Return an iterator over all [`ParamId`]s in the module.
-    ///
-    /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
-    ///
-    /// ## Example
-    /// ```rust,ignore
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .param_ids()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .query()
-    ///     .params()
-    ///     .to_param_ids()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .query()
-    ///     .select("descendant-or-self::Param")
-    ///     .to_param_ids()?
-    ///     .collect();
-    /// ```
-    pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
-        self.query().params().to_param_ids()
-    }
-
-    /// Return an iterator over all [`ParamId`]s in the module.
-    ///
-    /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
-    ///
-    /// ## Example
-    /// ```rust,ignore
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .param_descs()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .query()
-    ///     .params()
-    ///     .to_param_descs()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .query()
-    ///     .select("descendant-or-self::Param")
-    ///     .to_param_descs()?
-    ///     .collect();
-    /// ```
-    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
-        self.query().params().to_param_descs()
-    }
-}
-
-impl Debug for ModuleTree {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        f.write_str(&self.to_xml())
     }
 }
 
@@ -505,14 +524,23 @@ impl<'a> ModuleTreeQuery<'a> {
             .map_err(|e| adapt_xee_error(e, Some(expr)))
     }
 
-    pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
+    /// Iterate over [`TensorParamDesc`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`Self::params`].
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
+    /// errors.
+    pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
         let [param_id_nid, dtype_nid, rank_nid, kind_nid, shape_nid] = self
             .tree
             .bind_local_names([PARAM_ID_ATTR, DTYPE_ATTR, RANK_ATTR, KIND_ATTR, SHAPE_ATTR]);
 
-        let nodes: Vec<Node> = self.execute_many(|docs, item| Ok(item.to_node()?))?;
+        let mut query = self.params();
 
-        let xot = self.tree.docs.xot();
+        let nodes: Vec<Node> = query.execute_many(|docs, item| Ok(item.to_node()?))?;
+
+        let xot = query.tree.docs.xot();
 
         Ok(nodes
             .into_iter()
@@ -536,8 +564,63 @@ impl<'a> ModuleTreeQuery<'a> {
             .into_iter())
     }
 
+    /// Iterate over [`ParamId`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`Self::params`].
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let param_ids : HashSet<ParamId> = query
+    ///     .to_param_ids()?
+    ///     .collect();
+    ///
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = query
+    ///     .to_param_descs()?
+    ///     .map(|d| d.param_id())
+    ///     .collect();
+    /// ```
     pub fn to_param_ids(mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
         Ok(self.to_param_descs()?.map(|d| d.param_id()))
+    }
+
+    /// Iterate over string fragments for the current expression matches.
+    ///
+    /// # Arguments
+    /// * `pretty` - pretty-print/indent the xml fragments.
+    pub fn to_fragments(
+        &mut self,
+        pretty: bool,
+    ) -> BunsenResult<impl Iterator<Item = String>> {
+        use xee_xpath::Item;
+
+        let output_params = xot::output::xml::Parameters {
+            indentation: if pretty {
+                Some(Default::default())
+            } else {
+                None
+            },
+            ..Default::default()
+        };
+
+        let res = self.execute_many(
+            |docs: &mut Documents, item: &Item| -> SpannedResult<String> {
+                let xot: &xot::Xot = docs.xot();
+
+                match item {
+                    Item::Node(node) => xot
+                        .serialize_xml_string(output_params.clone(), *node)
+                        .map(|s| s.trim().to_string())
+                        .map_err(|e| ErrorValue::from(e).into()),
+                    _ => Ok(item.string_value(xot)?),
+                }
+            },
+        )?;
+
+        Ok(res.into_iter())
     }
 }
 
@@ -571,6 +654,111 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_debug_cuda() {
+        test_debug::<burn::backend::Cuda>();
+    }
+
+    #[test]
+    #[cfg(feature = "wgpu")]
+    fn test_debug_wgpu() {
+        test_debug::<burn::backend::Wgpu>();
+    }
+
+    fn test_debug<B: Backend>() {
+        let device = Default::default();
+        let module: Linear<B> = LinearConfig::new(2, 3).init(&device);
+
+        let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
+        let bias_ref = module.bias.as_ref().unwrap();
+        let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
+
+        let mut mtree = ModuleTree::build(&module);
+
+        assert_eq!(
+            format!("{:#?}", mtree),
+            indoc::formatdoc! {r#"
+                ModuleTree {{
+                  <ModuleTree version="{MODULE_TREE_VERSION}">
+                    <Structure>
+                      <Linear id="n:1" class="struct">
+                        <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                        <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                      </Linear>
+                    </Structure>
+                  </ModuleTree>
+                }}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+
+        assert_eq!(
+            format!("{:?}", mtree),
+            indoc::formatdoc! {r#"ModuleTree {{<ModuleTree version="{MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></ModuleTree>}}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_to_xml_cuda() {
+        test_to_xml::<burn::backend::Cuda>();
+    }
+
+    #[test]
+    #[cfg(feature = "wgpu")]
+    fn test_to_xml_wgpu() {
+        test_to_xml::<burn::backend::Wgpu>();
+    }
+
+    fn test_to_xml<B: Backend>() {
+        let device = Default::default();
+        let module: Linear<B> = LinearConfig::new(2, 3).init(&device);
+
+        let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
+        let bias_ref = module.bias.as_ref().unwrap();
+        let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
+
+        let mut mtree = ModuleTree::build(&module);
+
+        assert_eq!(
+            mtree.to_xml(true),
+            indoc::formatdoc! {r#"
+                <ModuleTree version="{MODULE_TREE_VERSION}">
+                  <Structure>
+                    <Linear id="n:1" class="struct">
+                      <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                      <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                    </Linear>
+                  </Structure>
+                </ModuleTree>
+                "#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+
+        assert_eq!(
+            mtree.to_xml(false),
+            indoc::formatdoc! {r#"<ModuleTree version="{MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></ModuleTree>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
     }
 
     #[derive(Module, Debug)]

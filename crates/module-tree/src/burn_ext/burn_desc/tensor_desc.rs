@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    fmt::Debug,
+    str::FromStr,
+};
 
 use burn::{
     Tensor,
@@ -15,6 +18,7 @@ use burn::{
 
 use crate::{
     burn_enc::shape_from_xml_attr,
+    burn_ext::burn_desc::ParamDesc,
     error::{
         BunsenError,
         BunsenResult,
@@ -149,11 +153,20 @@ impl TensorDesc {
         self.shape.rank()
     }
 
+    /// The number of elements in the shape.
+    pub fn num_elements(&self) -> usize {
+        self.shape.num_elements()
+    }
+
     /// The estimated size of the tensor.
+    /// This ignores alignment, padding, and metadata.
     pub fn size_estimate(&self) -> usize {
-        self.dtype.size() * self.shape.num_elements()
+        self.dtype.size() * self.num_elements()
     }
 }
+
+/// A type alias for a [`ParamDesc`] of a [`TensorDesc`].
+pub type TensorParamDesc = ParamDesc<TensorDesc>;
 
 #[cfg(test)]
 mod tests {

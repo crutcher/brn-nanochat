@@ -9,13 +9,14 @@ license.workspace = true
 [features]
 default = []
 cuda = ["burn/cuda"]
+wgpu = ["burn/wgpu"]
 
 [dependencies]
 burn = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-# debug-ignore = { workspace = true }
 spanned_error_message = { workspace = true }
+indoc = { workspace = true }
 
 xot = { workspace = true }
 xee-xpath = { workspace = true }

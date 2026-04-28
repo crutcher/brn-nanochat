@@ -1,3 +1,3 @@
-mod visitor_builder;
+mod module_tree_builder;
 #[doc(inline)]
-pub use visitor_builder::*;
+pub use module_tree_builder::*;
