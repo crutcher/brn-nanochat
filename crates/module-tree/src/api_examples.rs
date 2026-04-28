@@ -250,9 +250,8 @@ mod tests {
         // This is primarily useful for debugging.
         //
         // Initially, this will be the root Module node.
-        let fragments: Vec<String> = query.to_fragments(true)?.collect();
         assert_eq!(
-            &fragments,
+            &query.to_fragments(true)?.collect::<Vec<String>>(),
             &[indoc::formatdoc! {r#"
                 <Structure>
                   <Linear id="n:1" class="struct">
@@ -269,7 +268,7 @@ mod tests {
 
         // The [`ModuleTreeQuery::params`] method selects all the `Param` elements
         // in the current subtree.
-        let mut query = query.params();
+        let mut query = mtree.query().params();
         assert_eq!(
             query.expr(),
             "/ModuleTree/Structure/descendant-or-self::Param"
@@ -288,6 +287,54 @@ mod tests {
                     bias_dtype = format!("{:?}", bias_desc.dtype()),
                 )
             ],
+        );
+
+        // The structural elements start at '/ModuleTree/Structure/$Elem'.
+        // But there's only every exactly one root node (currently).
+        //
+        // We can select this using either:
+        // - the element selector (here, "Linear").
+        // - the wildcard selector ('*').
+        // - (a bunch of other, longer XPath operators).
+        let mut query = mtree.query().select("Linear");
+        assert_eq!(
+            &query.to_fragments(true)?.collect::<Vec<_>>(),
+            &[indoc::formatdoc! {r#"
+                <Linear id="n:1" class="struct">
+                  <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                  <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                </Linear>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            },],
+        );
+
+        // Here's the same thing using the wildcard selector:
+        let mut query = mtree.query().select("*");
+        assert_eq!(
+            &query.to_fragments(true)?.collect::<Vec<_>>(),
+            &[indoc::formatdoc! {r#"
+                <Linear id="n:1" class="struct">
+                  <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                  <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                </Linear>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            },],
+        );
+
+        let mut query = mtree.query().select("Linear/*[@name='weight']");
+        assert_eq!(
+            &query.to_fragments(false)?.collect::<Vec<_>>(),
+            &[format!(
+                r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+            ),],
         );
 
         Ok(())
