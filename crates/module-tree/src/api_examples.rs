@@ -289,6 +289,9 @@ mod tests {
             ],
         );
 
+        // A full coverage of the XPath language cannot be included here.
+        // For more details, see: <https://en.wikipedia.org/wiki/XPath>
+
         // The structural elements start at '/ModuleTree/Structure/$Elem'.
         // But there's only every exactly one root node (currently).
         //
@@ -296,7 +299,11 @@ mod tests {
         // - the element selector (here, "Linear").
         // - the wildcard selector ('*').
         // - (a bunch of other, longer XPath operators).
+        //
+        // "Linear":
+        // - Select the root 'Linear' node,
         let mut query = mtree.query().select("Linear");
+        assert_eq!(query.expr(), "/ModuleTree/Structure/Linear");
         assert_eq!(
             &query.to_fragments(true)?.collect::<Vec<_>>(),
             &[indoc::formatdoc! {r#"
@@ -312,7 +319,11 @@ mod tests {
         );
 
         // Here's the same thing using the wildcard selector:
+        //
+        // "*":
+        // - Select the root's children, which is only the 'Linear' node
         let mut query = mtree.query().select("*");
+        assert_eq!(query.expr(), "/ModuleTree/Structure/*");
         assert_eq!(
             &query.to_fragments(true)?.collect::<Vec<_>>(),
             &[indoc::formatdoc! {r#"
@@ -327,7 +338,45 @@ mod tests {
             },],
         );
 
+        // We can select specific names of structural elements by name,
+        // using an attribute predicated `[@name='name']`.
+        //
+        // "Linear/*[@name='weight']":
+        // - Select the root 'Linear' node,
+        // - Select all the children of 'Linear',
+        // - Filter those to elements with the attribte 'name' set to 'weight'.
+        //
+        // The "expr[predicate,...]" syntax is used to write filters,
+        // the selected values in `{expr}' are restricted to those where all
+        // of the predicates are true.
         let mut query = mtree.query().select("Linear/*[@name='weight']");
+        assert_eq!(
+            query.expr(),
+            "/ModuleTree/Structure/Linear/*[@name='weight']"
+        );
+        assert_eq!(
+            &query.to_fragments(false)?.collect::<Vec<_>>(),
+            &[format!(
+                r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+            ),],
+        );
+
+        // In general:
+        // - `query.select(expr)` appends "/expr" to the current query expression.
+        // - `query.filter(expr)` appends "[expr]" to the current query expression.
+        //
+        // `query.params()` may seem superflous, as both `.to_param_ids()` and
+        // `.to_param_descs()` Implictly call `.params()`.
+        //
+        // However, when used in conjunction with `.filter()`, we can write powerful
+        // selection expressions.
+        let mut query = mtree.query().params().filter("@rank=2");
+        assert_eq!(
+            query.expr(),
+            "/ModuleTree/Structure/descendant-or-self::Param[@rank=2]"
+        );
         assert_eq!(
             &query.to_fragments(false)?.collect::<Vec<_>>(),
             &[format!(
