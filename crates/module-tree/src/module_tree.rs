@@ -61,9 +61,14 @@ impl Debug for ModuleTree {
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        f.write_str("ModuleTree {\n")?;
-        for line in self.to_xml().lines() {
-            writeln!(f, "  {line}")?;
+        f.write_str("ModuleTree {")?;
+        if f.alternate() {
+            f.write_str("\n")?;
+            for line in self.to_xml(true).lines() {
+                writeln!(f, "  {line}")?;
+            }
+        } else {
+            f.write_str(self.to_xml(false).as_str())?;
         }
         f.write_str("}")
     }
@@ -91,12 +96,19 @@ impl ModuleTree {
     }
 
     /// Serialize the module tree to an XML string.
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(
+        &self,
+        pretty: bool,
+    ) -> String {
         self.docs
             .xot()
             .serialize_xml_string(
                 xot::output::xml::Parameters {
-                    indentation: Some(Default::default()),
+                    indentation: if pretty {
+                        Some(Default::default())
+                    } else {
+                        None
+                    },
                     ..Default::default()
                 },
                 self.root,
@@ -601,6 +613,93 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_debug() {
+        type B = burn::backend::Cuda;
+        let device = Default::default();
+        let module: Linear<B> = LinearConfig::new(2, 3).init(&device);
+
+        let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
+        let bias_ref = module.bias.as_ref().unwrap();
+        let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
+
+        let mut mtree = ModuleTree::build(&module);
+
+        assert_eq!(
+            format!("{:#?}", mtree),
+            indoc::formatdoc! {r#"
+                ModuleTree {{
+                  <ModuleTree version="{MODULE_TREE_VERSION}">
+                    <Structure>
+                      <Linear id="n:1" class="struct">
+                        <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                        <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                      </Linear>
+                    </Structure>
+                  </ModuleTree>
+                }}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+
+        assert_eq!(
+            format!("{:?}", mtree),
+            indoc::formatdoc! {r#"ModuleTree {{<ModuleTree version="{MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></ModuleTree>}}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cuda")]
+    fn test_to_xml() {
+        type B = burn::backend::Cuda;
+        let device = Default::default();
+        let module: Linear<B> = LinearConfig::new(2, 3).init(&device);
+
+        let weight_desc: TensorParamDesc = TensorParamDesc::from(&module.weight);
+        let bias_ref = module.bias.as_ref().unwrap();
+        let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
+
+        let mut mtree = ModuleTree::build(&module);
+
+        assert_eq!(
+            mtree.to_xml(true),
+            indoc::formatdoc! {r#"
+                <ModuleTree version="{MODULE_TREE_VERSION}">
+                  <Structure>
+                    <Linear id="n:1" class="struct">
+                      <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                      <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                    </Linear>
+                  </Structure>
+                </ModuleTree>
+                "#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+
+        assert_eq!(
+            mtree.to_xml(false),
+            indoc::formatdoc! {r#"<ModuleTree version="{MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></ModuleTree>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
     }
 
     #[derive(Module, Debug)]

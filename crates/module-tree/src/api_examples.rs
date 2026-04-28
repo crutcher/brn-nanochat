@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
     use burn::{
         module::ParamId,
@@ -99,7 +100,7 @@ mod tests {
         // If an element is a named field of a "struct"-class parent,
         // then it will have a `@name` attribute.
         assert_eq!(
-            mtree.to_xml(),
+            mtree.to_xml(true),
             indoc::formatdoc! {r#"
                 <ModuleTree version="{MODULE_TREE_VERSION}">
                   <Structure>
@@ -119,7 +120,7 @@ mod tests {
 
         // [`ModuleTree`] has a Debug impl:
         assert_eq!(
-            format!("{:?}", mtree),
+            format!("{:#?}", mtree),
             indoc::formatdoc! {r#"
                 ModuleTree {{
                   <ModuleTree version="{MODULE_TREE_VERSION}">
