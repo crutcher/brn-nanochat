@@ -158,7 +158,7 @@ mod tests {
         //       // equivalent to: .select("descendant-or-self::Param")
         //       .to_param_ids()?
         //       .collect();
-        let ids: Vec<ParamId> = mtree.param_ids()?.collect();
+        let module_param_ids: Vec<ParamId> = mtree.param_ids()?.collect();
 
         // IMPORTANT: Module Tree Ordering
         //
@@ -170,7 +170,10 @@ mod tests {
         // to use `HashSet<ParamId>` or similar to shield yourself from
         // ordering variation; particularly as you'll generally be using
         // this machinery when doing subset calculations.
-        assert_eq!(ids, [module.weight.id, module.bias.as_ref().unwrap().id]);
+        assert_eq!(
+            module_param_ids,
+            [module.weight.id, module.bias.as_ref().unwrap().id]
+        );
 
         // [`ModuleTree::param_descs`] iterates over descriptions of every parameter.
         //
@@ -186,14 +189,17 @@ mod tests {
         //       // equivalent to: .select("descendant-or-self::Param")
         //       .to_param_descs()?
         //       .collect();
-        let descs: Vec<TensorParamDesc> = mtree.param_descs()?.collect();
-        assert_eq!(&descs, &vec![weight_desc.clone(), bias_desc.clone()]);
+        let module_param_descs: Vec<TensorParamDesc> = mtree.param_descs()?.collect();
+        assert_eq!(
+            &module_param_descs,
+            &vec![weight_desc.clone(), bias_desc.clone()]
+        );
 
         // The query api is designed to be fluent and chainable.
         //
         // The [`ModuleTreeQuery<'a>`] captures a borrow of the module tree,
         // so you'll need to resolve the borrow before running another query.
-        let query: ModuleTreeQuery<'_> = mtree.query();
+        let mut query: ModuleTreeQuery<'_> = mtree.query();
 
         // We can introspect on the current XPath expression being accumulated
         // by a query by calling `expr()`.
@@ -225,9 +231,34 @@ mod tests {
 
         // We can collect the current query results as XML fragments.
         // This is primarily useful for debugging.
-        let fragments: Vec<String> = query.params().to_fragments(false)?.collect();
+        //
+        // Initially, this will be the root Module node.
+        let fragments: Vec<String> = query.to_fragments(true)?.collect();
         assert_eq!(
             &fragments,
+            &[indoc::formatdoc! {r#"
+                <Structure>
+                  <Linear id="n:1" class="struct">
+                    <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                    <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                  </Linear>
+                </Structure>"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            },],
+        );
+
+        // The [`ModuleTreeQuery::params`] method selects all the `Param` elements
+        // in the current subtree.
+        let mut query = query.params();
+        assert_eq!(
+            query.expr(),
+            "/ModuleTree/Structure/descendant-or-self::Param"
+        );
+        assert_eq!(
+            &query.to_fragments(false)?.collect::<Vec<_>>(),
             &[
                 format!(
                     r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
@@ -240,6 +271,23 @@ mod tests {
                     bias_dtype = format!("{:?}", bias_desc.dtype()),
                 )
             ],
+        );
+
+        /// [`ModuleTreeQuery::to_param_ids`] iterates over [`ParamId`]s for
+        /// each parameter in the subtree.
+        assert_eq!(
+            &mtree.query().to_param_ids()?.collect::<Vec<ParamId>>(),
+            &module_param_ids,
+        );
+
+        /// [`ModuleTreeQuery::to_param_descs`] iterates over
+        /// [`TensorParamDesc`]s for each parameter in the subtree.
+        assert_eq!(
+            &mtree
+                .query()
+                .to_param_descs()?
+                .collect::<Vec<TensorParamDesc>>(),
+            &module_param_descs,
         );
 
         Ok(())
