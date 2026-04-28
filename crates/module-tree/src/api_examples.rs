@@ -175,6 +175,13 @@ mod tests {
             [module.weight.id, module.bias.as_ref().unwrap().id]
         );
 
+        // [`ModuleTreeQuery::to_param_ids`] iterates over [`ParamId`]s for
+        // each parameter in the subtree.
+        assert_eq!(
+            &mtree.query().to_param_ids()?.collect::<Vec<ParamId>>(),
+            &module_param_ids,
+        );
+
         // [`ModuleTree::param_descs`] iterates over descriptions of every parameter.
         //
         // This leverages the [`TensorParamDesc`] API to strip generics from
@@ -193,6 +200,16 @@ mod tests {
         assert_eq!(
             &module_param_descs,
             &vec![weight_desc.clone(), bias_desc.clone()]
+        );
+
+        // [`ModuleTreeQuery::to_param_descs`] iterates over
+        // [`TensorParamDesc`]s for each parameter in the subtree.
+        assert_eq!(
+            &mtree
+                .query()
+                .to_param_descs()?
+                .collect::<Vec<TensorParamDesc>>(),
+            &module_param_descs,
         );
 
         // The query api is designed to be fluent and chainable.
@@ -271,23 +288,6 @@ mod tests {
                     bias_dtype = format!("{:?}", bias_desc.dtype()),
                 )
             ],
-        );
-
-        /// [`ModuleTreeQuery::to_param_ids`] iterates over [`ParamId`]s for
-        /// each parameter in the subtree.
-        assert_eq!(
-            &mtree.query().to_param_ids()?.collect::<Vec<ParamId>>(),
-            &module_param_ids,
-        );
-
-        /// [`ModuleTreeQuery::to_param_descs`] iterates over
-        /// [`TensorParamDesc`]s for each parameter in the subtree.
-        assert_eq!(
-            &mtree
-                .query()
-                .to_param_descs()?
-                .collect::<Vec<TensorParamDesc>>(),
-            &module_param_descs,
         );
 
         Ok(())
