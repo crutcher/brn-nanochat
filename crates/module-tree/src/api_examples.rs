@@ -1,24 +1,13 @@
 #[cfg(test)]
-#[allow(unused)]
 mod tests {
-    use std::collections::HashSet;
-
     use burn::{
-        module::{
-            Module,
-            ParamId,
-        },
+        module::ParamId,
         nn::{
             Linear,
             LinearConfig,
-            LinearLayout,
         },
         prelude::Backend,
         tensor::Shape,
-    };
-    use zsl_chat::gpt::gpt_model::{
-        GPT,
-        GPTConfig,
     };
 
     use crate::{
@@ -26,8 +15,6 @@ mod tests {
         ModuleTree,
         ModuleTreeQuery,
         burn_ext::burn_desc::{
-            ParamDesc,
-            TensorDesc,
             TensorKindDesc,
             TensorParamDesc,
         },
@@ -130,32 +117,38 @@ mod tests {
             }
         );
 
+        // [`ModuleTree`] has a Debug impl:
+        assert_eq!(
+            format!("{:?}", mtree),
+            indoc::formatdoc! {r#"
+                ModuleTree {{
+                  <ModuleTree version="{MODULE_TREE_VERSION}">
+                    <Structure>
+                      <Linear id="n:1" class="struct">
+                        <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                        <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                      </Linear>
+                    </Structure>
+                  </ModuleTree>
+                }}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            }
+        );
+
         // [`ModuleTree::param_ids`] iterates over all [`ParamId`]s.
         //
         // This is a useful way to get all the parameter ids in a module;
         // but it is actually a wrapper over a series of more complex steps.
         //
-        //   mtree
-        //     // Create a query over the whole structure.
-        //     .query()
-        //     // Sub-select all `Param` nodes.
-        //     .params()
-        //     // Extract all `@param_id` attributes to `ParamId`s.
-        //     .to_param_ids()?
-        //     // Collect the results into a `Vec`.
-        //     .collect::<Vec<_>>();
-        //
-        // Which further expands to:
-        //
-        //   mtree
-        //     // Create a query over the whole structure.
-        //     .query()
-        //     // Sub-select all `Param` nodes.
-        //     .select("descedant-or-self::Param")
-        //     // Extract all `@param_id` attributes to `ParamId`s.
-        //     .to_param_ids()?
-        //     // Collect the results into a `Vec`.
-        //     .collect::<Vec<_>>();
+        //   let ids: Vec<ParamId> = mtree
+        //       .query()
+        //       // .params() is implicit to [`ModuleTreeQuery::to_param_ids`],
+        //       // equivalent to: .select("descendant-or-self::Param")
+        //       .to_param_ids()?
+        //       .collect();
         let ids: Vec<ParamId> = mtree.param_ids()?.collect();
 
         // IMPORTANT: Module Tree Ordering
@@ -178,114 +171,48 @@ mod tests {
         // Similar to [`ModuleTree::param_ids`], this is a wrapper over a series of more
         // complex steps.
         //
-        //   mtree
-        //     // Create a query over the whole structure.
-        //     .query()
-        //     // Sub-select all `Param` nodes.
-        //     .params()
-        //     // Build a `TensorParamDesc` for each `Param`.
-        //     .to_param_descs()?
-        //     // Collect the results into a `Vec`.
-        //     .collect::<Vec<_>>();
-        //
-        // Which further expands to:
-        //
-        //   mtree
-        //     // Create a query over the whole structure.
-        //     .query()
-        //     // Sub-select all `Param` nodes.
-        //     .select("descedant-or-self::Param")
-        //     // Build a `TensorParamDesc` for each `Param`.
-        //     .to_param_descs()?
-        //     // Collect the results into a `Vec`.
-        //     .collect::<Vec<_>>();
+        //   let descs: Vec<ParamDesc<TensorDesc>> = mtree
+        //       .query()
+        //       // .params() is implicit to [`ModuleTreeQuery::to_param_descs`],
+        //       // equivalent to: .select("descendant-or-self::Param")
+        //       .to_param_descs()?
+        //       .collect();
         let descs: Vec<TensorParamDesc> = mtree.param_descs()?.collect();
+        assert_eq!(&descs, &vec![weight_desc.clone(), bias_desc.clone()]);
 
         // The query api is designed to be fluent and chainable.
         //
         // The [`ModuleTreeQuery<'a>`] captures a borrow of the module tree,
         // so you'll need to resolve the borrow before running another query.
-        let q: ModuleTreeQuery<'_> = mtree.query();
+        let query: ModuleTreeQuery<'_> = mtree.query();
 
         // We can introspect on the current XPath expression being accumulated
         // by a query by calling `expr()`.
-        assert_eq!(q.expr(), "/ModuleTree/Structure");
+        assert_eq!(query.expr(), "/ModuleTree/Structure");
 
-        Ok(())
-    }
-
-    #[derive(Module, Debug)]
-    struct BModule<B: Backend> {
-        a: Linear<B>,
-        b: Linear<B>,
-    }
-
-    #[derive(Module, Debug)]
-    enum ExampleEnumModule<B: Backend> {
-        Foo(Linear<B>),
-
-        Bar(BModule<B>),
-    }
-
-    #[derive(Module, Debug)]
-    struct ExampleStructModule<B: Backend> {
-        seq: Vec<Linear<B>>,
-        tup: (Linear<B>, Linear<B>),
-        arr: [Linear<B>; 1],
-    }
-
-    impl<B: Backend> ExampleStructModule<B> {
-        fn init(device: &B::Device) -> Self {
-            Self {
-                seq: vec![LinearConfig::new(10, 10).init(device)],
-                tup: (
-                    LinearConfig::new(10, 10).init(device),
-                    LinearConfig::new(10, 23).init(device),
-                ),
-                arr: [LinearConfig::new(10, 10).init(device)],
+        // [`ModuleTreeQuery`] has a Debug impl:
+        assert_eq!(
+            format!("{:#?}", query),
+            indoc::formatdoc! {r#"
+                ModuleTreeQuery {{
+                    tree: ModuleTree {{
+                      <ModuleTree version="{MODULE_TREE_VERSION}">
+                        <Structure>
+                          <Linear id="n:1" class="struct">
+                            <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
+                            <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
+                          </Linear>
+                        </Structure>
+                      </ModuleTree>
+                    }},
+                    expr: "/ModuleTree/Structure",
+                }}"#,
+                weight_id = weight_desc.param_id(),
+                weight_dtype = format!("{:?}", weight_desc.dtype()),
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
             }
-        }
-    }
-    #[test]
-    #[cfg(feature = "cuda")]
-    fn test_gpt() -> BunsenResult<()> {
-        type B = burn::backend::Cuda;
-        let device = Default::default();
-
-        let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);
-
-        let mut mtree = ModuleTree::build(&module);
-
-        println!("{:#?}", mtree);
-
-        /*
-        let ps = mtree
-            .select("GPT/Vec[@name='h']//Param")
-            .where_expr("@rank = 2")
-            .param_ids()?;
-
-        println!("Params: {ps:?}");
-         */
-
-        let ids: Vec<ParamId> = mtree
-            .select_params("GPT/*[@name='h']")
-            .filter("@rank=2")
-            .to_param_ids()?
-            .collect();
-
-        println!("IDs: {ids:?}");
-
-        let descs: Vec<ParamDesc<TensorDesc>> = mtree
-            .select_params("GPT/*[@name='h']")
-            .filter("@rank=2")
-            .to_param_descs()?
-            .collect();
-
-        println!("Descs: {descs:#?}");
-
-        let ids = descs.iter().map(|d| d.param_id()).collect::<Vec<_>>();
-
-        println!("IDs: {ids:?}");
+        );
 
         Ok(())
     }

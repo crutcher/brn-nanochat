@@ -14,10 +14,10 @@ use burn::module::{
 /// This type acts as [`AsRef<T>`], [`Deref<T>`].
 ///
 /// Currently, this will always be `Param<Tensor<_, _, _>>`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     param_id: ParamId,
     data: T,
@@ -25,7 +25,7 @@ where
 
 impl<T> Deref for ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     type Target = T;
 
@@ -36,7 +36,7 @@ where
 
 impl<T> AsRef<T> for ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     fn as_ref(&self) -> &T {
         &self.data
@@ -45,7 +45,7 @@ where
 
 impl<T> ParamDesc<T>
 where
-    T: Debug + Clone + Send,
+    T: Debug + Clone + Send + PartialEq,
 {
     pub fn new(
         param_id: ParamId,
@@ -66,7 +66,7 @@ where
 impl<T, D> From<&Param<T>> for ParamDesc<D>
 where
     T: Parameter,
-    D: for<'a> From<&'a T> + Debug + Clone + Send + 'static,
+    D: for<'a> From<&'a T> + Debug + Clone + Send + PartialEq + 'static,
 {
     fn from(param: &Param<T>) -> Self {
         Self::new(param.id, D::from(&param.val()))

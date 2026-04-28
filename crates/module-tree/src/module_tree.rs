@@ -30,6 +30,7 @@ use crate::{
     burn_ext::burn_desc::{
         ParamDesc,
         TensorDesc,
+        TensorParamDesc,
     },
     constants::{
         DTYPE_ATTR,
@@ -48,18 +49,25 @@ use crate::{
     xee_util::adapt_xee_error,
 };
 
+pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub struct ModuleTree {
     docs: Documents,
     root: Node,
 }
 
-impl Default for ModuleTree {
-    fn default() -> Self {
-        Self::new()
+impl Debug for ModuleTree {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        f.write_str("ModuleTree {\n")?;
+        for line in self.to_xml().lines() {
+            writeln!(f, "  {line}")?;
+        }
+        f.write_str("}")
     }
 }
-
-pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 impl ModuleTree {
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
@@ -148,39 +156,38 @@ impl ModuleTree {
         self.docs.xot_mut()
     }
 
-    /// Return an iterator over all [`ParamId`]s in the module.
+    /// Iterate over [`ParamId`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`ModuleTreeQuery::params`].
     ///
     /// # Returns
     /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
     ///
     /// ## Example
     /// ```rust,ignore
-    /// let parm_ids: HashSet<ParamId> = mtree
+    /// let param_ids: HashSet<ParamId> = mtree
     ///     .param_ids()?
     ///     .collect();
     ///
     /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree
+    /// let param_ids: HashSet<ParamId> = mtree
     ///     .query()
-    ///     .params()
-    ///     .to_param_ids()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let parm_ids: HashSet<ParamId> = mtree
-    ///     .query()
-    ///     .select("descendant-or-self::Param")
+    ///     // .params() is implicit to [`ModuleTreeQuery::to_param_ids`],
+    ///     // equivalent to: .select("descendant-or-self::Param")
     ///     .to_param_ids()?
     ///     .collect();
     /// ```
     pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
-        self.query().params().to_param_ids()
+        self.query().to_param_ids()
     }
 
-    /// Return an iterator over all [`ParamId`]s in the module.
+    /// Iterate over [`TensorParamDesc`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`ModuleTreeQuery::params`].
     ///
     /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
+    /// errors.
     ///
     /// ## Example
     /// ```rust,ignore
@@ -191,19 +198,13 @@ impl ModuleTree {
     /// // Is equivalent to:
     /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
     ///     .query()
-    ///     .params()
-    ///     .to_param_descs()?
-    ///     .collect();
-    ///
-    /// // Is equivalent to:
-    /// let descs: Vec<ParamDesc<TensorDesc>> = mtree
-    ///     .query()
-    ///     .select("descendant-or-self::Param")
+    ///     // .params() is implicit to [`ModuleTreeQuery::to_param_descs`],
+    ///     // equivalent to: .select("descendant-or-self::Param")
     ///     .to_param_descs()?
     ///     .collect();
     /// ```
-    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
-        self.query().params().to_param_descs()
+    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
+        self.query().to_param_descs()
     }
 
     /// Create a new default [`ModuleTreeQuery`] for this module tree.
@@ -346,21 +347,20 @@ impl ModuleTree {
     ///     .select("GPT/Linear/descendant-or-self::Param")
     ///     .to_param_ids()?
     ///     .collect();
+    ///
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = mtree
+    ///     .query()
+    ///     .select("GPT/Linear/descendant-or-self::Param")
+    ///     .to_param_descs()?
+    ///     .map(|d| d.param_id())
+    ///     .collect();
     /// ```
     pub fn select_param_ids(
         &mut self,
         expr: &str,
     ) -> BunsenResult<impl Iterator<Item = ParamId>> {
         self.try_select_params(expr)?.to_param_ids()
-    }
-}
-
-impl Debug for ModuleTree {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        f.write_str(&self.to_xml())
     }
 }
 
@@ -507,14 +507,23 @@ impl<'a> ModuleTreeQuery<'a> {
             .map_err(|e| adapt_xee_error(e, Some(expr)))
     }
 
-    pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = ParamDesc<TensorDesc>>> {
+    /// Iterate over [`TensorParamDesc`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`Self::params`].
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
+    /// errors.
+    pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
         let [param_id_nid, dtype_nid, rank_nid, kind_nid, shape_nid] = self
             .tree
             .bind_local_names([PARAM_ID_ATTR, DTYPE_ATTR, RANK_ATTR, KIND_ATTR, SHAPE_ATTR]);
 
-        let nodes: Vec<Node> = self.execute_many(|docs, item| Ok(item.to_node()?))?;
+        let mut query = self.params();
 
-        let xot = self.tree.docs.xot();
+        let nodes: Vec<Node> = query.execute_many(|docs, item| Ok(item.to_node()?))?;
+
+        let xot = query.tree.docs.xot();
 
         Ok(nodes
             .into_iter()
@@ -538,6 +547,25 @@ impl<'a> ModuleTreeQuery<'a> {
             .into_iter())
     }
 
+    /// Iterate over [`ParamId`]s for each parameter in the subtree.
+    ///
+    /// Implicitly calls [`Self::params`].
+    ///
+    /// # Returns
+    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let param_ids : HashSet<ParamId> = query
+    ///     .to_param_ids()?
+    ///     .collect();
+    ///
+    /// # Is equivalent to:
+    /// let param_ids : HashSet<ParamId> = query
+    ///     .to_param_descs()?
+    ///     .map(|d| d.param_id())
+    ///     .collect();
+    /// ```
     pub fn to_param_ids(mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
         Ok(self.to_param_descs()?.map(|d| d.param_id()))
     }
