@@ -407,6 +407,136 @@ mod tests {
             ),],
         );
 
+        // Many structural builtin components are also Modules.
+        let module = (
+            LinearConfig::new(2, 3).init::<B>(&device),
+            [LinearConfig::new(4, 5).init::<B>(&device)],
+            vec![
+                LinearConfig::new(6, 7).init::<B>(&device),
+                LinearConfig::new(8, 9).init::<B>(&device),
+            ],
+        );
+        let expected_dtype = module.0.weight.dtype();
+        let dtype_str = format!("{:?}", expected_dtype);
+        // So we can still walk these modules:
+        let mut mtree = ModuleTree::build(&module);
+        assert_eq!(
+            &mtree.query().to_fragments(true)?.collect::<Vec<String>>(),
+            &[indoc::formatdoc! {r#"
+                <Structure>
+                  <Tuple id="n:1" class="builtin">
+                    <Linear id="n:2" class="struct">
+                      <Param id="n:3" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="2 3" rank="2"/>
+                      <Param id="n:4" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="3" rank="1"/>
+                    </Linear>
+                    <Array id="n:5" class="builtin">
+                      <Linear id="n:6" class="struct">
+                        <Param id="n:7" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="4 5" rank="2"/>
+                        <Param id="n:8" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="5" rank="1"/>
+                      </Linear>
+                    </Array>
+                    <Vec id="n:9" class="builtin">
+                      <Linear id="n:A" class="struct">
+                        <Param id="n:B" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="6 7" rank="2"/>
+                        <Param id="n:C" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="7" rank="1"/>
+                      </Linear>
+                      <Linear id="n:D" class="struct">
+                        <Param id="n:E" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="8 9" rank="2"/>
+                        <Param id="n:F" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="9" rank="1"/>
+                      </Linear>
+                    </Vec>
+                  </Tuple>
+                </Structure>"#,
+                module.0.weight.id,
+                module.0.bias.as_ref().unwrap().id,
+                module.1[0].weight.id,
+                module.1[0].bias.as_ref().unwrap().id,
+                module.2[0].weight.id,
+                module.2[0].bias.as_ref().unwrap().id,
+                module.2[1].weight.id,
+                module.2[1].bias.as_ref().unwrap().id,
+                dtype=dtype_str,
+            }],
+        );
+
+        // We could select all the `Linear` descendants:
+        let mut query = mtree.select("*//Linear");
+        assert_eq!(query.expr(), "/ModuleTree/Structure/*//Linear");
+        assert_eq!(
+            &query.to_fragments(true)?.collect::<Vec<String>>(),
+            &[
+                indoc::formatdoc! {r#"
+                  <Linear id="n:2" class="struct">
+                    <Param id="n:3" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="2 3" rank="2"/>
+                    <Param id="n:4" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="3" rank="1"/>
+                  </Linear>"#,
+                    module.0.weight.id,
+                    module.0.bias.as_ref().unwrap().id,
+                    dtype=dtype_str,
+                },
+                indoc::formatdoc! {r#"
+                  <Linear id="n:6" class="struct">
+                    <Param id="n:7" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="4 5" rank="2"/>
+                    <Param id="n:8" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="5" rank="1"/>
+                  </Linear>"#,
+                    module.1[0].weight.id,
+                    module.1[0].bias.as_ref().unwrap().id,
+                    dtype=dtype_str,
+                },
+                indoc::formatdoc! {r#"
+                  <Linear id="n:A" class="struct">
+                    <Param id="n:B" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="6 7" rank="2"/>
+                    <Param id="n:C" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="7" rank="1"/>
+                  </Linear>"#,
+                    module.2[0].weight.id,
+                    module.2[0].bias.as_ref().unwrap().id,
+                    dtype=dtype_str,
+                },
+                indoc::formatdoc! {r#"
+                  <Linear id="n:D" class="struct">
+                    <Param id="n:E" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="8 9" rank="2"/>
+                    <Param id="n:F" name="bias" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="9" rank="1"/>
+                  </Linear>"#,
+                    module.2[1].weight.id,
+                    module.2[1].bias.as_ref().unwrap().id,
+                    dtype=dtype_str,
+                },
+            ],
+        );
+
+        // Returning to the power of .params().filter("@rank=2"), we can see the effect
+        // on complex modules:
+        let mut query = mtree.query().params().filter("@rank=2");
+        assert_eq!(
+            query.expr(),
+            "/ModuleTree/Structure/descendant-or-self::Param[@rank=2]"
+        );
+        assert_eq!(
+            &query.to_fragments(false)?.collect::<Vec<_>>(),
+            &[
+                format!(
+                    r#"<Param id="n:3" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="2 3" rank="2"/>"#,
+                    module.0.weight.id,
+                    dtype = dtype_str,
+                ),
+                format!(
+                    r#"<Param id="n:7" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="4 5" rank="2"/>"#,
+                    module.1[0].weight.id,
+                    dtype = dtype_str,
+                ),
+                format!(
+                    r#"<Param id="n:B" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="6 7" rank="2"/>"#,
+                    module.2[0].weight.id,
+                    dtype = dtype_str,
+                ),
+                format!(
+                    r#"<Param id="n:E" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="8 9" rank="2"/>"#,
+                    module.2[1].weight.id,
+                    dtype = dtype_str,
+                ),
+            ],
+        );
+
         Ok(())
     }
 }
