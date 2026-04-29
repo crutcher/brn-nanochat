@@ -18,6 +18,7 @@ use xot::{
 };
 
 use crate::{
+    meta::TensorParamDesc,
     modules::reflection::{
         XmlModuleTree,
         module_visitors::type_util,
@@ -34,7 +35,6 @@ use crate::{
             STRUCTURE_ELEM,
         },
     },
-    tensors::TensorParamDesc,
     zspace::shape_to_xml_attr,
 };
 

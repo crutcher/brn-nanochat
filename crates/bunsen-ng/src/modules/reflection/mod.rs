@@ -18,7 +18,7 @@
 //!         XmlModuleTree,
 //!         XPathModuleQuery,
 //!     },
-//!     tensors::{
+//!     meta::{
 //!         TensorKindDesc,
 //!         TensorParamDesc,
 //!     },

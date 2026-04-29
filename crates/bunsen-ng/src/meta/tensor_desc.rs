@@ -20,11 +20,11 @@ use crate::{
         BunsenError,
         BunsenResult,
     },
-    modules::ParamDesc,
-    tensors::tensor_kinds::{
+    meta::tensor_kinds::{
         ParamKindBinding,
         TensorKindDesc,
     },
+    modules::ParamDesc,
     zspace::shape_from_xml_attr,
 };
 

@@ -39,20 +39,18 @@ use xot::{
 
 use crate::{
     errors::BunsenResult,
-    modules::{
+    meta::{
         ParamDesc,
-        reflection::{
-            module_visitors::ModuleTreeBuilder,
-            xml_support::{
-                adapt_xee_error,
-                names,
-            },
-        },
-    },
-    tensors::{
         TensorDesc,
         TensorKindDesc,
         TensorParamDesc,
+    },
+    modules::reflection::{
+        module_visitors::ModuleTreeBuilder,
+        xml_support::{
+            adapt_xee_error,
+            names,
+        },
     },
 };
 

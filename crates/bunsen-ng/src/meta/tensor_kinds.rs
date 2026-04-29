@@ -44,7 +44,7 @@ impl ParamKindBinding for prelude::Int {
 mod tests {
     use burn::tensor;
 
-    use crate::tensors::TensorKindDesc;
+    use crate::meta::TensorKindDesc;
 
     #[test]
     fn test_tensor_kinds() {
