@@ -74,6 +74,10 @@ use module_tree::{
         TensorDesc,
         TensorKindDesc,
     },
+    optimizers::{
+        GroupOptimizerAdaptor2,
+        OptimizerGroup,
+    },
 };
 use rand::{
     SeedableRng,
@@ -85,15 +89,9 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
-use zsl_chat::{
-    gpt::gpt_model::{
-        GPT,
-        GPTConfig,
-    },
-    optimizers::{
-        GroupOptimizerAdaptor2,
-        OptimizerGroup,
-    },
+use zsl_chat::gpt::gpt_model::{
+    GPT,
+    GPTConfig,
 };
 use zsl_chat_data::{
     dataloader::ChatDataLoader,

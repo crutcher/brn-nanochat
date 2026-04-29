@@ -5077,7 +5077,9 @@ name = "module-tree"
 version = "0.0.9"
 dependencies = [
  "burn",
+ "hashbrown 0.16.1",
  "indoc",
+ "paste",
  "spanned_error_message",
  "strum 0.28.0",
  "thiserror 2.0.18",
