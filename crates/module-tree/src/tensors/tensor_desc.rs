@@ -9,7 +9,6 @@ use burn::{
         Backend,
         Shape,
     },
-    tensor,
     tensor::{
         BasicOps,
         DType,
@@ -17,55 +16,17 @@ use burn::{
 };
 
 use crate::{
-    burn_ext::{
-        ParamDesc,
-        shape_from_xml_attr,
-    },
     errors::{
         BunsenError,
         BunsenResult,
     },
+    modules::ParamDesc,
+    tensors::tensor_kinds::{
+        ParamKindBinding,
+        TensorKindDesc,
+    },
+    zspace::shape_from_xml_attr,
 };
-
-/// Encodes a description af [`burn::tensor::TensorKind`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString)]
-#[non_exhaustive]
-pub enum TensorKindDesc {
-    /// A Bool Tensor
-    /// Equivalent to [`burn::tensor::Bool`].
-    Bool,
-
-    /// A Float Tensor
-    /// Equivalent to [`burn::tensor::Float`].
-    Float,
-
-    /// An Int Tensor
-    /// Equivalent to [`burn::tensor::Int`].
-    Int,
-}
-
-/// A trait that binds a burn Tensor Kind to a `ParamKind`.
-pub trait ParamKindBinding {
-    const KIND: TensorKindDesc;
-}
-
-impl ParamKindBinding for tensor::Bool {
-    const KIND: TensorKindDesc = TensorKindDesc::Bool;
-}
-
-impl ParamKindBinding for tensor::Float {
-    const KIND: TensorKindDesc = TensorKindDesc::Float;
-}
-
-impl ParamKindBinding for tensor::Int {
-    const KIND: TensorKindDesc = TensorKindDesc::Int;
-}
-
-impl TensorKindDesc {
-    pub const fn for_kind<K: ParamKindBinding>() -> Self {
-        K::KIND
-    }
-}
 
 /// Description af a Tensor.
 #[derive(Debug, Clone, PartialEq)]
@@ -171,26 +132,9 @@ impl TensorDesc {
 pub type TensorParamDesc = ParamDesc<TensorDesc>;
 
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
-    use burn::tensor;
-
     use super::*;
-
-    #[test]
-    fn test_param_kind() {
-        assert_eq!(
-            TensorKindDesc::for_kind::<tensor::Bool>(),
-            TensorKindDesc::Bool
-        );
-        assert_eq!(
-            TensorKindDesc::for_kind::<tensor::Float>(),
-            TensorKindDesc::Float
-        );
-        assert_eq!(
-            TensorKindDesc::for_kind::<tensor::Int>(),
-            TensorKindDesc::Int
-        );
-    }
 
     #[test]
     #[cfg(feature = "cuda")]
@@ -214,7 +158,7 @@ mod tests {
 
         {
             // Bool
-            let tensor: Tensor<B, 2, tensor::Bool> = Tensor::zeros([2, 3], &device);
+            let tensor: Tensor<B, 2, burn::tensor::Bool> = Tensor::zeros([2, 3], &device);
 
             let desc = TensorDesc::from(&tensor);
 
@@ -228,7 +172,7 @@ mod tests {
 
         {
             // Int
-            let tensor: Tensor<B, 2, tensor::Int> = Tensor::zeros([2, 3], &device);
+            let tensor: Tensor<B, 2, burn::tensor::Int> = Tensor::zeros([2, 3], &device);
 
             let desc = TensorDesc::from(&tensor);
 

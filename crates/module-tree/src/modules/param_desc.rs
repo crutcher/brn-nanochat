@@ -83,7 +83,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::burn_ext::{
+    use crate::tensors::{
         TensorDesc,
         TensorKindDesc,
     };

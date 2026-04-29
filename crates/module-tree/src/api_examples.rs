@@ -12,14 +12,16 @@ mod tests {
     };
 
     use crate::{
-        MODULE_TREE_VERSION,
-        ModuleTree,
-        ModuleTreeQuery,
-        burn_ext::{
+        errors::BunsenResult,
+        modules::reflection::{
+            MODULE_TREE_VERSION,
+            ModuleTree,
+            ModuleTreeQuery,
+        },
+        tensors::{
             TensorKindDesc,
             TensorParamDesc,
         },
-        errors::BunsenResult,
     };
 
     #[test]

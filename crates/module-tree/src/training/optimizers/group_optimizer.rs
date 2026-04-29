@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use std::marker::PhantomData;
 
 use burn::{
@@ -26,7 +27,7 @@ use hashbrown::{
     HashSet,
 };
 
-use crate::optimizers::{
+use crate::training::optimizers::{
     clone_simple_optimizer,
     compat::GradAdaptor,
 };

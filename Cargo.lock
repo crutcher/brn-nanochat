@@ -829,6 +829,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bunsen-ng"
+version = "0.0.9"
+dependencies = [
+ "burn",
+ "hashbrown 0.16.1",
+ "indoc",
+ "paste",
+ "spanned_error_message",
+ "strum 0.28.0",
+ "thiserror 2.0.18",
+ "xee-xpath",
+ "xot",
+]
+
+[[package]]
 name = "burn"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5073,19 +5088,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a0b3262dc837d2513fe2ef31ff8461352ef932dcca31ba0c0abe33547cf6b9b"
 
 [[package]]
-name = "module-tree"
-version = "0.0.9"
-dependencies = [
- "burn",
- "indoc",
- "spanned_error_message",
- "strum 0.28.0",
- "thiserror 2.0.18",
- "xee-xpath",
- "xot",
-]
-
-[[package]]
 name = "moxcms"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7876,11 +7878,11 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bunsen",
+ "bunsen-ng",
  "burn",
  "clap",
  "hashbrown 0.16.1",
  "log",
- "module-tree",
  "rand 0.10.0",
  "regex",
  "wordchipper",

@@ -31,25 +31,20 @@ use xot::{
 };
 
 use crate::{
-    burn_ext::{
+    errors::BunsenResult,
+    modules::{
         ParamDesc,
+        reflection::{
+            module_visitors::ModuleTreeBuilder,
+            xml_support::{
+                adapt_xee_error,
+                names,
+            },
+        },
+    },
+    tensors::{
         TensorDesc,
         TensorParamDesc,
-    },
-    errors::BunsenResult,
-    module_visitors::ModuleTreeBuilder,
-    xml_support::{
-        adapt_xee_error,
-        names::{
-            DTYPE_ATTR,
-            KIND_ATTR,
-            MODULE_TREE_ELEM,
-            PARAM_ELEM,
-            PARAM_ID_ATTR,
-            RANK_ATTR,
-            SHAPE_ATTR,
-            STRUCTURE_ELEM,
-        },
     },
 };
 
@@ -88,7 +83,7 @@ impl ModuleTree {
     pub(crate) fn new() -> Self {
         let mut docs = Documents::new();
         let xot = docs.xot_mut();
-        let mtree_nid = xot.add_name(MODULE_TREE_ELEM);
+        let mtree_nid = xot.add_name(names::MODULE_TREE_ELEM);
         let root = xot.new_element(mtree_nid);
         let doc = xot.new_document_with_element(root).unwrap();
 
@@ -397,7 +392,7 @@ impl<'a> ModuleTreeQuery<'a> {
     pub fn new(tree: &'a mut ModuleTree) -> Self {
         Self {
             tree,
-            expr: format!("/{MODULE_TREE_ELEM}/{STRUCTURE_ELEM}"),
+            expr: format!("/{}/{}", names::MODULE_TREE_ELEM, names::STRUCTURE_ELEM),
         }
     }
 
@@ -501,7 +496,7 @@ impl<'a> ModuleTreeQuery<'a> {
     ///
     /// This is the `descendent-or-self::Param` operation.
     pub fn params(self) -> Self {
-        self.select(format!("descendant-or-self::{PARAM_ELEM}"))
+        self.select(format!("descendant-or-self::{}", names::PARAM_ELEM))
     }
 
     /// Execute a [`xee_xpath::Queries::many`] on the current selection.
@@ -530,9 +525,14 @@ impl<'a> ModuleTreeQuery<'a> {
     /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
     /// errors.
     pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
-        let [param_id_nid, dtype_nid, rank_nid, kind_nid, shape_nid] = self
-            .tree
-            .bind_local_names([PARAM_ID_ATTR, DTYPE_ATTR, RANK_ATTR, KIND_ATTR, SHAPE_ATTR]);
+        let [param_id_nid, dtype_nid, rank_nid, kind_nid, shape_nid] =
+            self.tree.bind_local_names([
+                names::PARAM_ID_ATTR,
+                names::DTYPE_ATTR,
+                names::RANK_ATTR,
+                names::KIND_ATTR,
+                names::SHAPE_ATTR,
+            ]);
 
         let mut query = self.params();
 
@@ -548,7 +548,11 @@ impl<'a> ModuleTreeQuery<'a> {
                 // TODO: Extract, real errors.
                 let param_id: ParamId =
                     ParamId::deserialize(attrs.get(param_id_nid).unwrap_or_else(|| {
-                        panic!("{PARAM_ELEM}/{PARAM_ID_ATTR} attribute missing")
+                        panic!(
+                            "{}/{} attribute missing",
+                            names::PARAM_ELEM,
+                            names::PARAM_ID_ATTR
+                        )
                     }));
                 let tensor_desc = TensorDesc::from_strings(
                     attrs.get(kind_nid).unwrap(),

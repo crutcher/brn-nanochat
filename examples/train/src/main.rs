@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::{
     cmp::max,
     path::PathBuf,
@@ -9,9 +7,13 @@ use std::{
     },
 };
 
-use anyhow::{
-    Result,
-    bail,
+use anyhow::bail;
+use bunsen_ng::{
+    modules::reflection::ModuleTree,
+    training::optimizers::{
+        GroupOptimizerAdaptor2,
+        OptimizerGroup,
+    },
 };
 use burn::{
     data::dataloader::DataLoader,
@@ -26,23 +28,14 @@ use burn::{
     },
     module::{
         Module,
-        ModuleVisitor,
-        Param,
         ParamId,
     },
     nn::loss::CrossEntropyLossConfig,
     optim::{
         AdamWConfig,
         MuonConfig,
-        Optimizer,
-        decay::WeightDecayConfig,
     },
-    prelude::{
-        Backend,
-        Bool,
-        Float,
-        Int,
-    },
+    prelude::Backend,
     record::CompactRecorder,
     tensor::{
         AsIndex,
@@ -67,14 +60,6 @@ use burn::{
 };
 use clap::Parser;
 use hashbrown::HashSet;
-use module_tree::{
-    ModuleTree,
-    burn_ext::{
-        ParamDesc,
-        TensorDesc,
-        TensorKindDesc,
-    },
-};
 use rand::{
     SeedableRng,
     rngs::StdRng,
@@ -85,15 +70,9 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
-use zsl_chat::{
-    gpt::gpt_model::{
-        GPT,
-        GPTConfig,
-    },
-    optimizers::{
-        GroupOptimizerAdaptor2,
-        OptimizerGroup,
-    },
+use zsl_chat::gpt::gpt_model::{
+    GPT,
+    GPTConfig,
 };
 use zsl_chat_data::{
     dataloader::ChatDataLoader,
