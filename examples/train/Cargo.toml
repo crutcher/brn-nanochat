@@ -9,7 +9,7 @@ zsl-chat = { path = "../../crates/zsl-chat", version = "0.0.9" }
 zsl-data-cache = { path = "../../crates/zsl-data-cache", version = "0.0.9" }
 zsl-chat-data = { path = "../../crates/zsl-chat-data", version = "0.0.9" }
 bunsen = { workspace = true }
-bunsen-ng = { path = "../../crates/module-tree", version = "0.0.9" }
+bunsen-ng = { path = "../../crates/bunsen-ng", version = "0.0.9" }
 
 rand = { workspace = true }
 anyhow = { workspace = true }
