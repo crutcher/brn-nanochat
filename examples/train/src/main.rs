@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::{
     cmp::max,
     path::PathBuf,
@@ -9,10 +7,7 @@ use std::{
     },
 };
 
-use anyhow::{
-    Result,
-    bail,
-};
+use anyhow::bail;
 use burn::{
     data::dataloader::DataLoader,
     grad_clipping::GradientClipping,
@@ -26,23 +21,14 @@ use burn::{
     },
     module::{
         Module,
-        ModuleVisitor,
-        Param,
         ParamId,
     },
     nn::loss::CrossEntropyLossConfig,
     optim::{
         AdamWConfig,
         MuonConfig,
-        Optimizer,
-        decay::WeightDecayConfig,
     },
-    prelude::{
-        Backend,
-        Bool,
-        Float,
-        Int,
-    },
+    prelude::Backend,
     record::CompactRecorder,
     tensor::{
         AsIndex,
@@ -67,14 +53,9 @@ use burn::{
 };
 use clap::Parser;
 use hashbrown::HashSet;
-use module_tree::{
-    ModuleTree,
-    burn_ext::{
-        ParamDesc,
-        TensorDesc,
-        TensorKindDesc,
-    },
-    optimizers::{
+use module_tree::burn_ext::{
+    modules::reflection::ModuleTree,
+    training::optimizers::{
         GroupOptimizerAdaptor2,
         OptimizerGroup,
     },

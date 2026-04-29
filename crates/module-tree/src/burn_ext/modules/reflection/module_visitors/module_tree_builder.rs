@@ -17,25 +17,25 @@ use xot::{
     Xot,
 };
 
-use crate::{
-    ModuleTree,
-    burn_ext::{
-        TensorParamDesc,
-        shape_to_xml_attr,
+use crate::burn_ext::{
+    modules::reflection::{
+        ModuleTree,
+        module_visitors::type_util,
+        xml_support::names::{
+            CLASS_ATTR,
+            DTYPE_ATTR,
+            ID_ATTR,
+            KIND_ATTR,
+            NAME_ATTR,
+            PARAM_ELEM,
+            PARAM_ID_ATTR,
+            RANK_ATTR,
+            SHAPE_ATTR,
+            STRUCTURE_ELEM,
+        },
     },
-    module_visitors::type_util,
-    xml_support::names::{
-        CLASS_ATTR,
-        DTYPE_ATTR,
-        ID_ATTR,
-        KIND_ATTR,
-        NAME_ATTR,
-        PARAM_ELEM,
-        PARAM_ID_ATTR,
-        RANK_ATTR,
-        SHAPE_ATTR,
-        STRUCTURE_ELEM,
-    },
+    shape_to_xml_attr,
+    tensors::TensorParamDesc,
 };
 
 /// [`ModuleVisitor`] builder for a [`ModuleTree`].
