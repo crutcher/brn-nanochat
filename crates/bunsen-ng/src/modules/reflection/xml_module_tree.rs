@@ -1,8 +1,11 @@
 #![allow(unused)]
 
-use std::fmt::{
-    Debug,
-    Display,
+use std::{
+    fmt::{
+        Debug,
+        Display,
+    },
+    str::FromStr,
 };
 
 use burn::{
@@ -32,26 +35,34 @@ use xee_xpath::{
     query::Convert,
 };
 use xot::{
+    Attribute,
+    Attributes,
     NameId,
     Node,
     Xot,
 };
 
 use crate::{
-    errors::BunsenResult,
+    errors::{
+        BunsenError,
+        BunsenResult,
+    },
     meta::{
         ParamDesc,
         TensorDesc,
         TensorKindDesc,
         TensorParamDesc,
+        dtype_from_str,
     },
     modules::reflection::{
         module_visitors::XmlModuleTreeBuilder,
         xml_support::{
             adapt_xee_error,
             names,
+            node_to_tensor_param_desc,
         },
     },
+    zspace::shape_from_xml_attr,
 };
 
 pub const XML_MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -578,43 +589,14 @@ impl<'a> XPathModuleQuery<'a> {
     /// `Ok(Vec<TensorParamDesc>)` on success, `Err(e)` on
     /// errors.
     pub fn to_param_descs(mut self) -> BunsenResult<Vec<TensorParamDesc>> {
-        let [param_id_nid, dtype_nid, rank_nid, kind_nid, shape_nid] =
-            self.tree.bind_local_names([
-                names::PARAM_ID_ATTR,
-                names::DTYPE_ATTR,
-                names::RANK_ATTR,
-                names::KIND_ATTR,
-                names::SHAPE_ATTR,
-            ]);
-
         let mut query = self.params();
 
         let nodes: Vec<Node> = query.xee_execute_many(|docs, item| Ok(item.to_node()?))?;
 
         let xot = query.tree.docs.xot();
-
         nodes
             .into_iter()
-            .map(|node| {
-                let attrs = xot.attributes(node);
-
-                // TODO: Extract, real errors.
-                let param_id: ParamId =
-                    ParamId::deserialize(attrs.get(param_id_nid).unwrap_or_else(|| {
-                        panic!(
-                            "{}/{} attribute missing",
-                            names::PARAM_ELEM,
-                            names::PARAM_ID_ATTR
-                        )
-                    }));
-                let tensor_desc = TensorDesc::from_strings(
-                    attrs.get(kind_nid).unwrap(),
-                    attrs.get(dtype_nid).unwrap(),
-                    attrs.get(shape_nid).unwrap(),
-                )?;
-
-                Ok(ParamDesc::new(param_id, tensor_desc))
-            })
+            .map(|node| node_to_tensor_param_desc(xot, node))
             .collect::<BunsenResult<Vec<ParamDesc<TensorDesc>>>>()
     }
 

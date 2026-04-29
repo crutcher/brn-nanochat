@@ -22,20 +22,17 @@ use crate::{
     modules::reflection::{
         XmlModuleTree,
         module_visitors::container_type_util,
-        xml_support::names::{
-            CLASS_ATTR,
-            DTYPE_ATTR,
-            ID_ATTR,
-            KIND_ATTR,
-            NAME_ATTR,
-            PARAM_ELEM,
-            PARAM_ID_ATTR,
-            RANK_ATTR,
-            SHAPE_ATTR,
-            STRUCTURE_ELEM,
+        xml_support::{
+            names::{
+                CLASS_ATTR,
+                ID_ATTR,
+                NAME_ATTR,
+                PARAM_ELEM,
+                STRUCTURE_ELEM,
+            },
+            tensor_param_desc_to_attributes,
         },
     },
-    zspace::shape_to_xml_attr,
 };
 
 /// [`ModuleVisitor`] builder for a [`XmlModuleTree`].
@@ -93,23 +90,10 @@ impl<B: Backend> XmlModuleTreeBuilder<B> {
         &mut self,
         param_desc: TensorParamDesc,
     ) {
-        let node = self.new_child(*self.stack.last().unwrap(), PARAM_ELEM);
+        let parent = *self.stack.last().unwrap();
+        let node = self.new_child(parent, PARAM_ELEM);
         self.set_idents(node);
-
-        self.set_attribute(node, PARAM_ID_ATTR, param_desc.param_id().to_string());
-        self.set_attribute(node, CLASS_ATTR, "tensor");
-
-        // Should kind be <Type kind="Float" dtype="F32" />?
-        self.set_attribute(node, KIND_ATTR, format!("{:?}", param_desc.kind()));
-        self.set_attribute(node, DTYPE_ATTR, format!("{:?}", param_desc.dtype()));
-
-        // Should shape be <Shape rank="1" dims="[10, 2]" />?
-        self.set_attribute(node, SHAPE_ATTR, shape_to_xml_attr(param_desc.shape()));
-        self.set_attribute(
-            node,
-            RANK_ATTR,
-            param_desc.shape().clone().rank().to_string(),
-        );
+        tensor_param_desc_to_attributes(self.xot_mut(), node, &param_desc).unwrap();
     }
 
     fn new_child<N: AsRef<str>>(
