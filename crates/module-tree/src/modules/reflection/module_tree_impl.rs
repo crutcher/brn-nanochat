@@ -11,7 +11,14 @@ use burn::{
         ModuleVisitor,
         ParamId,
     },
-    prelude::Backend,
+    nn::{
+        Linear,
+        LinearConfig,
+    },
+    prelude::{
+        Backend,
+        Shape,
+    },
 };
 use xee_xpath::{
     Documents,
@@ -44,12 +51,14 @@ use crate::{
     },
     tensors::{
         TensorDesc,
+        TensorKindDesc,
         TensorParamDesc,
     },
 };
 
 pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// XML/XPath reflection layer for burn [`Module`]s.
 pub struct ModuleTree {
     docs: Documents,
     root: Node,
