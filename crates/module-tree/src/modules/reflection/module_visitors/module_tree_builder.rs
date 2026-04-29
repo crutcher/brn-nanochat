@@ -19,7 +19,7 @@ use xot::{
 
 use crate::{
     modules::reflection::{
-        ModuleTree,
+        XmlModuleTree,
         module_visitors::type_util,
         xml_support::names::{
             CLASS_ATTR,
@@ -38,9 +38,9 @@ use crate::{
     zspace::shape_to_xml_attr,
 };
 
-/// [`ModuleVisitor`] builder for a [`ModuleTree`].
+/// [`ModuleVisitor`] builder for a [`XmlModuleTree`].
 pub struct ModuleTreeBuilder<B: Backend> {
-    mtree: ModuleTree,
+    mtree: XmlModuleTree,
 
     depth: usize,
     base: Node,
@@ -53,15 +53,15 @@ pub struct ModuleTreeBuilder<B: Backend> {
 }
 
 impl<B: Backend> ModuleTreeBuilder<B> {
-    /// Build a [`ModuleTree`] from a [`Module`].
-    pub fn build<M: Module<B>>(module: &M) -> ModuleTree {
+    /// Build a [`XmlModuleTree`] from a [`Module`].
+    pub fn build<M: Module<B>>(module: &M) -> XmlModuleTree {
         let mut builder = Self::new();
         module.visit(&mut builder);
         builder.mtree
     }
 
     fn new() -> Self {
-        let mut mtree = ModuleTree::new();
+        let mut mtree = XmlModuleTree::new();
         let root = mtree.root();
 
         let nodes_nid = mtree.bind_local_name(STRUCTURE_ELEM);

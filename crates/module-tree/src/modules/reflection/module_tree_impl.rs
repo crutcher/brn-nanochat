@@ -56,20 +56,20 @@ use crate::{
     },
 };
 
-pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const XML_MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// XML/XPath reflection layer for burn [`Module`]s.
-pub struct ModuleTree {
+pub struct XmlModuleTree {
     docs: Documents,
     root: Node,
 }
 
-impl Debug for ModuleTree {
+impl Debug for XmlModuleTree {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        f.write_str("ModuleTree {")?;
+        f.write_str("XmlModuleTree {")?;
         if f.alternate() {
             f.write_str("\n")?;
             for line in self.to_xml(true).lines() {
@@ -82,8 +82,8 @@ impl Debug for ModuleTree {
     }
 }
 
-impl ModuleTree {
-    /// Build a [`ModuleTree`] for a [`Module`].
+impl XmlModuleTree {
+    /// Build a [`XmlModuleTree`] for a [`Module`].
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
         ModuleTreeBuilder::build(module)
     }
@@ -92,12 +92,12 @@ impl ModuleTree {
     pub(crate) fn new() -> Self {
         let mut docs = Documents::new();
         let xot = docs.xot_mut();
-        let mtree_nid = xot.add_name(names::MODULE_TREE_ELEM);
+        let mtree_nid = xot.add_name(names::XML_MODULE_TREE_ELEM);
         let root = xot.new_element(mtree_nid);
         let doc = xot.new_document_with_element(root).unwrap();
 
         let version_nid = xot.add_name("version");
-        xot.set_attribute(root, version_nid, MODULE_TREE_VERSION);
+        xot.set_attribute(root, version_nid, XML_MODULE_TREE_VERSION);
 
         Self { docs, root }
     }
@@ -177,7 +177,7 @@ impl ModuleTree {
 
     /// Iterate over [`ParamId`]s for each parameter in the subtree.
     ///
-    /// Implicitly calls [`ModuleTreeQuery::params`].
+    /// Implicitly calls [`XPathModuleQuery::params`].
     ///
     /// # Returns
     /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
@@ -202,7 +202,7 @@ impl ModuleTree {
 
     /// Iterate over [`TensorParamDesc`]s for each parameter in the subtree.
     ///
-    /// Implicitly calls [`ModuleTreeQuery::params`].
+    /// Implicitly calls [`XPathModuleQuery::params`].
     ///
     /// # Returns
     /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
@@ -226,12 +226,12 @@ impl ModuleTree {
         self.query().to_param_descs()
     }
 
-    /// Create a new default [`ModuleTreeQuery`] for this module tree.
+    /// Create a new default [`XPathModuleQuery`] for this module tree.
     ///
     /// The query builder has a fluent api to incrementally refine a query.
     /// It begins with broad selection over the entire module structure.
-    pub fn query<'a>(&'a mut self) -> ModuleTreeQuery<'a> {
-        ModuleTreeQuery::new(self)
+    pub fn query<'a>(&'a mut self) -> XPathModuleQuery<'a> {
+        XPathModuleQuery::new(self)
     }
 
     /// Query a sub-tree.
@@ -252,8 +252,8 @@ impl ModuleTree {
     pub fn select<'a>(
         &'a mut self,
         expr: &str,
-    ) -> ModuleTreeQuery<'a> {
-        ModuleTreeQuery::new(self).select(expr)
+    ) -> XPathModuleQuery<'a> {
+        XPathModuleQuery::new(self).select(expr)
     }
 
     /// Query a sub-tree.
@@ -274,8 +274,8 @@ impl ModuleTree {
     pub fn try_select<'a>(
         &'a mut self,
         expr: &str,
-    ) -> BunsenResult<ModuleTreeQuery<'a>> {
-        ModuleTreeQuery::new(self).try_select(expr)
+    ) -> BunsenResult<XPathModuleQuery<'a>> {
+        XPathModuleQuery::new(self).try_select(expr)
     }
 
     /// Query all parameters of a subtree.
@@ -302,7 +302,7 @@ impl ModuleTree {
     pub fn select_params<'a>(
         &'a mut self,
         expr: &str,
-    ) -> ModuleTreeQuery<'a> {
+    ) -> XPathModuleQuery<'a> {
         self.select(expr).params()
     }
 
@@ -330,7 +330,7 @@ impl ModuleTree {
     pub fn try_select_params<'a>(
         &'a mut self,
         expr: &str,
-    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+    ) -> BunsenResult<XPathModuleQuery<'a>> {
         Ok(self.try_select(expr)?.params())
     }
 
@@ -383,25 +383,25 @@ impl ModuleTree {
     }
 }
 
-/// A query builder for a [`ModuleTree`].
+/// A query builder for a [`XmlModuleTree`].
 ///
 /// This works in two phases:
 /// 1. A fluent api to incrementally refine an `XPath` expression.
 /// 2. Various execution/output runners to run that expression.
 #[derive(Debug)]
-pub struct ModuleTreeQuery<'a> {
-    tree: &'a mut ModuleTree,
+pub struct XPathModuleQuery<'a> {
+    tree: &'a mut XmlModuleTree,
     expr: String,
 }
 
-impl<'a> ModuleTreeQuery<'a> {
-    /// Create a new [`ModuleTreeQuery`].
+impl<'a> XPathModuleQuery<'a> {
+    /// Create a new [`XPathModuleQuery`].
     ///
-    /// See: [`ModuleTree::query`].
-    pub fn new(tree: &'a mut ModuleTree) -> Self {
+    /// See: [`XmlModuleTree::query`].
+    pub fn new(tree: &'a mut XmlModuleTree) -> Self {
         Self {
             tree,
-            expr: format!("/{}/{}", names::MODULE_TREE_ELEM, names::STRUCTURE_ELEM),
+            expr: format!("/{}/{}", names::XML_MODULE_TREE_ELEM, names::STRUCTURE_ELEM),
         }
     }
 
@@ -440,7 +440,7 @@ impl<'a> ModuleTreeQuery<'a> {
     pub fn select<S: AsRef<str>>(
         self,
         expr: S,
-    ) -> ModuleTreeQuery<'a> {
+    ) -> XPathModuleQuery<'a> {
         self.append_expr(format!("/{}", expr.as_ref()).as_str())
     }
 
@@ -453,7 +453,7 @@ impl<'a> ModuleTreeQuery<'a> {
     pub fn try_select<S: AsRef<str>>(
         self,
         expr: S,
-    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+    ) -> BunsenResult<XPathModuleQuery<'a>> {
         self.try_append_expr(format!("/{}", expr.as_ref()).as_str())
     }
 
@@ -475,7 +475,7 @@ impl<'a> ModuleTreeQuery<'a> {
     pub fn filter<S: AsRef<str>>(
         self,
         pred: S,
-    ) -> ModuleTreeQuery<'a> {
+    ) -> XPathModuleQuery<'a> {
         self.append_expr(format!("[{}]", pred.as_ref()).as_str())
     }
 
@@ -497,7 +497,7 @@ impl<'a> ModuleTreeQuery<'a> {
     pub fn try_filter<S: AsRef<str>>(
         self,
         pred: S,
-    ) -> BunsenResult<ModuleTreeQuery<'a>> {
+    ) -> BunsenResult<XPathModuleQuery<'a>> {
         self.try_append_expr(format!("[{}]", pred.as_ref()).as_str())
     }
 
@@ -665,21 +665,22 @@ mod tests {
         let bias_ref = module.bias.as_ref().unwrap();
         let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
 
-        let mut mtree = ModuleTree::build(&module);
+        let mut mtree = XmlModuleTree::build(&module);
 
         assert_eq!(
             format!("{:#?}", mtree),
             indoc::formatdoc! {r#"
-                ModuleTree {{
-                  <ModuleTree version="{MODULE_TREE_VERSION}">
+                XmlModuleTree {{
+                  <XmlModuleTree version="{version}">
                     <Structure>
                       <Linear id="n:1" class="struct">
                         <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
                         <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
                       </Linear>
                     </Structure>
-                  </ModuleTree>
+                  </XmlModuleTree>
                 }}"#,
+                version=XML_MODULE_TREE_VERSION,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
                 bias_id = bias_desc.param_id(),
@@ -689,7 +690,7 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", mtree),
-            indoc::formatdoc! {r#"ModuleTree {{<ModuleTree version="{MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></ModuleTree>}}"#,
+            indoc::formatdoc! {r#"XmlModuleTree {{<XmlModuleTree version="{XML_MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></XmlModuleTree>}}"#,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
                 bias_id = bias_desc.param_id(),
@@ -718,20 +719,21 @@ mod tests {
         let bias_ref = module.bias.as_ref().unwrap();
         let bias_desc: TensorParamDesc = TensorParamDesc::from(bias_ref);
 
-        let mut mtree = ModuleTree::build(&module);
+        let mut mtree = XmlModuleTree::build(&module);
 
         assert_eq!(
             mtree.to_xml(true),
             indoc::formatdoc! {r#"
-                <ModuleTree version="{MODULE_TREE_VERSION}">
+                <XmlModuleTree version="{version}">
                   <Structure>
                     <Linear id="n:1" class="struct">
                       <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
                       <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
                     </Linear>
                   </Structure>
-                </ModuleTree>
+                </XmlModuleTree>
                 "#,
+                version=XML_MODULE_TREE_VERSION,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
                 bias_id = bias_desc.param_id(),
@@ -741,7 +743,8 @@ mod tests {
 
         assert_eq!(
             mtree.to_xml(false),
-            indoc::formatdoc! {r#"<ModuleTree version="{MODULE_TREE_VERSION}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></ModuleTree>"#,
+            indoc::formatdoc! {r#"<XmlModuleTree version="{version}"><Structure><Linear id="n:1" class="struct"><Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/><Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/></Linear></Structure></XmlModuleTree>"#,
+                version=XML_MODULE_TREE_VERSION,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
                 bias_id = bias_desc.param_id(),

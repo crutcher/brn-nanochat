@@ -14,9 +14,9 @@ mod tests {
     use crate::{
         errors::BunsenResult,
         modules::reflection::{
-            MODULE_TREE_VERSION,
-            ModuleTree,
-            ModuleTreeQuery,
+            XML_MODULE_TREE_VERSION,
+            XPathModuleQuery,
+            XmlModuleTree,
         },
         tensors::{
             TensorKindDesc,
@@ -75,12 +75,12 @@ mod tests {
             module.weight.dtype().size() * 2 * 3
         );
 
-        // Build a ModuleTree from the module.
-        // As the ModuleTree holds non-Send active active query environment,
+        // Build a XmlModuleTree from the module.
+        // As the XmlModuleTree holds non-Send active active query environment,
         // it must be `mut` to be useful.
-        let mut mtree = ModuleTree::build(&module);
+        let mut mtree = XmlModuleTree::build(&module);
 
-        // [`ModuleTree`] builds an XML meta-description of the module structure.
+        // [`XmlModuleTree`] builds an XML meta-description of the module structure.
         //
         // This can be dumped directly to a `String` to examine the module structure.
         //
@@ -112,14 +112,14 @@ mod tests {
         assert_eq!(
             mtree.to_xml(true),
             indoc::formatdoc! {r#"
-                <ModuleTree version="{MODULE_TREE_VERSION}">
+                <XmlModuleTree version="{XML_MODULE_TREE_VERSION}">
                   <Structure>
                     <Linear id="n:1" class="struct">
                       <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
                       <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
                     </Linear>
                   </Structure>
-                </ModuleTree>
+                </XmlModuleTree>
                 "#,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
@@ -128,19 +128,19 @@ mod tests {
             }
         );
 
-        // [`ModuleTree`] has a Debug impl:
+        // [`XmlModuleTree`] has a Debug impl:
         assert_eq!(
             format!("{:#?}", mtree),
             indoc::formatdoc! {r#"
-                ModuleTree {{
-                  <ModuleTree version="{MODULE_TREE_VERSION}">
+                XmlModuleTree {{
+                  <XmlModuleTree version="{XML_MODULE_TREE_VERSION}">
                     <Structure>
                       <Linear id="n:1" class="struct">
                         <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
                         <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
                       </Linear>
                     </Structure>
-                  </ModuleTree>
+                  </XmlModuleTree>
                 }}"#,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
@@ -149,14 +149,14 @@ mod tests {
             }
         );
 
-        // [`ModuleTree::param_ids`] iterates over all [`ParamId`]s.
+        // [`XmlModuleTree::param_ids`] iterates over all [`ParamId`]s.
         //
         // This is a useful way to get all the parameter ids in a module;
         // but it is actually a wrapper over a series of more complex steps.
         //
         //   let ids: Vec<ParamId> = mtree
         //       .query()
-        //       // .params() is implicit to [`ModuleTreeQuery::to_param_ids`],
+        //       // .params() is implicit to [`XPathModuleQuery::to_param_ids`],
         //       // equivalent to: .select("descendant-or-self::Param")
         //       .to_param_ids()?
         //       .collect();
@@ -177,24 +177,24 @@ mod tests {
             [module.weight.id, module.bias.as_ref().unwrap().id]
         );
 
-        // [`ModuleTreeQuery::to_param_ids`] iterates over [`ParamId`]s for
+        // [`XPathModuleQuery::to_param_ids`] iterates over [`ParamId`]s for
         // each parameter in the subtree.
         assert_eq!(
             &mtree.query().to_param_ids()?.collect::<Vec<ParamId>>(),
             &module_param_ids,
         );
 
-        // [`ModuleTree::param_descs`] iterates over descriptions of every parameter.
+        // [`XmlModuleTree::param_descs`] iterates over descriptions of every parameter.
         //
         // This leverages the [`TensorParamDesc`] API to strip generics from
         // the introspection api.
         //
-        // Similar to [`ModuleTree::param_ids`], this is a wrapper over a series of more
-        // complex steps.
+        // Similar to [`XmlModuleTree::param_ids`], this is a wrapper over a series of
+        // more complex steps.
         //
         //   let descs: Vec<ParamDesc<TensorDesc>> = mtree
         //       .query()
-        //       // .params() is implicit to [`ModuleTreeQuery::to_param_descs`],
+        //       // .params() is implicit to [`XPathModuleQuery::to_param_descs`],
         //       // equivalent to: .select("descendant-or-self::Param")
         //       .to_param_descs()?
         //       .collect();
@@ -204,7 +204,7 @@ mod tests {
             &vec![weight_desc.clone(), bias_desc.clone()]
         );
 
-        // [`ModuleTreeQuery::to_param_descs`] iterates over
+        // [`XPathModuleQuery::to_param_descs`] iterates over
         // [`TensorParamDesc`]s for each parameter in the subtree.
         assert_eq!(
             &mtree
@@ -216,30 +216,30 @@ mod tests {
 
         // The query api is designed to be fluent and chainable.
         //
-        // The [`ModuleTreeQuery<'a>`] captures a borrow of the module tree,
+        // The [`XPathModuleQuery<'a>`] captures a borrow of the module tree,
         // so you'll need to resolve the borrow before running another query.
-        let mut query: ModuleTreeQuery<'_> = mtree.query();
+        let mut query: XPathModuleQuery<'_> = mtree.query();
 
         // We can introspect on the current XPath expression being accumulated
         // by a query by calling `expr()`.
-        assert_eq!(query.expr(), "/ModuleTree/Structure");
+        assert_eq!(query.expr(), "/XmlModuleTree/Structure");
 
-        // [`ModuleTreeQuery`] has a Debug impl:
+        // [`XPathModuleQuery`] has a Debug impl:
         assert_eq!(
             format!("{:#?}", query),
             indoc::formatdoc! {r#"
-                ModuleTreeQuery {{
-                    tree: ModuleTree {{
-                      <ModuleTree version="{MODULE_TREE_VERSION}">
+                XPathModuleQuery {{
+                    tree: XmlModuleTree {{
+                      <XmlModuleTree version="{XML_MODULE_TREE_VERSION}">
                         <Structure>
                           <Linear id="n:1" class="struct">
                             <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
                             <Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>
                           </Linear>
                         </Structure>
-                      </ModuleTree>
+                      </XmlModuleTree>
                     }},
-                    expr: "/ModuleTree/Structure",
+                    expr: "/XmlModuleTree/Structure",
                 }}"#,
                 weight_id = weight_desc.param_id(),
                 weight_dtype = format!("{:?}", weight_desc.dtype()),
@@ -268,12 +268,12 @@ mod tests {
             },],
         );
 
-        // The [`ModuleTreeQuery::params`] method selects all the `Param` elements
+        // The [`XPathModuleQuery::params`] method selects all the `Param` elements
         // in the current subtree.
         let mut query = mtree.query().params();
         assert_eq!(
             query.expr(),
-            "/ModuleTree/Structure/descendant-or-self::Param"
+            "/XmlModuleTree/Structure/descendant-or-self::Param"
         );
         assert_eq!(
             &query.to_fragments(false)?.collect::<Vec<_>>(),
@@ -294,7 +294,7 @@ mod tests {
         // A full coverage of the XPath language cannot be included here.
         // For more details, see: <https://en.wikipedia.org/wiki/XPath>
 
-        // The structural elements start at '/ModuleTree/Structure/$Elem'.
+        // The structural elements start at '/XmlModuleTree/Structure/$Elem'.
         // But there's only every exactly one root node (currently).
         //
         // We can select this using either:
@@ -305,7 +305,7 @@ mod tests {
         // "Linear":
         // - Select the root 'Linear' node,
         let mut query = mtree.query().select("Linear");
-        assert_eq!(query.expr(), "/ModuleTree/Structure/Linear");
+        assert_eq!(query.expr(), "/XmlModuleTree/Structure/Linear");
         assert_eq!(
             &query.to_fragments(true)?.collect::<Vec<_>>(),
             &[indoc::formatdoc! {r#"
@@ -325,7 +325,7 @@ mod tests {
         // "*":
         // - Select the root's children, which is only the 'Linear' node
         let mut query = mtree.query().select("*");
-        assert_eq!(query.expr(), "/ModuleTree/Structure/*");
+        assert_eq!(query.expr(), "/XmlModuleTree/Structure/*");
         assert_eq!(
             &query.to_fragments(true)?.collect::<Vec<_>>(),
             &[indoc::formatdoc! {r#"
@@ -354,7 +354,7 @@ mod tests {
         let mut query = mtree.query().select("Linear/*[@name='weight']");
         assert_eq!(
             query.expr(),
-            "/ModuleTree/Structure/Linear/*[@name='weight']"
+            "/XmlModuleTree/Structure/Linear/*[@name='weight']"
         );
         assert_eq!(
             &query.to_fragments(false)?.collect::<Vec<_>>(),
@@ -376,7 +376,7 @@ mod tests {
         // - Select all the children of 'Linear',
         // - Select the 2nd (indexing from 1) child.
         let mut query = mtree.query().select("Linear/*[2]");
-        assert_eq!(query.expr(), "/ModuleTree/Structure/Linear/*[2]");
+        assert_eq!(query.expr(), "/XmlModuleTree/Structure/Linear/*[2]");
         assert_eq!(
             &query.to_fragments(false)?.collect::<Vec<_>>(),
             &[format!(
@@ -398,7 +398,7 @@ mod tests {
         let mut query = mtree.query().params().filter("@rank=2");
         assert_eq!(
             query.expr(),
-            "/ModuleTree/Structure/descendant-or-self::Param[@rank=2]"
+            "/XmlModuleTree/Structure/descendant-or-self::Param[@rank=2]"
         );
         assert_eq!(
             &query.to_fragments(false)?.collect::<Vec<_>>(),
@@ -421,7 +421,7 @@ mod tests {
         let expected_dtype = module.0.weight.dtype();
         let dtype_str = format!("{:?}", expected_dtype);
         // So we can still walk these modules:
-        let mut mtree = ModuleTree::build(&module);
+        let mut mtree = XmlModuleTree::build(&module);
         assert_eq!(
             &mtree.query().to_fragments(true)?.collect::<Vec<String>>(),
             &[indoc::formatdoc! {r#"
@@ -463,7 +463,7 @@ mod tests {
 
         // We could select all the `Linear` descendants:
         let mut query = mtree.select("*//Linear");
-        assert_eq!(query.expr(), "/ModuleTree/Structure/*//Linear");
+        assert_eq!(query.expr(), "/XmlModuleTree/Structure/*//Linear");
         assert_eq!(
             &query.to_fragments(true)?.collect::<Vec<String>>(),
             &[
@@ -511,7 +511,7 @@ mod tests {
         let mut query = mtree.query().params().filter("@rank=2");
         assert_eq!(
             query.expr(),
-            "/ModuleTree/Structure/descendant-or-self::Param[@rank=2]"
+            "/XmlModuleTree/Structure/descendant-or-self::Param[@rank=2]"
         );
         assert_eq!(
             &query.to_fragments(false)?.collect::<Vec<_>>(),
