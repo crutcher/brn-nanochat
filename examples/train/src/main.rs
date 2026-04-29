@@ -309,7 +309,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
     let mut mtree = XmlModuleTree::build(&host);
 
-    let all_params: HashSet<ParamId> = mtree.param_ids()?.collect();
+    let all_params: HashSet<ParamId> = mtree.param_ids()?.into_iter().collect();
     // ==>
     //   let all_params: HashSet<ParamId> = mtree
     //       .query()
@@ -328,6 +328,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .select_params("GptHost/GPT/Vec[@name='h']")
         .filter("@rank=2")
         .to_param_ids()?
+        .into_iter()
         .collect();
     // ==>
     //   let muon_params: HashSet<ParamId> = mtree

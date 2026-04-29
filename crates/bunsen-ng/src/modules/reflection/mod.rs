@@ -151,7 +151,7 @@
 //!     //       // equivalent to: .select("descendant-or-self::Param")
 //!     //       .to_param_ids()?
 //!     //       .collect();
-//!     let module_param_ids: Vec<ParamId> = mtree.param_ids()?.collect();
+//!     let module_param_ids: Vec<ParamId> = mtree.param_ids()?;
 //!
 //!     // IMPORTANT: Module Tree Ordering
 //!     //
@@ -171,7 +171,7 @@
 //!     // [`XPathModuleQuery::to_param_ids`] iterates over [`ParamId`]s for
 //!     // each parameter in the subtree.
 //!     assert_eq!(
-//!             &mtree.query().to_param_ids()?.collect::<Vec<ParamId>>(),
+//!             &mtree.query().to_param_ids()?,
 //!             &module_param_ids,
 //!         );
 //!
@@ -189,7 +189,7 @@
 //!     //       // equivalent to: .select("descendant-or-self::Param")
 //!     //       .to_param_descs()?
 //!     //       .collect();
-//!     let module_param_descs: Vec<TensorParamDesc> = mtree.param_descs()?.collect();
+//!     let module_param_descs: Vec<TensorParamDesc> = mtree.param_descs()?;
 //!     assert_eq!(
 //!         &module_param_descs,
 //!         &vec![weight_desc.clone(), bias_desc.clone()]
@@ -200,8 +200,7 @@
 //!     assert_eq!(
 //!             &mtree
 //!                 .query()
-//!                 .to_param_descs()?
-//!                 .collect::<Vec<TensorParamDesc>>(),
+//!                 .to_param_descs()?,
 //!             &module_param_descs,
 //!         );
 //!
@@ -245,7 +244,7 @@
 //!     //
 //!     // Initially, this will be the root Module node.
 //!     assert_eq!(
-//!             &query.to_fragments(true)?.collect::<Vec<String>>(),
+//!             &query.to_fragments(true)?,
 //!             &[indoc::formatdoc! {r#"
 //!                 <Structure>
 //!                   <Linear id="n:1" class="struct">
@@ -268,7 +267,7 @@
 //!         "/XmlModuleTree/Structure/descendant-or-self::Param"
 //!     );
 //!     assert_eq!(
-//!             &query.to_fragments(false)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(false)?,
 //!             &[
 //!                 format!(
 //!                     r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
@@ -299,7 +298,7 @@
 //!     let mut query = mtree.query().select("Linear");
 //!     assert_eq!(query.expr(), "/XmlModuleTree/Structure/Linear");
 //!     assert_eq!(
-//!             &query.to_fragments(true)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(true)?,
 //!             &[indoc::formatdoc! {r#"
 //!                 <Linear id="n:1" class="struct">
 //!                   <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
@@ -319,7 +318,7 @@
 //!     let mut query = mtree.query().select("*");
 //!     assert_eq!(query.expr(), "/XmlModuleTree/Structure/*");
 //!     assert_eq!(
-//!             &query.to_fragments(true)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(true)?,
 //!             &[indoc::formatdoc! {r#"
 //!                 <Linear id="n:1" class="struct">
 //!                   <Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>
@@ -349,7 +348,7 @@
 //!         "/XmlModuleTree/Structure/Linear/*[@name='weight']"
 //!     );
 //!     assert_eq!(
-//!             &query.to_fragments(false)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(false)?,
 //!             &[format!(
 //!                 r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
 //!                 weight_id = weight_desc.param_id(),
@@ -370,7 +369,7 @@
 //!     let mut query = mtree.query().select("Linear/*[2]");
 //!     assert_eq!(query.expr(), "/XmlModuleTree/Structure/Linear/*[2]");
 //!     assert_eq!(
-//!             &query.to_fragments(false)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(false)?,
 //!             &[format!(
 //!                 r#"<Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>"#,
 //!                 bias_id = bias_desc.param_id(),
@@ -393,7 +392,7 @@
 //!         "/XmlModuleTree/Structure/descendant-or-self::Param[@rank=2]"
 //!     );
 //!     assert_eq!(
-//!             &query.to_fragments(false)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(false)?,
 //!             &[format!(
 //!                 r#"<Param id="n:2" name="weight" param_id="{weight_id}" class="tensor" kind="Float" dtype="{weight_dtype}" shape="2 3" rank="2"/>"#,
 //!                 weight_id = weight_desc.param_id(),
@@ -415,7 +414,7 @@
 //!     // So we can still walk these modules:
 //!     let mut mtree = XmlModuleTree::build(&module);
 //!     assert_eq!(
-//!             &mtree.query().to_fragments(true)?.collect::<Vec<String>>(),
+//!             &mtree.query().to_fragments(true)?,
 //!             &[indoc::formatdoc! {r#"
 //!                 <Structure>
 //!                   <Tuple id="n:1" class="builtin">
@@ -457,7 +456,7 @@
 //!     let mut query = mtree.select("*//Linear");
 //!     assert_eq!(query.expr(), "/XmlModuleTree/Structure/*//Linear");
 //!     assert_eq!(
-//!             &query.to_fragments(true)?.collect::<Vec<String>>(),
+//!             &query.to_fragments(true)?,
 //!             &[
 //!                 indoc::formatdoc! {r#"
 //!                   <Linear id="n:2" class="struct">
@@ -506,7 +505,7 @@
 //!         "/XmlModuleTree/Structure/descendant-or-self::Param[@rank=2]"
 //!     );
 //!     assert_eq!(
-//!             &query.to_fragments(false)?.collect::<Vec<_>>(),
+//!             &query.to_fragments(false)?,
 //!             &[
 //!                 format!(
 //!                     r#"<Param id="n:3" name="weight" param_id="{}" class="tensor" kind="Float" dtype="{dtype}" shape="2 3" rank="2"/>"#,

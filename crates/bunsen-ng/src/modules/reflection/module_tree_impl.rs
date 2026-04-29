@@ -180,7 +180,7 @@ impl XmlModuleTree {
     /// Implicitly calls [`XPathModuleQuery::params`].
     ///
     /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    /// `Ok(Vec<ParamId>)` on success, `Err(e)` on errors.
     ///
     /// ## Example
     /// ```rust,ignore
@@ -196,7 +196,7 @@ impl XmlModuleTree {
     ///     .to_param_ids()?
     ///     .collect();
     /// ```
-    pub fn param_ids(&mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
+    pub fn param_ids(&mut self) -> BunsenResult<Vec<ParamId>> {
         self.query().to_param_ids()
     }
 
@@ -205,8 +205,7 @@ impl XmlModuleTree {
     /// Implicitly calls [`XPathModuleQuery::params`].
     ///
     /// # Returns
-    /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
-    /// errors.
+    /// `Ok(Vec<TensorParamDesc>)` on success, `Err(e)` on errors.
     ///
     /// ## Example
     /// ```rust,ignore
@@ -222,7 +221,7 @@ impl XmlModuleTree {
     ///     .to_param_descs()?
     ///     .collect();
     /// ```
-    pub fn param_descs(&mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
+    pub fn param_descs(&mut self) -> BunsenResult<Vec<TensorParamDesc>> {
         self.query().to_param_descs()
     }
 
@@ -381,7 +380,7 @@ impl XmlModuleTree {
     pub fn select_param_ids(
         &mut self,
         expr: &str,
-    ) -> BunsenResult<impl Iterator<Item = ParamId>> {
+    ) -> BunsenResult<Vec<ParamId>> {
         self.try_select_params(expr)?.to_param_ids()
     }
 }
@@ -426,17 +425,29 @@ impl<'a> XPathModuleQuery<'a> {
         Ok(Self { expr, ..self })
     }
 
-    fn append_expr(
-        mut self,
-        expr: &str,
-    ) -> Self {
-        self.try_append_expr(expr)
-            .unwrap_or_else(|e| panic!("{}", e))
+    /// Execute a [`xee_xpath::Queries::many`] on the current selection.
+    ///
+    /// This exposes the `xot`/`xee_xpath` query execution functionality.
+    pub fn xee_execute_many<V, F>(
+        &mut self,
+        f: F,
+    ) -> BunsenResult<Vec<V>>
+    where
+        F: Convert<V>,
+    {
+        let expr = &self.expr;
+        let root = self.tree.root;
+
+        Queries::default()
+            .many(expr, f)
+            .map_err(|e| adapt_xee_error(e, Some(expr)))?
+            .execute(&mut self.tree.docs, root)
+            .map_err(|e| adapt_xee_error(e, Some(expr)))
     }
 
     /// Refine the current selection by appending an `XPath` path expression.
     ///
-    /// If the expression was "E", the new expression will be "{E}/{expr}".
+    /// This is: `{EXPR}` => `{EXPR}/{expr}`
     ///
     /// # Panics
     /// On invalid `XPath` expressions.
@@ -444,12 +455,12 @@ impl<'a> XPathModuleQuery<'a> {
         self,
         expr: S,
     ) -> XPathModuleQuery<'a> {
-        self.append_expr(format!("/{}", expr.as_ref()).as_str())
+        self.try_select(expr).unwrap_or_else(|e| panic!("{}", e))
     }
 
     /// Refine the current selection by appending an `XPath` path expression.
     ///
-    /// If the expression was "E", the new expression will be "{E}/{expr}".
+    /// This is: `{EXPR}` => `{EXPR}/{expr}`
     ///
     /// # Returns
     /// `Ok(query)` on success, `Err(e)` on `XPath` errors.
@@ -467,7 +478,7 @@ impl<'a> XPathModuleQuery<'a> {
     /// nodes for which each branch of the predicate expression evaluates to
     /// true.
     ///
-    /// If the expression was "E", the new expression will be "{E}[{expr}]".
+    /// This is: `{EXPR}` => `{EXPR}[{expr}]`
     ///
     /// # Example
     /// * `filter("@name='foo'")` - select only nodes with a "name" attribute
@@ -479,7 +490,7 @@ impl<'a> XPathModuleQuery<'a> {
         self,
         pred: S,
     ) -> XPathModuleQuery<'a> {
-        self.append_expr(format!("[{}]", pred.as_ref()).as_str())
+        self.try_filter(pred).unwrap_or_else(|e| panic!("{}", e))
     }
 
     /// Refine the current selection by appending an `XPath` predicate
@@ -489,7 +500,7 @@ impl<'a> XPathModuleQuery<'a> {
     /// nodes for which each branch of the predicate expression evaluates to
     /// true.
     ///
-    /// If the expression was "E", the new expression will be "{E}[{expr}]".
+    /// This is: `{EXPR}` => `{EXPR}[{expr}]`
     ///
     /// # Example
     /// * `filter("@name='foo'")` - select only nodes with a "name" attribute
@@ -513,7 +524,7 @@ impl<'a> XPathModuleQuery<'a> {
 
     /// Select children withh the given `name` attribute.
     ///
-    /// This is: "{EXPR}" => "{EXPR}/*[@name='{name}']"
+    /// This is: `{EXPR}` => `{EXPR}/*[@name='{name}']`
     pub fn named_children(
         self,
         name: &str,
@@ -525,7 +536,7 @@ impl<'a> XPathModuleQuery<'a> {
     ///
     /// NOTE: `XPath` indexing is 1-based; so this method adds 1 to the index.
     ///
-    /// This is: "{EXPR}" => "{EXPR}/*[{index + 1}]"
+    /// This is: `{EXPR}` => `{EXPR}/*[{index + 1}]`
     pub fn indexed_children(
         self,
         index: usize,
@@ -535,7 +546,7 @@ impl<'a> XPathModuleQuery<'a> {
 
     /// Recursively select all descedant or self elements with `name`.
     ///
-    /// This is: "{EXPR}" => "{`EXPR}/descendant-or-self::{name`}"
+    /// This is: `{EXPR}` => `{EXPR}/descendant-or-self::{name}`
     pub fn subtree_elements(
         self,
         name: &str,
@@ -561,32 +572,14 @@ impl<'a> XPathModuleQuery<'a> {
         self.filter(format!("@rank={}", rank))
     }
 
-    /// Execute a [`xee_xpath::Queries::many`] on the current selection.
-    pub fn execute_many<V, F>(
-        &mut self,
-        f: F,
-    ) -> BunsenResult<Vec<V>>
-    where
-        F: Convert<V>,
-    {
-        let expr = &self.expr;
-        let root = self.tree.root;
-
-        Queries::default()
-            .many(expr, f)
-            .map_err(|e| adapt_xee_error(e, Some(expr)))?
-            .execute(&mut self.tree.docs, root)
-            .map_err(|e| adapt_xee_error(e, Some(expr)))
-    }
-
     /// Iterate over [`TensorParamDesc`]s for each parameter in the subtree.
     ///
     /// Implicitly calls [`Self::params`].
     ///
     /// # Returns
-    /// `Ok(impl Iterator<Item = TensorParamDesc>)` on success, `Err(e)` on
+    /// `Ok(Vec<TensorParamDesc>)` on success, `Err(e)` on
     /// errors.
-    pub fn to_param_descs(mut self) -> BunsenResult<impl Iterator<Item = TensorParamDesc>> {
+    pub fn to_param_descs(mut self) -> BunsenResult<Vec<TensorParamDesc>> {
         let [param_id_nid, dtype_nid, rank_nid, kind_nid, shape_nid] =
             self.tree.bind_local_names([
                 names::PARAM_ID_ATTR,
@@ -598,11 +591,11 @@ impl<'a> XPathModuleQuery<'a> {
 
         let mut query = self.params();
 
-        let nodes: Vec<Node> = query.execute_many(|docs, item| Ok(item.to_node()?))?;
+        let nodes: Vec<Node> = query.xee_execute_many(|docs, item| Ok(item.to_node()?))?;
 
         let xot = query.tree.docs.xot();
 
-        Ok(nodes
+        nodes
             .into_iter()
             .map(|node| {
                 let attrs = xot.attributes(node);
@@ -624,8 +617,7 @@ impl<'a> XPathModuleQuery<'a> {
 
                 Ok(ParamDesc::new(param_id, tensor_desc))
             })
-            .collect::<BunsenResult<Vec<ParamDesc<TensorDesc>>>>()?
-            .into_iter())
+            .collect::<BunsenResult<Vec<ParamDesc<TensorDesc>>>>()
     }
 
     /// Iterate over [`ParamId`]s for each parameter in the subtree.
@@ -633,7 +625,7 @@ impl<'a> XPathModuleQuery<'a> {
     /// Implicitly calls [`Self::params`].
     ///
     /// # Returns
-    /// `Ok(impl Iterator<Item = ParamId>)` on success, `Err(e)` on errors.
+    /// `Ok(Vec<ParamId>)` on success, `Err(e)` on errors.
     ///
     /// # Example
     /// ```rust,ignore
@@ -647,8 +639,12 @@ impl<'a> XPathModuleQuery<'a> {
     ///     .map(|d| d.param_id())
     ///     .collect();
     /// ```
-    pub fn to_param_ids(mut self) -> BunsenResult<impl Iterator<Item = ParamId>> {
-        Ok(self.to_param_descs()?.map(|d| d.param_id()))
+    pub fn to_param_ids(mut self) -> BunsenResult<Vec<ParamId>> {
+        Ok(self
+            .to_param_descs()?
+            .iter()
+            .map(|d| d.param_id())
+            .collect())
     }
 
     /// Iterate over string fragments for the current expression matches.
@@ -658,7 +654,7 @@ impl<'a> XPathModuleQuery<'a> {
     pub fn to_fragments(
         &mut self,
         pretty: bool,
-    ) -> BunsenResult<impl Iterator<Item = String>> {
+    ) -> BunsenResult<Vec<String>> {
         use xee_xpath::Item;
 
         let output_params = xot::output::xml::Parameters {
@@ -670,7 +666,7 @@ impl<'a> XPathModuleQuery<'a> {
             ..Default::default()
         };
 
-        let res = self.execute_many(
+        let fragments = self.xee_execute_many(
             |docs: &mut Documents, item: &Item| -> SpannedResult<String> {
                 let xot: &xot::Xot = docs.xot();
 
@@ -684,7 +680,7 @@ impl<'a> XPathModuleQuery<'a> {
             },
         )?;
 
-        Ok(res.into_iter())
+        Ok(fragments)
     }
 }
 
