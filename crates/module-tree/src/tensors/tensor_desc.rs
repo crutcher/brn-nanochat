@@ -132,9 +132,8 @@ impl TensorDesc {
 pub type TensorParamDesc = ParamDesc<TensorDesc>;
 
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
-    use burn::tensor;
-
     use super::*;
 
     #[test]
@@ -159,7 +158,7 @@ mod tests {
 
         {
             // Bool
-            let tensor: Tensor<B, 2, tensor::Bool> = Tensor::zeros([2, 3], &device);
+            let tensor: Tensor<B, 2, burn::tensor::Bool> = Tensor::zeros([2, 3], &device);
 
             let desc = TensorDesc::from(&tensor);
 
@@ -173,7 +172,7 @@ mod tests {
 
         {
             // Int
-            let tensor: Tensor<B, 2, tensor::Int> = Tensor::zeros([2, 3], &device);
+            let tensor: Tensor<B, 2, burn::tensor::Int> = Tensor::zeros([2, 3], &device);
 
             let desc = TensorDesc::from(&tensor);
 
