@@ -537,6 +537,6 @@
 pub mod module_visitors;
 pub mod xml_support;
 
-mod module_tree_impl;
+mod xml_module_tree;
 #[doc(inline)]
-pub use module_tree_impl::*;
+pub use xml_module_tree::*;

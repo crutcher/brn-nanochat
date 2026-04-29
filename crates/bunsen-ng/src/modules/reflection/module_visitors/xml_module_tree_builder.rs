@@ -21,7 +21,7 @@ use crate::{
     meta::TensorParamDesc,
     modules::reflection::{
         XmlModuleTree,
-        module_visitors::type_util,
+        module_visitors::container_type_util,
         xml_support::names::{
             CLASS_ATTR,
             DTYPE_ATTR,
@@ -39,7 +39,7 @@ use crate::{
 };
 
 /// [`ModuleVisitor`] builder for a [`XmlModuleTree`].
-pub struct ModuleTreeBuilder<B: Backend> {
+pub struct XmlModuleTreeBuilder<B: Backend> {
     mtree: XmlModuleTree,
 
     depth: usize,
@@ -52,7 +52,7 @@ pub struct ModuleTreeBuilder<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend> ModuleTreeBuilder<B> {
+impl<B: Backend> XmlModuleTreeBuilder<B> {
     /// Build a [`XmlModuleTree`] from a [`Module`].
     pub fn build<M: Module<B>>(module: &M) -> XmlModuleTree {
         let mut builder = Self::new();
@@ -70,7 +70,7 @@ impl<B: Backend> ModuleTreeBuilder<B> {
 
         xot.append(root, base).unwrap();
 
-        ModuleTreeBuilder::<B> {
+        XmlModuleTreeBuilder::<B> {
             mtree,
             depth: 0,
             base,
@@ -161,11 +161,11 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         let pelem = xot.element(*parent).unwrap();
         let pname = pelem.name();
         let parent_type = xot.local_name_str(pname);
-        type_util::type_is_sequence(parent_type)
+        container_type_util::container_type_is_sequence(parent_type)
     }
 }
 
-impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
+impl<B: Backend> ModuleVisitor<B> for XmlModuleTreeBuilder<B> {
     fn enter_module(
         &mut self,
         name: &str,
@@ -183,7 +183,7 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
             // and we need to attach it to the document.
             let parent = self.stack.last().copied().unwrap_or(self.base);
 
-            let (cls, elem_name) = type_util::parse_container_type(container_type);
+            let (cls, elem_name) = container_type_util::parse_container_type(container_type);
             let _elem_nid = self.mtree.bind_local_name(&elem_name);
 
             let elem_node = self.new_child(parent, elem_name);

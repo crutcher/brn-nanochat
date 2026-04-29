@@ -1,9 +1,9 @@
 //! [`burn::module::ModuleVisitor`] utilities.
 
-mod module_tree_builder;
-mod type_util;
+mod container_type_util;
+mod xml_module_tree_builder;
 
 #[doc(inline)]
-pub use module_tree_builder::*;
+pub use container_type_util::*;
 #[doc(inline)]
-pub use type_util::*;
+pub use xml_module_tree_builder::*;

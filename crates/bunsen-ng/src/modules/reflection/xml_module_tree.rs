@@ -46,7 +46,7 @@ use crate::{
         TensorParamDesc,
     },
     modules::reflection::{
-        module_visitors::ModuleTreeBuilder,
+        module_visitors::XmlModuleTreeBuilder,
         xml_support::{
             adapt_xee_error,
             names,
@@ -83,7 +83,7 @@ impl Debug for XmlModuleTree {
 impl XmlModuleTree {
     /// Build a [`XmlModuleTree`] for a [`Module`].
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
-        ModuleTreeBuilder::build(module)
+        XmlModuleTreeBuilder::build(module)
     }
 
     /// Create a new/empty module tree.
