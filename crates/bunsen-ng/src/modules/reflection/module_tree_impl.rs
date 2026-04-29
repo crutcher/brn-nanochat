@@ -231,7 +231,10 @@ impl XmlModuleTree {
     /// The query builder has a fluent api to incrementally refine a query.
     /// It begins with broad selection over the entire module structure.
     pub fn query<'a>(&'a mut self) -> XPathModuleQuery<'a> {
-        XPathModuleQuery::new(self)
+        XPathModuleQuery::new(
+            self,
+            format!("/{}/{}", names::XML_MODULE_TREE_ELEM, names::STRUCTURE_ELEM),
+        )
     }
 
     /// Query a sub-tree.
@@ -253,7 +256,7 @@ impl XmlModuleTree {
         &'a mut self,
         expr: &str,
     ) -> XPathModuleQuery<'a> {
-        XPathModuleQuery::new(self).select(expr)
+        self.query().select(expr)
     }
 
     /// Query a sub-tree.
@@ -275,7 +278,7 @@ impl XmlModuleTree {
         &'a mut self,
         expr: &str,
     ) -> BunsenResult<XPathModuleQuery<'a>> {
-        XPathModuleQuery::new(self).try_select(expr)
+        self.query().try_select(expr)
     }
 
     /// Query all parameters of a subtree.
@@ -398,11 +401,11 @@ impl<'a> XPathModuleQuery<'a> {
     /// Create a new [`XPathModuleQuery`].
     ///
     /// See: [`XmlModuleTree::query`].
-    pub fn new(tree: &'a mut XmlModuleTree) -> Self {
-        Self {
-            tree,
-            expr: format!("/{}/{}", names::XML_MODULE_TREE_ELEM, names::STRUCTURE_ELEM),
-        }
+    fn new(
+        tree: &'a mut XmlModuleTree,
+        expr: String,
+    ) -> Self {
+        Self { tree, expr }
     }
 
     /// Get the current `XPath` expression.
@@ -501,11 +504,61 @@ impl<'a> XPathModuleQuery<'a> {
         self.try_append_expr(format!("[{}]", pred.as_ref()).as_str())
     }
 
+    /// Select children of the current set.
+    ///
+    /// This is: "{EXPR}" => "{EXPR}/*"
+    pub fn children(self) -> XPathModuleQuery<'a> {
+        self.select("*")
+    }
+
+    /// Select children withh the given `name` attribute.
+    ///
+    /// This is: "{EXPR}" => "{EXPR}/*[@name='{name}']"
+    pub fn named_children(
+        self,
+        name: &str,
+    ) -> XPathModuleQuery<'a> {
+        self.select(format!("*[@name='{name}']"))
+    }
+
+    /// Select children with the given positional index.
+    ///
+    /// NOTE: `XPath` indexing is 1-based; so this method adds 1 to the index.
+    ///
+    /// This is: "{EXPR}" => "{EXPR}/*[{index + 1}]"
+    pub fn indexed_children(
+        self,
+        index: usize,
+    ) -> XPathModuleQuery<'a> {
+        self.select(format!("*[{}]", index + 1))
+    }
+
+    /// Recursively select all descedant or self elements with `name`.
+    ///
+    /// This is: "{EXPR}" => "{`EXPR}/descendant-or-self::{name`}"
+    pub fn subtree_elements(
+        self,
+        name: &str,
+    ) -> XPathModuleQuery<'a> {
+        self.select(format!("descendant-or-self::{}", name))
+    }
+
     /// Recursively select all parameter elements in the current context.
     ///
-    /// This is the `descendent-or-self::Param` operation.
+    /// Equivalent to `.desdendant_or_self_elem(names::PARAM_ELEM)`
     pub fn params(self) -> Self {
-        self.select(format!("descendant-or-self::{}", names::PARAM_ELEM))
+        self.subtree_elements(names::PARAM_ELEM)
+    }
+
+    /// Filter the selection to nodes where the `rank` attribute has the given
+    /// value.
+    ///
+    /// Equivalent to `.filter(format!("@rank={rank}"))`
+    pub fn rank(
+        self,
+        rank: usize,
+    ) -> Self {
+        self.filter(format!("@rank={}", rank))
     }
 
     /// Execute a [`xee_xpath::Queries::many`] on the current selection.
