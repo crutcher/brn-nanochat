@@ -1,7 +1,9 @@
 use burn::prelude;
 
 /// Encodes a description af [`burn::tensor::TensorKind`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
+)]
 #[non_exhaustive]
 pub enum TensorKindDesc {
     /// A Bool Tensor
@@ -44,7 +46,7 @@ impl ParamKindBinding for prelude::Int {
 mod tests {
     use burn::tensor;
 
-    use crate::tensors::TensorKindDesc;
+    use crate::meta::TensorKindDesc;
 
     #[test]
     fn test_tensor_kinds() {

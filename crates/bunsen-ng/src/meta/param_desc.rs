@@ -83,7 +83,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::tensors::{
+    use crate::meta::{
         TensorDesc,
         TensorKindDesc,
     };

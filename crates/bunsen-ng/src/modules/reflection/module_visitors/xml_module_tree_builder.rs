@@ -18,29 +18,26 @@ use xot::{
 };
 
 use crate::{
+    meta::TensorParamDesc,
     modules::reflection::{
-        ModuleTree,
-        module_visitors::type_util,
-        xml_support::names::{
-            CLASS_ATTR,
-            DTYPE_ATTR,
-            ID_ATTR,
-            KIND_ATTR,
-            NAME_ATTR,
-            PARAM_ELEM,
-            PARAM_ID_ATTR,
-            RANK_ATTR,
-            SHAPE_ATTR,
-            STRUCTURE_ELEM,
+        XmlModuleTree,
+        module_visitors::container_type_util,
+        xml_support::{
+            names::{
+                CLASS_ATTR,
+                ID_ATTR,
+                NAME_ATTR,
+                PARAM_ELEM,
+                STRUCTURE_ELEM,
+            },
+            tensor_param_desc_to_attributes,
         },
     },
-    tensors::TensorParamDesc,
-    zspace::shape_to_xml_attr,
 };
 
-/// [`ModuleVisitor`] builder for a [`ModuleTree`].
-pub struct ModuleTreeBuilder<B: Backend> {
-    mtree: ModuleTree,
+/// [`ModuleVisitor`] builder for a [`XmlModuleTree`].
+pub struct XmlModuleTreeBuilder<B: Backend> {
+    mtree: XmlModuleTree,
 
     depth: usize,
     base: Node,
@@ -52,16 +49,16 @@ pub struct ModuleTreeBuilder<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend> ModuleTreeBuilder<B> {
-    /// Build a [`ModuleTree`] from a [`Module`].
-    pub fn build<M: Module<B>>(module: &M) -> ModuleTree {
+impl<B: Backend> XmlModuleTreeBuilder<B> {
+    /// Build a [`XmlModuleTree`] from a [`Module`].
+    pub fn build<M: Module<B>>(module: &M) -> XmlModuleTree {
         let mut builder = Self::new();
         module.visit(&mut builder);
         builder.mtree
     }
 
     fn new() -> Self {
-        let mut mtree = ModuleTree::new();
+        let mut mtree = XmlModuleTree::new();
         let root = mtree.root();
 
         let nodes_nid = mtree.bind_local_name(STRUCTURE_ELEM);
@@ -70,7 +67,7 @@ impl<B: Backend> ModuleTreeBuilder<B> {
 
         xot.append(root, base).unwrap();
 
-        ModuleTreeBuilder::<B> {
+        XmlModuleTreeBuilder::<B> {
             mtree,
             depth: 0,
             base,
@@ -93,23 +90,10 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         &mut self,
         param_desc: TensorParamDesc,
     ) {
-        let node = self.new_child(*self.stack.last().unwrap(), PARAM_ELEM);
+        let parent = *self.stack.last().unwrap();
+        let node = self.new_child(parent, PARAM_ELEM);
         self.set_idents(node);
-
-        self.set_attribute(node, PARAM_ID_ATTR, param_desc.param_id().to_string());
-        self.set_attribute(node, CLASS_ATTR, "tensor");
-
-        // Should kind be <Type kind="Float" dtype="F32" />?
-        self.set_attribute(node, KIND_ATTR, format!("{:?}", param_desc.kind()));
-        self.set_attribute(node, DTYPE_ATTR, format!("{:?}", param_desc.dtype()));
-
-        // Should shape be <Shape rank="1" dims="[10, 2]" />?
-        self.set_attribute(node, SHAPE_ATTR, shape_to_xml_attr(param_desc.shape()));
-        self.set_attribute(
-            node,
-            RANK_ATTR,
-            param_desc.shape().clone().rank().to_string(),
-        );
+        tensor_param_desc_to_attributes(self.xot_mut(), node, &param_desc).unwrap();
     }
 
     fn new_child<N: AsRef<str>>(
@@ -161,11 +145,11 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         let pelem = xot.element(*parent).unwrap();
         let pname = pelem.name();
         let parent_type = xot.local_name_str(pname);
-        type_util::type_is_sequence(parent_type)
+        container_type_util::container_type_is_sequence(parent_type)
     }
 }
 
-impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
+impl<B: Backend> ModuleVisitor<B> for XmlModuleTreeBuilder<B> {
     fn enter_module(
         &mut self,
         name: &str,
@@ -183,7 +167,7 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
             // and we need to attach it to the document.
             let parent = self.stack.last().copied().unwrap_or(self.base);
 
-            let (cls, elem_name) = type_util::parse_container_type(container_type);
+            let (cls, elem_name) = container_type_util::parse_container_type(container_type);
             let _elem_nid = self.mtree.bind_local_name(&elem_name);
 
             let elem_node = self.new_child(parent, elem_name);

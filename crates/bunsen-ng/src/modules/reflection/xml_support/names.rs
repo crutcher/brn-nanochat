@@ -1,6 +1,6 @@
 //! Various constants used in the module tree.
 
-pub const MODULE_TREE_ELEM: &str = "ModuleTree";
+pub const XML_MODULE_TREE_ELEM: &str = "XmlModuleTree";
 pub const PARAM_ELEM: &str = "Param";
 pub const STRUCTURE_ELEM: &str = "Structure";
 

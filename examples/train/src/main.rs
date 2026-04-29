@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::bail;
 use bunsen_ng::{
-    modules::reflection::ModuleTree,
+    modules::reflection::XmlModuleTree,
     training::optimizers::{
         GroupOptimizerAdaptor2,
         OptimizerGroup,
@@ -307,9 +307,9 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
     .with_file_checkpointer(CompactRecorder::new())
     .summary();
 
-    let mut mtree = ModuleTree::build(&host);
+    let mut mtree = XmlModuleTree::build(&host);
 
-    let all_params: HashSet<ParamId> = mtree.param_ids()?.collect();
+    let all_params: HashSet<ParamId> = mtree.param_ids()?.into_iter().collect();
     // ==>
     //   let all_params: HashSet<ParamId> = mtree
     //       .query()
@@ -328,6 +328,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .select_params("GptHost/GPT/Vec[@name='h']")
         .filter("@rank=2")
         .to_param_ids()?
+        .into_iter()
         .collect();
     // ==>
     //   let muon_params: HashSet<ParamId> = mtree

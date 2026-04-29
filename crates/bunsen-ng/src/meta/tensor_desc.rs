@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    str::FromStr,
-};
+use std::fmt::Debug;
 
 use burn::{
     Tensor,
@@ -20,12 +17,11 @@ use crate::{
         BunsenError,
         BunsenResult,
     },
-    modules::ParamDesc,
-    tensors::tensor_kinds::{
+    meta::tensor_kinds::{
         ParamKindBinding,
         TensorKindDesc,
     },
-    zspace::shape_from_xml_attr,
+    modules::ParamDesc,
 };
 
 /// Description af a Tensor.
@@ -51,7 +47,7 @@ where
     }
 }
 
-fn parse_dtype(dtype: &str) -> BunsenResult<DType> {
+pub fn dtype_from_str(dtype: &str) -> BunsenResult<DType> {
     Ok(match dtype {
         "F64" => DType::F64,
         "F32" => DType::F32,
@@ -79,21 +75,6 @@ impl TensorDesc {
         shape: Shape,
     ) -> Self {
         Self { kind, dtype, shape }
-    }
-
-    pub fn from_strings(
-        kind: &str,
-        dtype: &str,
-        shape: &str,
-    ) -> BunsenResult<Self> {
-        let shape: Shape = shape_from_xml_attr(shape)?;
-
-        let kind = TensorKindDesc::from_str(kind)
-            .map_err(|e| BunsenError::External(format!("Invalid kind: {}", e)))?;
-
-        let dtype = parse_dtype(dtype)?;
-
-        Ok(Self::new(kind, dtype, shape))
     }
 
     /// The [`TensorKindDesc`] kind wrapper.
