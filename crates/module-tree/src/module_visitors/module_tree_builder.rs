@@ -1,7 +1,7 @@
-#![allow(unused)]
 use burn::{
     Tensor,
     module::{
+        Module,
         ModuleVisitor,
         Param,
     },
@@ -19,13 +19,12 @@ use xot::{
 
 use crate::{
     ModuleTree,
-    burn_enc::shape_to_xml_attr,
-    burn_ext::burn_desc::{
-        ParamDesc,
-        TensorDesc,
+    burn_ext::{
         TensorParamDesc,
+        shape_to_xml_attr,
     },
-    constants::{
+    module_visitors::type_util,
+    xml_support::names::{
         CLASS_ATTR,
         DTYPE_ATTR,
         ID_ATTR,
@@ -37,10 +36,9 @@ use crate::{
         SHAPE_ATTR,
         STRUCTURE_ELEM,
     },
-    type_util,
-    type_util::parse_container_type,
 };
 
+/// [`ModuleVisitor`] builder for a [`ModuleTree`].
 pub struct ModuleTreeBuilder<B: Backend> {
     mtree: ModuleTree,
 
@@ -54,8 +52,15 @@ pub struct ModuleTreeBuilder<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend> Default for ModuleTreeBuilder<B> {
-    fn default() -> Self {
+impl<B: Backend> ModuleTreeBuilder<B> {
+    /// Build a [`ModuleTree`] from a [`Module`].
+    pub fn build<M: Module<B>>(module: &M) -> ModuleTree {
+        let mut builder = Self::new();
+        module.visit(&mut builder);
+        builder.mtree
+    }
+
+    fn new() -> Self {
         let mut mtree = ModuleTree::new();
         let root = mtree.root();
 
@@ -63,9 +68,9 @@ impl<B: Backend> Default for ModuleTreeBuilder<B> {
         let xot = mtree.xot_mut();
         let base = xot.new_element(nodes_nid);
 
-        xot.append(root, base);
+        xot.append(root, base).unwrap();
 
-        Self {
+        ModuleTreeBuilder::<B> {
             mtree,
             depth: 0,
             base,
@@ -74,12 +79,6 @@ impl<B: Backend> Default for ModuleTreeBuilder<B> {
             next_id: 0,
             phantom: Default::default(),
         }
-    }
-}
-
-impl<B: Backend> ModuleTreeBuilder<B> {
-    pub fn build(self) -> ModuleTree {
-        self.mtree
     }
 
     fn xot(&self) -> &Xot {
@@ -119,7 +118,7 @@ impl<B: Backend> ModuleTreeBuilder<B> {
         name: N,
     ) -> Node {
         let node = self.new_element(name);
-        self.xot_mut().append(parent, node);
+        self.xot_mut().append(parent, node).unwrap();
         node
     }
 
@@ -185,7 +184,7 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
             let parent = self.stack.last().copied().unwrap_or(self.base);
 
             let (cls, elem_name) = type_util::parse_container_type(container_type);
-            let elem_nid = self.mtree.bind_local_name(&elem_name);
+            let _elem_nid = self.mtree.bind_local_name(&elem_name);
 
             let elem_node = self.new_child(parent, elem_name);
 
@@ -206,8 +205,8 @@ impl<B: Backend> ModuleVisitor<B> for ModuleTreeBuilder<B> {
 
     fn exit_module(
         &mut self,
-        name: &str,
-        container_type: &str,
+        _name: &str,
+        _container_type: &str,
     ) {
         if self.depth < self.stack.len() {
             self.pending_name = None;

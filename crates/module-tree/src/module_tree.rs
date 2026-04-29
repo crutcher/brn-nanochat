@@ -19,7 +19,6 @@ use xee_xpath::{
     Queries,
     Query,
     error::{
-        Error as SpannedError,
         ErrorValue,
         Result as SpannedResult,
     },
@@ -32,26 +31,26 @@ use xot::{
 };
 
 use crate::{
-    burn_ext::burn_desc::{
+    burn_ext::{
         ParamDesc,
         TensorDesc,
         TensorParamDesc,
     },
-    constants::{
-        DTYPE_ATTR,
-        KIND_ATTR,
-        MODULE_TREE_ELEM,
-        PARAM_ELEM,
-        PARAM_ID_ATTR,
-        RANK_ATTR,
-        SHAPE_ATTR,
-        STRUCTURE_ELEM,
+    errors::BunsenResult,
+    module_visitors::ModuleTreeBuilder,
+    xml_support::{
+        adapt_xee_error,
+        names::{
+            DTYPE_ATTR,
+            KIND_ATTR,
+            MODULE_TREE_ELEM,
+            PARAM_ELEM,
+            PARAM_ID_ATTR,
+            RANK_ATTR,
+            SHAPE_ATTR,
+            STRUCTURE_ELEM,
+        },
     },
-    error::BunsenResult,
-    implementation::ModuleTreeBuilder,
-    pretty_print_node,
-    xee_util,
-    xee_util::adapt_xee_error,
 };
 
 pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -80,10 +79,9 @@ impl Debug for ModuleTree {
 }
 
 impl ModuleTree {
+    /// Build a [`ModuleTree`] for a [`Module`].
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
-        let mut builder = ModuleTreeBuilder::default();
-        module.visit(&mut builder);
-        builder.build()
+        ModuleTreeBuilder::build(module)
     }
 
     /// Create a new/empty module tree.
@@ -637,24 +635,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::pretty_print_node;
-
-    fn print_node_query(
-        mtree: &mut ModuleTree,
-        selector: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let q = Queries::default().many(selector, |_docs, item| Ok(item.to_node()?))?;
-
-        let nodes: Vec<xot::Node> = q.execute(&mut mtree.docs, mtree.root)?;
-
-        println!("Query: {selector}");
-        for (idx, node) in nodes.into_iter().enumerate() {
-            print!("[{idx}]: ");
-            pretty_print_node(mtree.docs.xot(), node)?;
-        }
-
-        Ok(())
-    }
 
     #[test]
     #[cfg(feature = "cuda")]

@@ -4,7 +4,7 @@ use spanned_error_message::{
 };
 use xee_xpath::error::ErrorValue;
 
-use crate::error::BunsenError;
+use crate::errors::BunsenError;
 
 /// Construct a long-form error message from an [`ErrorValue`].
 pub fn pretty_errorvalue(e: &ErrorValue) -> String {

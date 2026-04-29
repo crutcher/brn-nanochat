@@ -1,20 +1,14 @@
-#![recursion_limit = "512"]
-
-pub mod burn_ext;
-mod module_tree;
-mod type_util;
-mod xot_util;
-
-pub mod burn_enc;
-pub mod constants;
-pub mod error;
-pub(crate) mod implementation;
-pub mod xee_util;
+#![cfg_attr(feature = "wgpu", recursion_limit = "512")]
 
 #[cfg(test)]
 pub mod api_examples;
 
+pub mod burn_ext;
+pub mod errors;
+pub mod module_visitors;
+
+pub mod xml_support;
+
+mod module_tree;
 #[doc(inline)]
 pub use module_tree::*;
-#[doc(inline)]
-pub use xot_util::*;

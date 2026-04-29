@@ -15,11 +15,11 @@ mod tests {
         MODULE_TREE_VERSION,
         ModuleTree,
         ModuleTreeQuery,
-        burn_ext::burn_desc::{
+        burn_ext::{
             TensorKindDesc,
             TensorParamDesc,
         },
-        error::BunsenResult,
+        errors::BunsenResult,
     };
 
     #[test]

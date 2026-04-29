@@ -1,7 +1,7 @@
 //! Public Encode/Decode Utilites for Burn Types.
 use burn::prelude::Shape;
 
-use crate::error::{
+use crate::errors::{
     BunsenError,
     BunsenResult,
 };

@@ -69,7 +69,7 @@ use clap::Parser;
 use hashbrown::HashSet;
 use module_tree::{
     ModuleTree,
-    burn_ext::burn_desc::{
+    burn_ext::{
         ParamDesc,
         TensorDesc,
         TensorKindDesc,
