@@ -27,7 +27,7 @@ use hashbrown::{
     HashSet,
 };
 
-use crate::burn_ext::training::optimizers::{
+use crate::training::optimizers::{
     clone_simple_optimizer,
     compat::GradAdaptor,
 };

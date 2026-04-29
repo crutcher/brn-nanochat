@@ -8,6 +8,13 @@ use std::{
 };
 
 use anyhow::bail;
+use bunsen_ng::{
+    modules::reflection::ModuleTree,
+    training::optimizers::{
+        GroupOptimizerAdaptor2,
+        OptimizerGroup,
+    },
+};
 use burn::{
     data::dataloader::DataLoader,
     grad_clipping::GradientClipping,
@@ -53,13 +60,6 @@ use burn::{
 };
 use clap::Parser;
 use hashbrown::HashSet;
-use module_tree::burn_ext::{
-    modules::reflection::ModuleTree,
-    training::optimizers::{
-        GroupOptimizerAdaptor2,
-        OptimizerGroup,
-    },
-};
 use rand::{
     SeedableRng,
     rngs::StdRng,

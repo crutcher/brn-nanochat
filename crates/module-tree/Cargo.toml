@@ -1,5 +1,5 @@
 [package]
-name = "module-tree"
+name = "bunsen-ng"
 version.workspace = true
 repository.workspace = true
 rust-version.workspace = true

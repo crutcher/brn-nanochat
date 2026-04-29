@@ -3,5 +3,8 @@
 #[cfg(test)]
 pub mod api_examples;
 
-pub mod burn_ext;
 pub mod errors;
+pub mod modules;
+pub mod tensors;
+pub mod training;
+pub mod zspace;

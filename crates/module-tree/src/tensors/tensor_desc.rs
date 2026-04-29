@@ -16,18 +16,16 @@ use burn::{
 };
 
 use crate::{
-    burn_ext::{
-        modules::ParamDesc,
-        shape_from_xml_attr,
-        tensors::tensor_kinds::{
-            ParamKindBinding,
-            TensorKindDesc,
-        },
-    },
     errors::{
         BunsenError,
         BunsenResult,
     },
+    modules::ParamDesc,
+    tensors::tensor_kinds::{
+        ParamKindBinding,
+        TensorKindDesc,
+    },
+    zspace::shape_from_xml_attr,
 };
 
 /// Description af a Tensor.

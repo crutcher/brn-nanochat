@@ -17,7 +17,7 @@ use xot::{
     Xot,
 };
 
-use crate::burn_ext::{
+use crate::{
     modules::reflection::{
         ModuleTree,
         module_visitors::type_util,
@@ -34,8 +34,8 @@ use crate::burn_ext::{
             STRUCTURE_ELEM,
         },
     },
-    shape_to_xml_attr,
     tensors::TensorParamDesc,
+    zspace::shape_to_xml_attr,
 };
 
 /// [`ModuleVisitor`] builder for a [`ModuleTree`].

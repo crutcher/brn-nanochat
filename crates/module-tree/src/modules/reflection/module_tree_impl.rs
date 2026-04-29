@@ -31,24 +31,21 @@ use xot::{
 };
 
 use crate::{
-    burn_ext::{
-        modules::{
-            ParamDesc,
-            reflection::{
-                module_visitors::ModuleTreeBuilder,
-                xml_support::{
-                    adapt_xee_error,
-                    names,
-                    names::MODULE_TREE_ELEM,
-                },
+    errors::BunsenResult,
+    modules::{
+        ParamDesc,
+        reflection::{
+            module_visitors::ModuleTreeBuilder,
+            xml_support::{
+                adapt_xee_error,
+                names,
             },
         },
-        tensors::{
-            TensorDesc,
-            TensorParamDesc,
-        },
     },
-    errors::BunsenResult,
+    tensors::{
+        TensorDesc,
+        TensorParamDesc,
+    },
 };
 
 pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
