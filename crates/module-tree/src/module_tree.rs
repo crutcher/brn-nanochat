@@ -19,7 +19,6 @@ use xee_xpath::{
     Queries,
     Query,
     error::{
-        Error as SpannedError,
         ErrorValue,
         Result as SpannedResult,
     },
@@ -32,26 +31,26 @@ use xot::{
 };
 
 use crate::{
-    burn_ext::burn_desc::{
+    burn_ext::{
         ParamDesc,
         TensorDesc,
         TensorParamDesc,
     },
-    constants::{
-        DTYPE_ATTR,
-        KIND_ATTR,
-        MODULE_TREE_ELEM,
-        PARAM_ELEM,
-        PARAM_ID_ATTR,
-        RANK_ATTR,
-        SHAPE_ATTR,
-        STRUCTURE_ELEM,
+    errors::BunsenResult,
+    module_visitors::ModuleTreeBuilder,
+    xml_support::{
+        adapt_xee_error,
+        names::{
+            DTYPE_ATTR,
+            KIND_ATTR,
+            MODULE_TREE_ELEM,
+            PARAM_ELEM,
+            PARAM_ID_ATTR,
+            RANK_ATTR,
+            SHAPE_ATTR,
+            STRUCTURE_ELEM,
+        },
     },
-    error::BunsenResult,
-    implementation::ModuleTreeBuilder,
-    pretty_print_node,
-    xee_util,
-    xee_util::adapt_xee_error,
 };
 
 pub const MODULE_TREE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -80,10 +79,9 @@ impl Debug for ModuleTree {
 }
 
 impl ModuleTree {
+    /// Build a [`ModuleTree`] for a [`Module`].
     pub fn build<B: Backend, M: Module<B>>(module: &M) -> Self {
-        let mut builder = ModuleTreeBuilder::default();
-        module.visit(&mut builder);
-        builder.build()
+        ModuleTreeBuilder::build(module)
     }
 
     /// Create a new/empty module tree.
@@ -631,30 +629,8 @@ mod tests {
         Linear,
         LinearConfig,
     };
-    use zsl_chat::gpt::gpt_model::{
-        GPT,
-        GPTConfig,
-    };
 
     use super::*;
-    use crate::pretty_print_node;
-
-    fn print_node_query(
-        mtree: &mut ModuleTree,
-        selector: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let q = Queries::default().many(selector, |_docs, item| Ok(item.to_node()?))?;
-
-        let nodes: Vec<xot::Node> = q.execute(&mut mtree.docs, mtree.root)?;
-
-        println!("Query: {selector}");
-        for (idx, node) in nodes.into_iter().enumerate() {
-            print!("[{idx}]: ");
-            pretty_print_node(mtree.docs.xot(), node)?;
-        }
-
-        Ok(())
-    }
 
     #[test]
     #[cfg(feature = "cuda")]
@@ -759,71 +735,5 @@ mod tests {
                 bias_dtype = format!("{:?}", bias_desc.dtype()),
             }
         );
-    }
-
-    #[derive(Module, Debug)]
-    struct TestModule<B: Backend> {
-        seq: Vec<Linear<B>>,
-        tup: (Linear<B>, Linear<B>),
-        arr: [Linear<B>; 1],
-    }
-
-    impl<B: Backend> TestModule<B> {
-        fn init(device: &B::Device) -> Self {
-            Self {
-                seq: vec![LinearConfig::new(10, 10).init(device)],
-                tup: (
-                    LinearConfig::new(10, 10).init(device),
-                    LinearConfig::new(10, 23).init(device),
-                ),
-                arr: [LinearConfig::new(10, 10).init(device)],
-            }
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "cuda")]
-    fn test_gpt() -> BunsenResult<()> {
-        type B = burn::backend::Cuda;
-        let device = Default::default();
-
-        let module: GPT<B> = GPTConfig::new().with_n_layer(1).init(&device);
-
-        let mut mtree = ModuleTree::build(&module);
-
-        println!("{:#?}", mtree);
-
-        /*
-        let ps = mtree
-            .select("GPT/Vec[@name='h']//Param")
-            .where_expr("@rank = 2")
-            .param_ids()?;
-
-        println!("Params: {ps:?}");
-         */
-
-        use xee_xpath::Item;
-
-        let ids: Vec<ParamId> = mtree
-            .select_params("GPT/*[@name='h']")
-            .filter("@rank=2")
-            .to_param_ids()?
-            .collect();
-
-        println!("IDs: {ids:?}");
-
-        let descs: Vec<ParamDesc<TensorDesc>> = mtree
-            .select_params("GPT/*[@name='h']")
-            .filter("@rank=2")
-            .to_param_descs()?
-            .collect();
-
-        println!("Descs: {descs:#?}");
-
-        let ids = descs.iter().map(|d| d.param_id()).collect::<Vec<_>>();
-
-        println!("IDs: {ids:?}");
-
-        Ok(())
     }
 }

@@ -5083,7 +5083,6 @@ dependencies = [
  "thiserror 2.0.18",
  "xee-xpath",
  "xot",
- "zsl-chat",
 ]
 
 [[package]]

@@ -17,9 +17,11 @@ use burn::{
 };
 
 use crate::{
-    burn_enc::shape_from_xml_attr,
-    burn_ext::burn_desc::ParamDesc,
-    error::{
+    burn_ext::{
+        ParamDesc,
+        shape_from_xml_attr,
+    },
+    errors::{
         BunsenError,
         BunsenResult,
     },

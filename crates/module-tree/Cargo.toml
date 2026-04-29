@@ -21,8 +21,5 @@ indoc = { workspace = true }
 xot = { workspace = true }
 xee-xpath = { workspace = true }
 
-[dev-dependencies]
-zsl-chat = { path = "../zsl-chat" }
-
 [lints]
 workspace = true
