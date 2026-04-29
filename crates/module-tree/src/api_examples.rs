@@ -363,6 +363,27 @@ mod tests {
             ),],
         );
 
+        // We can also select the children of elements by their index.
+        // Note: XPath indexes from 1, not 0.
+        //
+        // The children of sequences in the "bulitins" class ('Tuple', 'Vec', 'Array')
+        // don't have names, but do have positional indices in XPath.
+        //
+        // "Linear/*[2]":
+        // - Select the root 'Linear' node,
+        // - Select all the children of 'Linear',
+        // - Select the 2nd (indexing from 1) child.
+        let mut query = mtree.query().select("Linear/*[2]");
+        assert_eq!(query.expr(), "/ModuleTree/Structure/Linear/*[2]");
+        assert_eq!(
+            &query.to_fragments(false)?.collect::<Vec<_>>(),
+            &[format!(
+                r#"<Param id="n:3" name="bias" param_id="{bias_id}" class="tensor" kind="Float" dtype="{bias_dtype}" shape="3" rank="1"/>"#,
+                bias_id = bias_desc.param_id(),
+                bias_dtype = format!("{:?}", bias_desc.dtype()),
+            )],
+        );
+
         // In general:
         // - `query.select(expr)` appends "/expr" to the current query expression.
         // - `query.filter(expr)` appends "[expr]" to the current query expression.
