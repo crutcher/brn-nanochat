@@ -25,12 +25,16 @@ double_must_use = "allow"
 doc_markdown = "deny"
 
 
+[patch.crates-io]
+bunsen = { path = "../bunsen/crates/bunsen" }
+bunsen-contracts = { path = "../bunsen/crates/bunsen-contracts" }
+
+
 [workspace.dependencies]
-burn = "0.20.1"
-bunsen = "0.0.4"
+burn = "0.21.0"
+bunsen = { version = "0.21.0-pre.5" }
 wordchipper = { version = "0.9.1" }
 wordchipper-cli-util = { version = "0.9.1" }
-bimm-contracts = "0.20.1"
 regex = "1.12.3"
 
 xot = "0.31.2"

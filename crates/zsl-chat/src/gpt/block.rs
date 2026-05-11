@@ -1,6 +1,6 @@
 //! # GPT Block
 
-use bunsen::nn::{
+use bunsen::blocks::transformers::{
     attention::{
         csa::{
             CausalSelfAttention,

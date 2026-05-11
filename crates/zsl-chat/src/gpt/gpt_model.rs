@@ -1,8 +1,27 @@
 //! # GPT Module
 
-use bimm_contracts::{
-    assert_shape_contract_periodically,
-    unpack_shape_contract,
+use bunsen::{
+    blocks::transformers::{
+        attention::{
+            csa::{
+                CausalSelfAttentionConfig,
+                CausalSelfAttentionMeta,
+            },
+            kvcache::{
+                KVCache,
+                KVCacheConfig,
+            },
+        },
+        embedding::rotary::{
+            RotaryEmbedding,
+            RotaryEmbeddingConfig,
+            RotaryEmbeddingMeta,
+        },
+    },
+    contracts::{
+        assert_shape_contract_periodically,
+        unpack_shape_contract,
+    },
 };
 use burn::{
     Tensor,
@@ -26,31 +45,12 @@ use burn::{
     },
 };
 
-use crate::{
-    bunsen::nn::{
-        attention::{
-            csa::{
-                CausalSelfAttentionConfig,
-                CausalSelfAttentionMeta,
-            },
-            kvcache::{
-                KVCache,
-                KVCacheConfig,
-            },
-        },
-        embedding::rotary::{
-            RotaryEmbedding,
-            RotaryEmbeddingConfig,
-            RotaryEmbeddingMeta,
-        },
+use crate::gpt::{
+    block::{
+        GPTBlock,
+        GPTBlockConfig,
     },
-    gpt::{
-        block::{
-            GPTBlock,
-            GPTBlockConfig,
-        },
-        mlp::MLPConfig,
-    },
+    mlp::MLPConfig,
 };
 
 /// Common meta for [`GPT`] and [`GPTConfig`].

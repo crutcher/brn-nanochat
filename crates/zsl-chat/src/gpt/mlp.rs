@@ -1,6 +1,6 @@
 //! GPT Block MLP
 
-use bimm_contracts::{
+use bunsen::contracts::{
     assert_shape_contract_periodically,
     unpack_shape_contract,
 };
@@ -99,7 +99,7 @@ impl<B: Backend> MLP<B> {
     ) -> Tensor<B, 3> {
         let [batch, time] = unpack_shape_contract!(
             ["batch", "time", "embed"],
-            &x.dims(),
+            &x,
             &["batch", "time"],
             &[("embed", self.n_embed())]
         );
@@ -111,7 +111,7 @@ impl<B: Backend> MLP<B> {
 
         assert_shape_contract_periodically!(
             ["batch", "time", "embed"],
-            &x.dims(),
+            &x,
             &[("batch", batch), ("time", time), ("embed", self.n_embed())]
         );
 
