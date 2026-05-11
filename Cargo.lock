@@ -843,7 +843,9 @@ checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
 name = "bunsen"
-version = "0.21.0-pre.5"
+version = "0.21.0-pre.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18b26b1e990b6b84056f8d02e2677b5e563c3fce7bea48ad688b9edcb0382d5b"
 dependencies = [
  "anyhow",
  "bunsen-contracts",
@@ -864,7 +866,9 @@ dependencies = [
 
 [[package]]
 name = "bunsen-contracts"
-version = "0.21.0-pre.5"
+version = "0.21.0-pre.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e4d7005b8315630cc86661f492f54e7d1d5946fe9a1f8f624721e16e6f6a55f"
 dependencies = [
  "bunsen-contracts-macros",
  "burn",
@@ -872,7 +876,9 @@ dependencies = [
 
 [[package]]
 name = "bunsen-contracts-macros"
-version = "0.21.0-pre.5"
+version = "0.21.0-pre.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e2927f1a430d4be85a30a0b35896d1c3cc318d864079b04050413e90f001aec"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8566,7 +8572,6 @@ dependencies = [
  "regex",
  "wordchipper",
  "wordchipper-cli-util",
- "zsl-chat",
  "zsl-chat-data",
  "zsl-data-cache",
 ]
@@ -10239,18 +10244,6 @@ name = "zmij"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02aae0f83f69aafc94776e879363e9771d7ecbffe2c7fbb6c14c5e00dfe88439"
-
-[[package]]
-name = "zsl-chat"
-version = "0.0.9"
-dependencies = [
- "anyhow",
- "bunsen",
- "burn",
- "hashbrown 0.16.1",
- "paste",
- "serde",
-]
 
 [[package]]
 name = "zsl-chat-data"

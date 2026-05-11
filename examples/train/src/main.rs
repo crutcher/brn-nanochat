@@ -7,11 +7,18 @@ use std::{
     },
 };
 
-use bunsen_ng::{
-    modules::reflection::XmlModuleTree,
-    training::optimizers::{
-        GroupOptimizerAdaptor2,
-        OptimizerGroup,
+use bunsen::{
+    kit::{
+        module::reflection::XmlModuleTree,
+        optim::{
+            GroupOptimizerAdaptor2,
+            OptimizerGroup,
+        },
+    },
+    models::transformers::nanochat::{
+        NanoGpt,
+        NanoGptConfig,
+        NanoGptMeta,
     },
 };
 use burn::{
@@ -23,6 +30,7 @@ use burn::{
     nn::loss::CrossEntropyLossConfig,
     optim::{
         AdamWConfig,
+        LearningRate,
         MuonConfig,
         decay::WeightDecayConfig,
     },
@@ -62,11 +70,6 @@ use wordchipper::{
     disk_cache::WordchipperDiskCache,
 };
 use wordchipper_cli_util::logging::LogArgs;
-use zsl_chat::gpt::gpt_model::{
-    GPT,
-    GPTConfig,
-    GPTMeta,
-};
 use zsl_chat_data::{
     dataloader::ChatDataLoader,
     tokens::{
@@ -257,12 +260,12 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
         .with_parallel(true)
         .build(vocab);
 
-    let gpt_config = GPTConfig::new()
+    let gpt_config = NanoGptConfig::new()
         .with_n_embed(args.n_embed)
         .with_n_layer(args.n_layer)
         .with_vocab_size(vocab_size);
 
-    let gpt: GPT<B> = gpt_config.clone().init::<B>(&device);
+    let gpt: NanoGpt<B> = gpt_config.clone().init::<B>(&device);
 
     let host = GptHost { gpt };
 
@@ -363,7 +366,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
                     .with_weight_decay(0.01)
                     .init::<B, GptHost<B>>(),
             )
-            .with_lr_selector(move |lr: f64, _: &hashbrown::HashMap<String, f64>| lr * lm_head_lr),
+            .with_lr_selector(
+                move |lr: f64,
+                      _: &bunsen::public::hashbrown::HashMap<String, LearningRate>|
+                      -> LearningRate { lr * lm_head_lr },
+            ),
             OptimizerGroup::from_adaptor(
                 embedding_params,
                 &AdamWConfig::new()
@@ -373,9 +380,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
                     .with_weight_decay(0.001)
                     .init::<B, GptHost<B>>(),
             )
-            .with_lr_selector(move |lr: f64, _: &hashbrown::HashMap<String, f64>| {
-                lr * embedding_lr
-            }),
+            .with_lr_selector(
+                move |lr: LearningRate,
+                      _: &bunsen::public::hashbrown::HashMap<String, LearningRate>|
+                      -> LearningRate { lr * embedding_lr },
+            ),
             OptimizerGroup::from_adaptor(
                 remnant_params,
                 &AdamWConfig::new()
@@ -385,7 +394,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
                     .with_weight_decay(0.01)
                     .init::<B, GptHost<B>>(),
             )
-            .with_lr_selector(move |lr: f64, _: &hashbrown::HashMap<String, f64>| lr * scalar_lr),
+            .with_lr_selector(
+                move |lr: LearningRate,
+                      _: &bunsen::public::hashbrown::HashMap<String, LearningRate>|
+                      -> LearningRate { lr * scalar_lr },
+            ),
         ],
         vec![
             OptimizerGroup::from_adaptor(
@@ -397,7 +410,11 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
                     }))
                     .init::<B, GptHost<B>>(),
             )
-            .with_lr_selector(move |lr: f64, _: &hashbrown::HashMap<String, f64>| lr * matrix_lr),
+            .with_lr_selector(
+                move |lr: LearningRate,
+                      _: &bunsen::public::hashbrown::HashMap<String, LearningRate>|
+                      -> LearningRate { lr * matrix_lr },
+            ),
         ],
     )
     .unwrap();
@@ -414,7 +431,7 @@ fn run<B: AutodiffBackend>(args: &Args) -> anyhow::Result<()> {
 
 #[derive(Module, Debug)]
 pub struct GptHost<B: Backend> {
-    pub gpt: GPT<B>,
+    pub gpt: NanoGpt<B>,
 }
 
 impl<B: Backend> GptHost<B> {
