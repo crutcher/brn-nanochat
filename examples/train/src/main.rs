@@ -8,18 +8,19 @@ use std::{
 };
 
 use bunsen::{
-    kit::{
+    blocks::transformers::nanochat::{
+        NanoGpt,
+        NanoGptConfig,
+        NanoGptMeta,
+    },
+    burn_ext::{
         module::reflection::XmlModuleTree,
         optim::{
             GroupOptimizerAdaptor2,
             OptimizerGroup,
         },
     },
-    models::transformers::nanochat::{
-        NanoGpt,
-        NanoGptConfig,
-        NanoGptMeta,
-    },
+    public::hashbrown::HashSet,
 };
 use burn::{
     lr_scheduler::linear::LinearLrSchedulerConfig,
@@ -58,7 +59,6 @@ use burn::{
     },
 };
 use clap::Parser;
-use hashbrown::HashSet;
 use num_traits::Pow;
 use rand::{
     SeedableRng,

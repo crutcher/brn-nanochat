@@ -32,7 +32,7 @@ doc_markdown = "deny"
 
 [workspace.dependencies]
 burn = "0.21.0"
-bunsen = { version = "0.21.0-pre.6" }
+bunsen = { version = "0.21.0-pre.7" }
 wordchipper = { version = "0.9.1" }
 wordchipper-cli-util = { version = "0.9.1" }
 regex = "1.12.3"

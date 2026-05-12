@@ -843,12 +843,11 @@ checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
 name = "bunsen"
-version = "0.21.0-pre.6"
+version = "0.21.0-pre.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18b26b1e990b6b84056f8d02e2677b5e563c3fce7bea48ad688b9edcb0382d5b"
+checksum = "23fea658b513abc0d00062d5c869e919c1e2b2a368bad9b15a32e58992abec28"
 dependencies = [
  "anyhow",
- "bunsen-contracts",
  "bunsen-contracts-macros",
  "burn",
  "document-features",
@@ -865,20 +864,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bunsen-contracts"
-version = "0.21.0-pre.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e4d7005b8315630cc86661f492f54e7d1d5946fe9a1f8f624721e16e6f6a55f"
-dependencies = [
- "bunsen-contracts-macros",
- "burn",
-]
-
-[[package]]
 name = "bunsen-contracts-macros"
-version = "0.21.0-pre.6"
+version = "0.21.0-pre.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e2927f1a430d4be85a30a0b35896d1c3cc318d864079b04050413e90f001aec"
+checksum = "7792e1de271ab1691fa250a7d23f4f0596ee13bc3c18f0e0fb6f49a7184c2035"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8565,7 +8554,6 @@ dependencies = [
  "bunsen",
  "burn",
  "clap",
- "hashbrown 0.16.1",
  "log",
  "num-traits",
  "rand 0.10.1",
