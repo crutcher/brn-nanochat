@@ -843,9 +843,9 @@ checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
 name = "bunsen"
-version = "0.21.0-pre.7"
+version = "0.21.0-pre.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23fea658b513abc0d00062d5c869e919c1e2b2a368bad9b15a32e58992abec28"
+checksum = "9c77d37ad9766417607e7258f5e27dbccf4b4da6a3ba219f448e442cec9e5caa"
 dependencies = [
  "anyhow",
  "bunsen-contracts-macros",
@@ -865,9 +865,9 @@ dependencies = [
 
 [[package]]
 name = "bunsen-contracts-macros"
-version = "0.21.0-pre.7"
+version = "0.21.0-pre.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7792e1de271ab1691fa250a7d23f4f0596ee13bc3c18f0e0fb6f49a7184c2035"
+checksum = "768b622fff43ff866e0fa14cae8946e1c4b9730129a0fe572a2b4232c225a300"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1411,6 +1411,7 @@ dependencies = [
  "aligned-vec",
  "bon",
  "burn-cubecl",
+ "burn-flex",
  "burn-fusion",
  "burn-ir",
  "burn-tensor",
